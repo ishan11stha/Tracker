@@ -28,21 +28,27 @@ import { formatCurrency } from '../../utils/currency';
 import { adToBs, formatBSDateNepali } from '../../utils/nepaliDate';
 import { ITEM_STATUSES, ItemStatus, PersonalItem } from '../../types';
 import { ItemFormModal } from '../../components/ItemFormModal';
+import {
+  CardWithHeader,
+  CurrencyDisplayer,
+} from '../../components/monekin/MonekinComponents';
+import { CategoryDonutChart } from '../../components/monekin/MonekinCharts';
 
 const STATUS_BADGE_COLORS: Record<
   ItemStatus,
   { bg: string; text: string }
 > = {
-  Owned: { bg: '#DCFCE7', text: '#166534' },
-  Borrowed: { bg: '#FEF3C7', text: '#92400E' },
-  Lent: { bg: '#FFEDD5', text: '#9A3412' },
-  Sold: { bg: '#DBEAFE', text: '#1E40AF' },
-  Returned: { bg: '#F1F5F9', text: '#475569' },
+  Owned: { bg: 'rgba(55, 161, 59, 0.16)', text: '#37A13B' },
+  Borrowed: { bg: 'rgba(217, 119, 6, 0.16)', text: '#D97706' },
+  Lent: { bg: 'rgba(234, 88, 12, 0.16)', text: '#EA580C' },
+  Sold: { bg: 'rgba(29, 78, 216, 0.16)', text: '#1D4ED8' },
+  Returned: { bg: 'rgba(100, 116, 139, 0.16)', text: '#64748B' },
 };
 
 export default function ItemTrackerScreen() {
   const { settings, items, itemHistory, removeItem } = useVaultStore();
   const isDark = settings.theme === 'dark';
+  const privateMode = Boolean(settings.privateMode);
   const theme = getThemeColors(isDark);
   const palette = getSectionPalette('items', isDark);
 
@@ -62,6 +68,20 @@ export default function ItemTrackerScreen() {
     const lentCount = items.filter((i) => i.status === 'Lent').length;
     const borrowedCount = items.filter((i) => i.status === 'Borrowed').length;
     return { totalItems, totalUnits, totalValue, lentCount, borrowedCount };
+  }, [items]);
+
+  // Asset valuation distribution by category for Monekin Donut Chart
+  const assetCategoryDistribution = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const i of items) {
+      const val = (i.purchasePrice || 0) * (i.quantity || 1);
+      if (val > 0) {
+        map[i.category] = (map[i.category] || 0) + val;
+      }
+    }
+    return Object.entries(map)
+      .map(([category, amount]) => ({ category, amount }))
+      .sort((a, b) => b.amount - a.amount);
   }, [items]);
 
   const filteredItems = useMemo(() => {
@@ -113,10 +133,10 @@ export default function ItemTrackerScreen() {
         <View style={styles.headerRow}>
           <View>
             <Text style={[styles.screenTitle, { color: theme.textPrimary }]}>
-              Item Tracker
+              Assets & Items
             </Text>
             <Text
-              style={[styles.screenSubtitle, { color: theme.textSecondary }]}
+              style={[styles.screenSubtitle, { color: theme.textMuted }]}
             >
               सामान तथा सम्पत्ति अभिलेख • Inventory & Lending
             </Text>
@@ -128,30 +148,30 @@ export default function ItemTrackerScreen() {
             }}
             style={[styles.addBtn, { backgroundColor: palette.accent }]}
           >
-            <Plus size={16} color="#FFFFFF" />
+            <Plus size={15} color="#FFFFFF" strokeWidth={2.5} />
             <Text style={styles.addBtnText}>Add Item</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Overview Summary Card */}
+        {/* Monekin Net Asset Portfolio Card */}
         <View
           style={[
             styles.summaryCard,
-            { backgroundColor: theme.card, borderColor: palette.accentBorder },
+            { backgroundColor: theme.card, borderColor: theme.border },
           ]}
         >
           <View style={styles.summaryTopRow}>
-            <View>
-              <Text
-                style={[styles.summaryLabel, { color: theme.textSecondary }]}
-              >
-                TOTAL PORTFOLIO VALUE
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.summaryLabel, { color: theme.textMuted }]}>
+                TOTAL ASSET PORTFOLIO VALUATION
               </Text>
-              <Text
-                style={[styles.summaryValue, { color: theme.textPrimary }]}
-              >
-                {formatCurrency(stats.totalValue, settings.currency)}
-              </Text>
+              <CurrencyDisplayer
+                amount={stats.totalValue}
+                currency={settings.currency}
+                isDark={isDark}
+                privateMode={privateMode}
+                size="xl"
+              />
             </View>
             <View
               style={[
@@ -165,45 +185,64 @@ export default function ItemTrackerScreen() {
 
           <View style={styles.metricsRow}>
             <View
-              style={[styles.metricBox, { backgroundColor: theme.inputBg }]}
+              style={[
+                styles.metricBox,
+                { backgroundColor: theme.surfaceContainerHigh },
+              ]}
             >
               <Text style={[styles.metricNum, { color: palette.accent }]}>
                 {stats.totalUnits}
               </Text>
-              <Text
-                style={[styles.metricText, { color: theme.textSecondary }]}
-              >
+              <Text style={[styles.metricText, { color: theme.textMuted }]}>
                 Total Units
               </Text>
             </View>
 
             <View
-              style={[styles.metricBox, { backgroundColor: theme.inputBg }]}
+              style={[
+                styles.metricBox,
+                { backgroundColor: theme.surfaceContainerHigh },
+              ]}
             >
               <Text style={[styles.metricNum, { color: '#EA580C' }]}>
                 {stats.lentCount}
               </Text>
-              <Text
-                style={[styles.metricText, { color: theme.textSecondary }]}
-              >
+              <Text style={[styles.metricText, { color: theme.textMuted }]}>
                 Lent Out
               </Text>
             </View>
 
             <View
-              style={[styles.metricBox, { backgroundColor: theme.inputBg }]}
+              style={[
+                styles.metricBox,
+                { backgroundColor: theme.surfaceContainerHigh },
+              ]}
             >
               <Text style={[styles.metricNum, { color: '#D97706' }]}>
                 {stats.borrowedCount}
               </Text>
-              <Text
-                style={[styles.metricText, { color: theme.textSecondary }]}
-              >
+              <Text style={[styles.metricText, { color: theme.textMuted }]}>
                 Borrowed
               </Text>
             </View>
           </View>
         </View>
+
+        {/* Monekin Asset Valuation Contribution Donut Card */}
+        <CardWithHeader
+          title="Valuation by Category"
+          subtitle="Portfolio share across personal item categories"
+          isDark={isDark}
+          accentColor={palette.accent}
+        >
+          <CategoryDonutChart
+            items={assetCategoryDistribution}
+            currency={settings.currency}
+            isDark={isDark}
+            privateMode={privateMode}
+            emptyText="Add item valuations to view portfolio breakdown."
+          />
+        </CardWithHeader>
 
         {/* Search Input */}
         <View
@@ -271,7 +310,7 @@ export default function ItemTrackerScreen() {
             <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
               No items found
             </Text>
-            <Text style={[styles.emptySub, { color: theme.textSecondary }]}>
+            <Text style={[styles.emptySub, { color: theme.textMuted }]}>
               Tap "Add Item" to record electronics, books, documents, or lent
               belongings.
             </Text>
@@ -333,7 +372,7 @@ export default function ItemTrackerScreen() {
                     <Text
                       style={[
                         styles.itemCategory,
-                        { color: theme.textSecondary },
+                        { color: theme.textMuted },
                       ]}
                     >
                       {item.category} • Qty: {item.quantity}
@@ -374,7 +413,12 @@ export default function ItemTrackerScreen() {
                     <Text
                       style={[styles.itemPrice, { color: theme.textPrimary }]}
                     >
-                      {formatCurrency(item.purchasePrice, settings.currency)}
+                      {formatCurrency(
+                        item.purchasePrice,
+                        settings.currency,
+                        false,
+                        privateMode
+                      )}
                     </Text>
                     <Text
                       style={[styles.itemDate, { color: theme.textMuted }]}
@@ -388,10 +432,10 @@ export default function ItemTrackerScreen() {
                       onPress={() => setHistoryItem(item)}
                       style={[
                         styles.actionPillBtn,
-                        { backgroundColor: theme.inputBg },
+                        { backgroundColor: theme.surfaceContainerHigh },
                       ]}
                     >
-                      <History size={14} color={palette.accent} />
+                      <History size={13} color={palette.accent} />
                       <Text
                         style={[
                           styles.actionPillText,
@@ -409,7 +453,7 @@ export default function ItemTrackerScreen() {
                       }}
                       style={[
                         styles.iconBtn,
-                        { backgroundColor: theme.inputBg },
+                        { backgroundColor: theme.surfaceContainerHigh },
                       ]}
                     >
                       <Edit3 size={15} color={theme.textSecondary} />
@@ -422,7 +466,7 @@ export default function ItemTrackerScreen() {
                         { backgroundColor: theme.expenseBg },
                       ]}
                     >
-                      <Trash2 size={15} color="#DC2626" />
+                      <Trash2 size={15} color="#EF4444" />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -473,7 +517,7 @@ export default function ItemTrackerScreen() {
                 <Text
                   style={[
                     styles.historySubtitle,
-                    { color: theme.textSecondary },
+                    { color: theme.textMuted },
                   ]}
                 >
                   {historyItem?.name}
@@ -549,8 +593,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 18,
-    paddingTop: 12,
+    paddingHorizontal: 16,
+    paddingTop: 10,
     paddingBottom: 32,
   },
   headerRow: {
@@ -560,8 +604,8 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   screenTitle: {
-    fontSize: 22,
-    fontWeight: '900',
+    fontSize: 21,
+    fontWeight: '800',
   },
   screenSubtitle: {
     fontSize: 12,
@@ -573,17 +617,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 5,
     paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 12,
+    paddingVertical: 9,
+    borderRadius: 999,
   },
   addBtnText: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800',
   },
   summaryCard: {
-    borderRadius: 22,
-    padding: 18,
+    borderRadius: 20,
+    padding: 16,
     borderWidth: 1,
     marginBottom: 14,
   },
@@ -597,16 +641,12 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.6,
-    marginBottom: 4,
-  },
-  summaryValue: {
-    fontSize: 24,
-    fontWeight: '900',
+    marginBottom: 6,
   },
   iconBadge: {
     width: 44,
     height: 44,
-    borderRadius: 14,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -617,7 +657,7 @@ const styles = StyleSheet.create({
   metricBox: {
     flex: 1,
     paddingVertical: 10,
-    borderRadius: 12,
+    borderRadius: 14,
     alignItems: 'center',
   },
   metricNum: {
@@ -633,7 +673,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderRadius: 14,
+    borderRadius: 16,
     paddingHorizontal: 12,
     height: 44,
     gap: 8,
@@ -645,12 +685,12 @@ const styles = StyleSheet.create({
   },
   filterRow: {
     gap: 8,
-    paddingBottom: 12,
+    paddingBottom: 14,
   },
   filterChip: {
     paddingHorizontal: 14,
     paddingVertical: 7,
-    borderRadius: 10,
+    borderRadius: 999,
     borderWidth: 1,
   },
   filterChipText: {
@@ -658,7 +698,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   emptyCard: {
-    borderRadius: 18,
+    borderRadius: 20,
     padding: 24,
     borderWidth: 1,
     alignItems: 'center',
@@ -673,8 +713,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   itemCard: {
-    borderRadius: 18,
-    padding: 14,
+    borderRadius: 20,
+    padding: 15,
     borderWidth: 1,
     marginBottom: 12,
   },
@@ -683,14 +723,14 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   itemImage: {
-    width: 56,
-    height: 56,
-    borderRadius: 14,
+    width: 54,
+    height: 54,
+    borderRadius: 16,
   },
   itemPlaceholder: {
-    width: 56,
-    height: 56,
-    borderRadius: 14,
+    width: 54,
+    height: 54,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -703,15 +743,15 @@ const styles = StyleSheet.create({
   itemName: {
     flex: 1,
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   statusBadge: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 9,
     paddingVertical: 3,
-    borderRadius: 8,
+    borderRadius: 999,
   },
   statusBadgeText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '800',
   },
   itemCategory: {
@@ -742,7 +782,7 @@ const styles = StyleSheet.create({
   },
   itemPrice: {
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '800',
   },
   itemDate: {
     fontSize: 11,
@@ -759,7 +799,7 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 9,
+    borderRadius: 999,
   },
   actionPillText: {
     fontSize: 11,
@@ -768,7 +808,7 @@ const styles = StyleSheet.create({
   iconBtn: {
     width: 32,
     height: 32,
-    borderRadius: 9,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -781,7 +821,7 @@ const styles = StyleSheet.create({
   historyCard: {
     width: '100%',
     maxWidth: 400,
-    borderRadius: 22,
+    borderRadius: 20,
     padding: 18,
     borderWidth: 1,
   },

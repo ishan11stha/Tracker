@@ -11,6 +11,11 @@ import {
 import { useVaultStore } from '../../store/useVaultStore';
 import { getSectionPalette, getThemeColors } from '../../theme/colors';
 
+/**
+ * Monekin `AppBottomBar` (from `lib/app/layout/widgets/app_bottom_bar.dart`)
+ * NavigationBar with `surfaceContainerHigh` background and 20% opacity pill indicator.
+ * Strictly English labels (`Home`, `Money`, `Items`, `Tracker`, `Reminders`).
+ */
 export default function TabsLayout() {
   const { settings } = useVaultStore();
   const isDark = settings.theme === 'dark';
@@ -31,15 +36,15 @@ export default function TabsLayout() {
           backgroundColor: theme.tabBar,
           borderTopColor: theme.tabBarBorder,
           borderTopWidth: 1,
-          height: Platform.OS === 'android' ? 68 : 82,
+          height: Platform.OS === 'android' ? 70 : 84,
           paddingTop: 8,
           paddingBottom: Platform.OS === 'android' ? 10 : 22,
-          elevation: 12,
+          elevation: 8,
         },
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: '700',
-          marginTop: 2,
+          marginTop: 3,
         },
         tabBarInactiveTintColor: theme.textMuted,
       }}
@@ -53,10 +58,10 @@ export default function TabsLayout() {
             <View
               style={[
                 styles.iconPill,
-                focused && { backgroundColor: dashboardPalette.accentSoft },
+                focused && { backgroundColor: `${dashboardPalette.accent}24` },
               ]}
             >
-              <Home size={20} color={color} strokeWidth={focused ? 2.4 : 1.9} />
+              <Home size={20} color={color} strokeWidth={focused ? 2.5 : 1.9} />
             </View>
           ),
         }}
@@ -71,13 +76,13 @@ export default function TabsLayout() {
             <View
               style={[
                 styles.iconPill,
-                focused && { backgroundColor: moneyPalette.accentSoft },
+                focused && { backgroundColor: `${moneyPalette.accent}24` },
               ]}
             >
               <Wallet
                 size={20}
                 color={color}
-                strokeWidth={focused ? 2.4 : 1.9}
+                strokeWidth={focused ? 2.5 : 1.9}
               />
             </View>
           ),
@@ -93,13 +98,13 @@ export default function TabsLayout() {
             <View
               style={[
                 styles.iconPill,
-                focused && { backgroundColor: itemsPalette.accentSoft },
+                focused && { backgroundColor: `${itemsPalette.accent}24` },
               ]}
             >
               <Package
                 size={20}
                 color={color}
-                strokeWidth={focused ? 2.4 : 1.9}
+                strokeWidth={focused ? 2.5 : 1.9}
               />
             </View>
           ),
@@ -115,13 +120,13 @@ export default function TabsLayout() {
             <View
               style={[
                 styles.iconPill,
-                focused && { backgroundColor: trackerPalette.accentSoft },
+                focused && { backgroundColor: `${trackerPalette.accent}24` },
               ]}
             >
               <Activity
                 size={20}
                 color={color}
-                strokeWidth={focused ? 2.4 : 1.9}
+                strokeWidth={focused ? 2.5 : 1.9}
               />
             </View>
           ),
@@ -137,10 +142,10 @@ export default function TabsLayout() {
             <View
               style={[
                 styles.iconPill,
-                focused && { backgroundColor: remindersPalette.accentSoft },
+                focused && { backgroundColor: `${remindersPalette.accent}24` },
               ]}
             >
-              <Bell size={20} color={color} strokeWidth={focused ? 2.4 : 1.9} />
+              <Bell size={20} color={color} strokeWidth={focused ? 2.5 : 1.9} />
             </View>
           ),
         }}
@@ -151,9 +156,9 @@ export default function TabsLayout() {
 
 const styles = StyleSheet.create({
   iconPill: {
-    paddingHorizontal: 14,
-    paddingVertical: 4,
-    borderRadius: 14,
+    width: 56,
+    height: 30,
+    borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
   },

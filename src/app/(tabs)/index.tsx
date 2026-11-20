@@ -14,12 +14,15 @@ import {
   ArrowUpRight,
   Bell,
   CheckCircle2,
-  ChevronRight,
   Circle,
+  CreditCard,
+  Eye,
+  EyeOff,
+  Landmark,
   Package,
   Plus,
   Settings,
-  ShieldCheck,
+  Smartphone,
   Wallet,
 } from 'lucide-react-native';
 import {
@@ -39,12 +42,27 @@ import { ItemFormModal } from '../../components/ItemFormModal';
 import { ActivityFormModal } from '../../components/ActivityFormModal';
 import { ReminderFormModal } from '../../components/ReminderFormModal';
 import { NepaliCalendarModal } from '../../components/NepaliCalendarModal';
-import { TransactionType } from '../../types';
+import {
+  CardWithHeader,
+  CurrencyDisplayer,
+  DateRangeChips,
+  MONEKIN_PERIODS,
+  MonekinPeriodKey,
+  TrendingValueChip,
+} from '../../components/monekin/MonekinComponents';
+import {
+  BalanceEvolutionChart,
+  CategoryDonutChart,
+  FinanceHealthGauge,
+  getFinanceHealthMeta,
+} from '../../components/monekin/MonekinCharts';
+import { PaymentMethod, TransactionType } from '../../types';
 
 export default function DashboardScreen() {
   const router = useRouter();
   const {
     settings,
+    updateSettings,
     transactions,
     items,
     activities,
@@ -54,31 +72,186 @@ export default function DashboardScreen() {
   } = useVaultStore();
 
   const isDark = settings.theme === 'dark';
+  const privateMode = Boolean(settings.privateMode);
   const theme = getThemeColors(isDark);
   const palette = getSectionPalette('dashboard', isDark);
 
+  const [selectedPeriod, setSelectedPeriod] =
+    useState<MonekinPeriodKey>('1M');
+
   const initialNpt = useMemo(() => getNowInNPT(), []);
 
-  // Greeting in Nepali / English based on Nepal local hour
-  const greeting = useMemo(() => {
+  // Monekin time-of-day welcome greeting (`_pickWelcomeGreeting`)
+  const welcomeGreeting = useMemo(() => {
     const h = initialNpt.hours;
     if (settings.language === 'ne') {
-      if (h < 12) return 'शुभ प्रभात (Good Morning)';
-      if (h < 17) return 'शुभ दिन (Good Afternoon)';
-      return 'शुभ सन्ध्या (Good Evening)';
+      if (h >= 6 && h < 12) return 'शुभ प्रभात • Good morning';
+      if (h >= 12 && h < 18) return 'शुभ दिन • Good afternoon';
+      return 'शुभ सन्ध्या • Good evening';
     }
-    if (h < 12) return 'Good Morning';
-    if (h < 17) return 'Good Afternoon';
-    return 'Good Evening';
+    if (h >= 6 && h < 12) return 'Good morning, welcome back';
+    if (h >= 12 && h < 18) return 'Good afternoon, welcome back';
+    return 'Good evening, welcome back';
   }, [initialNpt.hours, settings.language]);
 
-  // Financial Summary: Total Balance = Total Income - Total Expenses
-  const financialSummary = useMemo(
+  // All-time total balance: Total Balance = Total Income - Total Expenses
+  const allTimeSummary = useMemo(
     () => calculateFinancialSummary(transactions),
     [transactions]
   );
 
-  // Recent & Upcoming slices
+  // Period-filtered transactions & previous-period comparison (Monekin `DatePeriodState`)
+  const {
+    periodTransactions,
+    periodSummary,
+    prevPeriodSummary,
+    incomeTrendPct,
+    expenseTrendPct,
+    balanceDelta,
+    balanceTrendPct,
+    evolutionPoints,
+  } = useMemo(() => {
+    const periodDef =
+      MONEKIN_PERIODS.find((p) => p.key === selectedPeriod) ||
+      MONEKIN_PERIODS[1];
+    const todayParts = initialNpt.isoDate.split('-').map(Number);
+    const todayUTC = Date.UTC(todayParts[0], todayParts[1] - 1, todayParts[2]);
+
+    const currentList = transactions.filter((t) => {
+      if (!periodDef.days) return true;
+      const parts = t.dateISO.split('-').map(Number);
+      const tUTC = Date.UTC(parts[0], parts[1] - 1, parts[2]);
+      const diffDays = Math.floor((todayUTC - tUTC) / 86400000);
+      return diffDays >= 0 && diffDays <= periodDef.days;
+    });
+
+    const prevList = transactions.filter((t) => {
+      if (!periodDef.days) return false;
+      const parts = t.dateISO.split('-').map(Number);
+      const tUTC = Date.UTC(parts[0], parts[1] - 1, parts[2]);
+      const diffDays = Math.floor((todayUTC - tUTC) / 86400000);
+      return diffDays > periodDef.days && diffDays <= periodDef.days * 2;
+    });
+
+    const currSum = calculateFinancialSummary(currentList);
+    const prevSum = calculateFinancialSummary(prevList);
+
+    const calcPct = (curr: number, prev: number) => {
+      if (prev === 0) return curr > 0 ? 100 : 0;
+      return ((curr - prev) / prev) * 100;
+    };
+
+    // Build chronological running balance points for the SVG Area Chart
+    const sortedAsc = [...transactions].sort((a, b) =>
+      a.dateISO.localeCompare(b.dateISO)
+    );
+    let running = 0;
+    const pts: number[] = [0];
+    for (const t of sortedAsc) {
+      running += t.type === 'income' ? t.amount : -t.amount;
+      pts.push(running);
+    }
+    if (pts.length < 4) {
+      pts.unshift(0);
+    }
+
+    return {
+      periodTransactions: currentList,
+      periodSummary: currSum,
+      prevPeriodSummary: prevSum,
+      incomeTrendPct: calcPct(currSum.totalIncome, prevSum.totalIncome),
+      expenseTrendPct: calcPct(currSum.totalExpense, prevSum.totalExpense),
+      balanceDelta: currSum.totalBalance,
+      balanceTrendPct:
+        allTimeSummary.totalIncome > 0
+          ? (currSum.totalBalance / allTimeSummary.totalIncome) * 100
+          : 0,
+      evolutionPoints: pts,
+    };
+  }, [transactions, selectedPeriod, initialNpt.isoDate, allTimeSummary.totalIncome]);
+
+  // Monekin `DashboardAccountList`: Group transactions by Payment Account / Wallet
+  const accountBalances = useMemo(() => {
+    const map: Record<
+      PaymentMethod,
+      { method: PaymentMethod; balance: number; txCount: number; color: string }
+    > = {
+      'Bank Transfer': {
+        method: 'Bank Transfer',
+        balance: 0,
+        txCount: 0,
+        color: '#0F3375',
+      },
+      eSewa: { method: 'eSewa', balance: 0, txCount: 0, color: '#37A13B' },
+      Khalti: { method: 'Khalti', balance: 0, txCount: 0, color: '#6D28D9' },
+      Cash: { method: 'Cash', balance: 0, txCount: 0, color: '#059669' },
+      ConnectIPS: {
+        method: 'ConnectIPS',
+        balance: 0,
+        txCount: 0,
+        color: '#2563EB',
+      },
+      Card: { method: 'Card', balance: 0, txCount: 0, color: '#D97706' },
+      Other: { method: 'Other', balance: 0, txCount: 0, color: '#64748B' },
+    };
+
+    for (const t of transactions) {
+      const entry = map[t.paymentMethod] || map.Other;
+      entry.txCount += 1;
+      entry.balance += t.type === 'income' ? t.amount : -t.amount;
+    }
+
+    return Object.values(map)
+      .filter((a) => a.txCount > 0)
+      .sort((a, b) => b.balance - a.balance);
+  }, [transactions]);
+
+  // Monekin `FinanceHealthCard` score (0-100) from savings rate, cash flow, and task completion
+  const financeHealthScore = useMemo(() => {
+    const savingsRatio =
+      allTimeSummary.totalIncome > 0
+        ? Math.max(
+            0,
+            (allTimeSummary.totalIncome - allTimeSummary.totalExpense) /
+              allTimeSummary.totalIncome
+          )
+        : 0.5;
+    const savingsPoints = Math.min(60, Math.round(savingsRatio * 75));
+
+    const completedActs = activities.filter(
+      (a) => a.status === 'completed'
+    ).length;
+    const actRatio =
+      activities.length > 0 ? completedActs / activities.length : 1;
+    const actPoints = Math.round(actRatio * 20);
+
+    const overdueRems = reminders.filter(
+      (r) => !r.isCompleted && r.dateISO < initialNpt.isoDate
+    ).length;
+    const remPoints = Math.max(0, 20 - overdueRems * 7);
+
+    return Math.min(100, Math.max(10, savingsPoints + actPoints + remPoints));
+  }, [allTimeSummary, activities, reminders, initialNpt.isoDate]);
+
+  const healthMeta = useMemo(
+    () => getFinanceHealthMeta(financeHealthScore),
+    [financeHealthScore]
+  );
+
+  // Monekin `PieChartByCategories` data
+  const expenseCategories = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const t of periodTransactions) {
+      if (t.type === 'expense') {
+        map[t.category] = (map[t.category] || 0) + t.amount;
+      }
+    }
+    return Object.entries(map)
+      .map(([category, amount]) => ({ category, amount }))
+      .sort((a, b) => b.amount - a.amount);
+  }, [periodTransactions]);
+
+  // Slices for life tracker cards
   const recentTransactions = useMemo(
     () => transactions.slice(0, 4),
     [transactions]
@@ -114,7 +287,7 @@ export default function DashboardScreen() {
     return { totalCount, totalValue, owned, lent, borrowed };
   }, [items]);
 
-  // Quick Action Modals
+  // Modal states
   const [txnModalVisible, setTxnModalVisible] = useState(false);
   const [txnModalType, setTxnModalType] = useState<TransactionType>('income');
   const [itemModalVisible, setItemModalVisible] = useState(false);
@@ -133,6 +306,30 @@ export default function DashboardScreen() {
     setCalendarModalVisible(true);
   }, []);
 
+  const togglePrivateMode = useCallback(() => {
+    updateSettings({ privateMode: !privateMode });
+  }, [privateMode, updateSettings]);
+
+  const userInitials = useMemo(() => {
+    const parts = (settings.userName || 'V').trim().split(/\s+/);
+    return parts.length > 1
+      ? `${parts[0][0]}${parts[1][0]}`.toUpperCase()
+      : parts[0].slice(0, 2).toUpperCase();
+  }, [settings.userName]);
+
+  const getAccountIcon = (method: PaymentMethod, color: string) => {
+    if (method === 'Bank Transfer' || method === 'ConnectIPS') {
+      return <Landmark size={18} color={color} />;
+    }
+    if (method === 'eSewa' || method === 'Khalti') {
+      return <Smartphone size={18} color={color} />;
+    }
+    if (method === 'Card') {
+      return <CreditCard size={18} color={color} />;
+    }
+    return <Wallet size={18} color={color} />;
+  };
+
   return (
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: palette.background }]}
@@ -142,181 +339,249 @@ export default function DashboardScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* 1. HEADER: VAULT Logo, Personalized Greeting & Settings */}
-        <View style={styles.headerContainer}>
-          <View style={styles.brandRow}>
-            <View
-              style={[
-                styles.logoBox,
-                { backgroundColor: isDark ? '#F8FAFC' : '#0F172A' },
-              ]}
+        {/* 1. MONEKIN HEADER: UserAvatar + Welcome Greeting + Private Mode Eye Button + Settings */}
+        <View style={styles.headerGutter}>
+          <View style={styles.headerRow}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => router.push('/settings')}
+              style={styles.welcomeTouch}
             >
-              <ShieldCheck
-                size={20}
-                color={isDark ? '#0F172A' : '#FFFFFF'}
-                strokeWidth={2.4}
+              <View
+                style={[
+                  styles.userAvatar,
+                  { backgroundColor: palette.accent },
+                ]}
+              >
+                <Text style={styles.userAvatarText}>{userInitials}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={[styles.welcomeHint, { color: theme.textMuted }]}
+                  numberOfLines={1}
+                >
+                  {welcomeGreeting}
+                </Text>
+                <View style={styles.userNameRow}>
+                  <Text
+                    style={[styles.userNameText, { color: theme.textPrimary }]}
+                    numberOfLines={1}
+                  >
+                    {settings.userName}
+                  </Text>
+                  <View
+                    style={[
+                      styles.vaultTagPill,
+                      { backgroundColor: palette.accentSoft },
+                    ]}
+                  >
+                    <Text
+                      style={[styles.vaultTagText, { color: palette.accent }]}
+                    >
+                      VAULT
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </TouchableOpacity>
+
+            <View style={styles.headerBtnsGroup}>
+              {/* Monekin Private Mode Button (`_buildPrivateModeButton`) */}
+              <TouchableOpacity
+                onPress={togglePrivateMode}
+                style={[
+                  styles.circleIconBtn,
+                  { backgroundColor: theme.surfaceContainerHigh },
+                ]}
+              >
+                {privateMode ? (
+                  <EyeOff size={19} color={theme.textPrimary} />
+                ) : (
+                  <Eye size={19} color={theme.textPrimary} />
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => router.push('/settings')}
+                style={[
+                  styles.circleIconBtn,
+                  { backgroundColor: theme.surfaceContainerHigh },
+                ]}
+              >
+                <Settings size={19} color={theme.textPrimary} />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* 2. NEPALI BIKRAM SAMBAT & LIVE NPT CLOCK BANNER */}
+          <NepaliDateClockBanner
+            timeFormat={settings.timeFormat}
+            isDark={isDark}
+            onPressCalendar={handleOpenCalendar}
+          />
+        </View>
+
+        {/* 3. MONEKIN `EvolutionCard` BALANCE HERO (Full-Bleed SVG Area Chart + DateRangeChips) */}
+        <View style={styles.evolutionBlock}>
+          <View style={styles.evolutionHeaderInset}>
+            <Text style={[styles.evolutionLabel, { color: theme.textMuted }]}>
+              TOTAL BALANCE (कुल मौज्दात)
+            </Text>
+
+            <View style={styles.evolutionValueRow}>
+              <CurrencyDisplayer
+                amount={allTimeSummary.totalBalance}
+                currency={settings.currency}
+                isDark={isDark}
+                privateMode={privateMode}
+                size="xl"
+              />
+              <TrendingValueChip
+                percentage={balanceTrendPct}
+                deltaText={formatCurrency(
+                  Math.abs(balanceDelta),
+                  settings.currency,
+                  true,
+                  privateMode
+                )}
+                isDark={isDark}
               />
             </View>
-            <View>
-              <View style={styles.titleTagRow}>
-                <Text style={[styles.brandName, { color: theme.textPrimary }]}>
-                  VAULT
-                </Text>
+          </View>
+
+          {/* Full-bleed Smooth Area Chart (`DashboardBalanceChart`) */}
+          <View style={styles.chartWrapper}>
+            <BalanceEvolutionChart
+              dataPoints={evolutionPoints}
+              lineColor={palette.accent}
+              height={118}
+            />
+          </View>
+
+          {/* Monekin DateRangeChips (`7D`, `1M`, `3M`, `1Y`, `ALL`) */}
+          <DateRangeChips
+            selected={selectedPeriod}
+            onSelect={setSelectedPeriod}
+            accentColor={palette.accent}
+            isDark={isDark}
+          />
+        </View>
+
+        {/* Main Content Gutter (16px horizontal padding as in Monekin `dashboard.page.dart`) */}
+        <View style={styles.contentGutter}>
+          {/* 4. MONEKIN `IncomeExpenseFlowCard` PAIR (Expenses Left, Income Right) */}
+          <View style={styles.flowCardsRow}>
+            {/* Expenses Flow Card (inverse: true — drop in expenses is green!) */}
+            <TouchableOpacity
+              activeOpacity={0.88}
+              onPress={() => openQuickTxn('expense')}
+              style={[
+                styles.flowCard,
+                {
+                  backgroundColor: theme.card,
+                  borderColor: theme.border,
+                },
+              ]}
+            >
+              <View style={styles.flowCardTop}>
                 <View
                   style={[
-                    styles.offlineBadge,
+                    styles.flowIconBadge,
+                    { backgroundColor: theme.expenseBg },
+                  ]}
+                >
+                  <ArrowUpRight size={16} color={theme.expense} />
+                </View>
+                <Text
+                  style={[styles.flowLabelText, { color: theme.textMuted }]}
+                  numberOfLines={1}
+                >
+                  EXPENSES
+                </Text>
+              </View>
+
+              <View style={styles.flowAmountWrap}>
+                <CurrencyDisplayer
+                  amount={periodSummary.totalExpense}
+                  currency={settings.currency}
+                  isDark={isDark}
+                  privateMode={privateMode}
+                  size="lg"
+                  compact={periodSummary.totalExpense >= 1000000}
+                />
+              </View>
+
+              <TrendingValueChip
+                percentage={expenseTrendPct}
+                afterText={`vs prev ${selectedPeriod}`}
+                inverse
+                isDark={isDark}
+              />
+            </TouchableOpacity>
+
+            {/* Income Flow Card */}
+            <TouchableOpacity
+              activeOpacity={0.88}
+              onPress={() => openQuickTxn('income')}
+              style={[
+                styles.flowCard,
+                {
+                  backgroundColor: theme.card,
+                  borderColor: theme.border,
+                },
+              ]}
+            >
+              <View style={styles.flowCardTop}>
+                <View
+                  style={[
+                    styles.flowIconBadge,
                     { backgroundColor: theme.incomeBg },
                   ]}
                 >
-                  <Text style={styles.offlineBadgeText}>OFFLINE-FIRST</Text>
+                  <ArrowDownLeft size={16} color={theme.income} />
                 </View>
-              </View>
-              <Text style={[styles.greetingText, { color: theme.textSecondary }]}>
-                {greeting}, {settings.userName.split(' ')[0]}
-              </Text>
-            </View>
-          </View>
-
-          <TouchableOpacity
-            onPress={() => router.push('/settings')}
-            style={[
-              styles.settingsBtn,
-              { backgroundColor: theme.card, borderColor: theme.border },
-            ]}
-          >
-            <Settings size={20} color={theme.textPrimary} />
-          </TouchableOpacity>
-        </View>
-
-        {/* 2. NEPALI DATE & LIVE NPT CLOCK HERO BANNER (Isolated 1s Re-render) */}
-        <NepaliDateClockBanner
-          timeFormat={settings.timeFormat}
-          isDark={isDark}
-          onPressCalendar={handleOpenCalendar}
-        />
-
-        {/* 3. FINANCIAL OVERVIEW CARD */}
-        <View
-          style={[
-            styles.financeCard,
-            {
-              backgroundColor: isDark ? '#1E293B' : '#0F172A',
-            },
-          ]}
-        >
-          <View style={styles.financeTopRow}>
-            <View>
-              <Text style={styles.balanceLabel}>
-                TOTAL AVAILABLE BALANCE (कुल मौज्दात)
-              </Text>
-              <Text style={styles.balanceAmount}>
-                {formatCurrency(
-                  financialSummary.totalBalance,
-                  settings.currency
-                )}
-              </Text>
-            </View>
-            <TouchableOpacity
-              onPress={() => router.push('/(tabs)/money')}
-              style={styles.walletIconCircle}
-            >
-              <Wallet size={20} color="#4ADE80" />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.incomeExpenseSplit}>
-            <View style={styles.splitBox}>
-              <View style={styles.splitLabelRow}>
-                <View
-                  style={[
-                    styles.splitArrowCircle,
-                    { backgroundColor: 'rgba(74, 222, 128, 0.2)' },
-                  ]}
+                <Text
+                  style={[styles.flowLabelText, { color: theme.textMuted }]}
+                  numberOfLines={1}
                 >
-                  <ArrowDownLeft size={14} color="#4ADE80" />
-                </View>
-                <Text style={styles.splitLabelText}>Total Income</Text>
+                  INCOME
+                </Text>
               </View>
-              <Text style={[styles.splitValueText, { color: '#4ADE80' }]}>
-                {formatCurrency(
-                  financialSummary.totalIncome,
-                  settings.currency
-                )}
-              </Text>
-            </View>
 
-            <View style={styles.splitDivider} />
-
-            <View style={styles.splitBox}>
-              <View style={styles.splitLabelRow}>
-                <View
-                  style={[
-                    styles.splitArrowCircle,
-                    { backgroundColor: 'rgba(248, 113, 113, 0.2)' },
-                  ]}
-                >
-                  <ArrowUpRight size={14} color="#F87171" />
-                </View>
-                <Text style={styles.splitLabelText}>Total Expenses</Text>
+              <View style={styles.flowAmountWrap}>
+                <CurrencyDisplayer
+                  amount={periodSummary.totalIncome}
+                  currency={settings.currency}
+                  isDark={isDark}
+                  privateMode={privateMode}
+                  size="lg"
+                  compact={periodSummary.totalIncome >= 1000000}
+                />
               </View>
-              <Text style={[styles.splitValueText, { color: '#F87171' }]}>
-                {formatCurrency(
-                  financialSummary.totalExpense,
-                  settings.currency
-                )}
-              </Text>
-            </View>
-          </View>
 
-          {/* Quick Add Income / Add Expense inside Financial Overview */}
-          <View style={styles.financeQuickButtonsRow}>
-            <TouchableOpacity
-              onPress={() => openQuickTxn('income')}
-              style={[
-                styles.financeQuickBtn,
-                { backgroundColor: '#16A34A' },
-              ]}
-            >
-              <Plus size={16} color="#FFFFFF" />
-              <Text style={styles.financeQuickBtnText}>Add Income</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => openQuickTxn('expense')}
-              style={[
-                styles.financeQuickBtn,
-                { backgroundColor: 'rgba(255,255,255,0.14)' },
-              ]}
-            >
-              <Plus size={16} color="#FFFFFF" />
-              <Text style={styles.financeQuickBtnText}>Add Expense</Text>
+              <TrendingValueChip
+                percentage={incomeTrendPct}
+                afterText={`vs prev ${selectedPeriod}`}
+                isDark={isDark}
+              />
             </TouchableOpacity>
           </View>
-        </View>
 
-        {/* 4. QUICK ACTIONS BAR (5 Actions) */}
-        <View style={styles.sectionBlock}>
-          <Text style={[styles.sectionHeading, { color: theme.textPrimary }]}>
-            Quick Actions (द्रुत कार्यहरू)
-          </Text>
+          {/* 5. QUICK ACTIONS PILL BAR (5 VAULT Actions) */}
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.quickActionsRow}
+            contentContainerStyle={styles.quickPillsScroll}
           >
             <TouchableOpacity
               onPress={() => openQuickTxn('income')}
               style={[
-                styles.quickActionCard,
+                styles.quickPill,
                 { backgroundColor: '#E8F5E9', borderColor: '#BBF7D0' },
               ]}
             >
-              <View
-                style={[styles.quickActionIcon, { backgroundColor: '#16A34A' }]}
-              >
-                <ArrowDownLeft size={18} color="#FFFFFF" />
-              </View>
-              <Text style={[styles.quickActionLabel, { color: '#14532D' }]}>
+              <Plus size={14} color="#37A13B" strokeWidth={2.6} />
+              <Text style={[styles.quickPillText, { color: '#14532D' }]}>
                 Add Money
               </Text>
             </TouchableOpacity>
@@ -324,16 +589,12 @@ export default function DashboardScreen() {
             <TouchableOpacity
               onPress={() => openQuickTxn('expense')}
               style={[
-                styles.quickActionCard,
+                styles.quickPill,
                 { backgroundColor: '#FEE2E2', borderColor: '#FECACA' },
               ]}
             >
-              <View
-                style={[styles.quickActionIcon, { backgroundColor: '#DC2626' }]}
-              >
-                <ArrowUpRight size={18} color="#FFFFFF" />
-              </View>
-              <Text style={[styles.quickActionLabel, { color: '#7F1D1D' }]}>
+              <Plus size={14} color="#EF4444" strokeWidth={2.6} />
+              <Text style={[styles.quickPillText, { color: '#7F1D1D' }]}>
                 Add Expense
               </Text>
             </TouchableOpacity>
@@ -341,16 +602,12 @@ export default function DashboardScreen() {
             <TouchableOpacity
               onPress={() => setItemModalVisible(true)}
               style={[
-                styles.quickActionCard,
+                styles.quickPill,
                 { backgroundColor: '#E8F1FC', borderColor: '#BFDBFE' },
               ]}
             >
-              <View
-                style={[styles.quickActionIcon, { backgroundColor: '#2563EB' }]}
-              >
-                <Package size={18} color="#FFFFFF" />
-              </View>
-              <Text style={[styles.quickActionLabel, { color: '#1E3A8A' }]}>
+              <Package size={14} color="#1D4ED8" strokeWidth={2.3} />
+              <Text style={[styles.quickPillText, { color: '#1E3A8A' }]}>
                 Add Item
               </Text>
             </TouchableOpacity>
@@ -358,16 +615,12 @@ export default function DashboardScreen() {
             <TouchableOpacity
               onPress={() => setActivityModalVisible(true)}
               style={[
-                styles.quickActionCard,
+                styles.quickPill,
                 { backgroundColor: '#F0EBFA', borderColor: '#DDD6FE' },
               ]}
             >
-              <View
-                style={[styles.quickActionIcon, { backgroundColor: '#7C3AED' }]}
-              >
-                <Activity size={18} color="#FFFFFF" />
-              </View>
-              <Text style={[styles.quickActionLabel, { color: '#4C1D95' }]}>
+              <Activity size={14} color="#6D28D9" strokeWidth={2.3} />
+              <Text style={[styles.quickPillText, { color: '#4C1D95' }]}>
                 Add Activity
               </Text>
             </TouchableOpacity>
@@ -375,62 +628,42 @@ export default function DashboardScreen() {
             <TouchableOpacity
               onPress={() => setReminderModalVisible(true)}
               style={[
-                styles.quickActionCard,
+                styles.quickPill,
                 { backgroundColor: '#FFF0E6', borderColor: '#FED7AA' },
               ]}
             >
-              <View
-                style={[styles.quickActionIcon, { backgroundColor: '#EA580C' }]}
-              >
-                <Bell size={18} color="#FFFFFF" />
-              </View>
-              <Text style={[styles.quickActionLabel, { color: '#7C2D12' }]}>
+              <Bell size={14} color="#EA580C" strokeWidth={2.3} />
+              <Text style={[styles.quickPillText, { color: '#7C2D12' }]}>
                 Create Reminder
               </Text>
             </TouchableOpacity>
           </ScrollView>
-        </View>
 
-        {/* 5. OVERVIEW CARD: RECENT TRANSACTIONS */}
-        <View
-          style={[
-            styles.overviewCard,
-            { backgroundColor: theme.card, borderColor: theme.border },
-          ]}
-        >
-          <View style={styles.cardHeaderRow}>
-            <View style={styles.cardTitleGroup}>
-              <View
-                style={[styles.moduleDot, { backgroundColor: '#16A34A' }]}
-              />
-              <Text style={[styles.cardTitle, { color: theme.textPrimary }]}>
-                Recent Transactions
+          {/* 6. MONEKIN `DashboardAccountList` ("My Accounts & Wallets") */}
+          <CardWithHeader
+            title="My Accounts & Wallets"
+            subtitle="Active payment methods & net balances"
+            isDark={isDark}
+            headerActionIcon={<Plus size={14} color={palette.accent} />}
+            headerActionText="New Txn"
+            onHeaderActionPress={() => openQuickTxn('income')}
+            footerText={`See all transactions (${transactions.length})`}
+            onFooterPress={() => router.push('/(tabs)/money')}
+            accentColor={palette.accent}
+          >
+            {accountBalances.length === 0 ? (
+              <Text style={[styles.emptyText, { color: theme.textMuted }]}>
+                No active accounts yet. Add an income or expense to populate.
               </Text>
-            </View>
-            <TouchableOpacity
-              onPress={() => router.push('/(tabs)/money')}
-              style={styles.seeAllBtn}
-            >
-              <Text style={[styles.seeAllText, { color: '#16A34A' }]}>
-                View All
-              </Text>
-              <ChevronRight size={15} color="#16A34A" />
-            </TouchableOpacity>
-          </View>
-
-          {recentTransactions.length === 0 ? (
-            <Text style={[styles.emptyText, { color: theme.textMuted }]}>
-              No transactions recorded yet. Tap Add Money or Add Expense above.
-            </Text>
-          ) : (
-            recentTransactions.map((t, idx) => {
-              const isIncome = t.type === 'income';
-              return (
-                <View
-                  key={t.id}
+            ) : (
+              accountBalances.slice(0, 4).map((acc, idx) => (
+                <TouchableOpacity
+                  key={acc.method}
+                  activeOpacity={0.8}
+                  onPress={() => router.push('/(tabs)/money')}
                   style={[
-                    styles.listItemRow,
-                    idx < recentTransactions.length - 1 && {
+                    styles.accountRow,
+                    idx < Math.min(accountBalances.length, 4) - 1 && {
                       borderBottomWidth: 1,
                       borderBottomColor: theme.divider,
                     },
@@ -438,351 +671,460 @@ export default function DashboardScreen() {
                 >
                   <View
                     style={[
-                      styles.txnIconWrap,
-                      {
-                        backgroundColor: isIncome
-                          ? theme.incomeBg
-                          : theme.expenseBg,
+                      styles.accountIconCircle,
+                      { backgroundColor: `${acc.color}1C` },
+                    ]}
+                  >
+                    {getAccountIcon(acc.method, acc.color)}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={[
+                        styles.accountNameText,
+                        { color: theme.textPrimary },
+                      ]}
+                    >
+                      {acc.method}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.accountMetaText,
+                        { color: theme.textMuted },
+                      ]}
+                    >
+                      {acc.txCount} {acc.txCount === 1 ? 'movement' : 'movements'}
+                    </Text>
+                  </View>
+                  <CurrencyDisplayer
+                    amount={acc.balance}
+                    currency={settings.currency}
+                    isDark={isDark}
+                    privateMode={privateMode}
+                    size="md"
+                    color={
+                      acc.balance >= 0 ? theme.textPrimary : theme.expense
+                    }
+                  />
+                </TouchableOpacity>
+              ))
+            )}
+          </CardWithHeader>
+
+          {/* 7. MONEKIN `FinanceHealthCard` (270° Circular SVG Gauge + Score Badge) */}
+          <CardWithHeader
+            title="Financial & Life Health"
+            subtitle="Savings ratio, cash flow & habit consistency"
+            isDark={isDark}
+            onHeaderActionPress={() => router.push('/(tabs)/money')}
+            accentColor={palette.accent}
+          >
+            <View style={styles.healthCardRow}>
+              <FinanceHealthGauge
+                score={financeHealthScore}
+                size={96}
+                isDark={isDark}
+              />
+              <View style={styles.healthTextCol}>
+                <View style={styles.healthBadgesWrap}>
+                  <View
+                    style={[
+                      styles.healthBadgePill,
+                      { backgroundColor: `${healthMeta.color}26` },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.healthBadgeText,
+                        { color: healthMeta.color },
+                      ]}
+                    >
+                      {healthMeta.label}
+                    </Text>
+                  </View>
+                </View>
+                <Text
+                  style={[
+                    styles.healthDescrText,
+                    { color: theme.textSecondary },
+                  ]}
+                >
+                  {healthMeta.description}
+                </Text>
+              </View>
+            </View>
+          </CardWithHeader>
+
+          {/* 8. MONEKIN `PieChartByCategories` ("By Categories" Distribution Card) */}
+          <CardWithHeader
+            title="By Categories"
+            subtitle={`Expense distribution (${selectedPeriod})`}
+            isDark={isDark}
+            onHeaderActionPress={() => router.push('/(tabs)/money')}
+            accentColor={palette.accent}
+          >
+            <CategoryDonutChart
+              items={expenseCategories}
+              currency={settings.currency}
+              isDark={isDark}
+              privateMode={privateMode}
+              emptyText="No expenses recorded in this period."
+            />
+          </CardWithHeader>
+
+          {/* 9. RECENT TRANSACTIONS CARD */}
+          <CardWithHeader
+            title="Recent Movements"
+            isDark={isDark}
+            headerActionText="View All"
+            onHeaderActionPress={() => router.push('/(tabs)/money')}
+            accentColor="#37A13B"
+          >
+            {recentTransactions.length === 0 ? (
+              <Text style={[styles.emptyText, { color: theme.textMuted }]}>
+                No transactions recorded yet.
+              </Text>
+            ) : (
+              recentTransactions.map((t, idx) => {
+                const isIncome = t.type === 'income';
+                return (
+                  <View
+                    key={t.id}
+                    style={[
+                      styles.listItemRow,
+                      idx < recentTransactions.length - 1 && {
+                        borderBottomWidth: 1,
+                        borderBottomColor: theme.divider,
                       },
                     ]}
                   >
-                    {isIncome ? (
-                      <ArrowDownLeft size={16} color={theme.income} />
-                    ) : (
-                      <ArrowUpRight size={16} color={theme.expense} />
-                    )}
-                  </View>
-
-                  <View style={{ flex: 1 }}>
-                    <Text
-                      style={[styles.itemTitle, { color: theme.textPrimary }]}
-                      numberOfLines={1}
-                    >
-                      {t.title}
-                    </Text>
-                    <Text
+                    <View
                       style={[
-                        styles.itemSubtitle,
-                        { color: theme.textSecondary },
-                      ]}
-                    >
-                      {t.category} • {t.paymentMethod} •{' '}
-                      {formatDisplayDate(
-                        t.dateISO,
-                        settings.preferredCalendar,
-                        settings.language
-                      )}
-                    </Text>
-                  </View>
-
-                  <Text
-                    style={[
-                      styles.amountBadgeText,
-                      { color: isIncome ? theme.income : theme.expense },
-                    ]}
-                  >
-                    {isIncome ? '+' : '-'}
-                    {formatCurrency(t.amount, settings.currency)}
-                  </Text>
-                </View>
-              );
-            })
-          )}
-        </View>
-
-        {/* 6. OVERVIEW CARD: UPCOMING REMINDERS */}
-        <View
-          style={[
-            styles.overviewCard,
-            { backgroundColor: theme.card, borderColor: theme.border },
-          ]}
-        >
-          <View style={styles.cardHeaderRow}>
-            <View style={styles.cardTitleGroup}>
-              <View
-                style={[styles.moduleDot, { backgroundColor: '#EA580C' }]}
-              />
-              <Text style={[styles.cardTitle, { color: theme.textPrimary }]}>
-                Upcoming Reminders
-              </Text>
-            </View>
-            <TouchableOpacity
-              onPress={() => router.push('/(tabs)/reminders')}
-              style={styles.seeAllBtn}
-            >
-              <Text style={[styles.seeAllText, { color: '#EA580C' }]}>
-                Manage
-              </Text>
-              <ChevronRight size={15} color="#EA580C" />
-            </TouchableOpacity>
-          </View>
-
-          {upcomingReminders.length === 0 ? (
-            <Text style={[styles.emptyText, { color: theme.textMuted }]}>
-              All caught up! No pending reminders.
-            </Text>
-          ) : (
-            upcomingReminders.map((rem, idx) => {
-              const priorityColor =
-                rem.priority === 'High'
-                  ? '#DC2626'
-                  : rem.priority === 'Medium'
-                  ? '#D97706'
-                  : '#2563EB';
-              return (
-                <TouchableOpacity
-                  key={rem.id}
-                  onPress={() => toggleReminderCompleted(rem.id)}
-                  style={[
-                    styles.listItemRow,
-                    idx < upcomingReminders.length - 1 && {
-                      borderBottomWidth: 1,
-                      borderBottomColor: theme.divider,
-                    },
-                  ]}
-                >
-                  <Circle size={20} color="#EA580C" />
-                  <View style={{ flex: 1 }}>
-                    <Text
-                      style={[styles.itemTitle, { color: theme.textPrimary }]}
-                      numberOfLines={1}
-                    >
-                      {rem.title}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.itemSubtitle,
-                        { color: theme.textSecondary },
-                      ]}
-                    >
-                      {formatDisplayDate(
-                        rem.dateISO,
-                        settings.preferredCalendar,
-                        settings.language
-                      )}{' '}
-                      • {formatTimeString(rem.timeString, settings.timeFormat)}{' '}
-                      NPT
-                    </Text>
-                  </View>
-                  <View
-                    style={[
-                      styles.priorityTag,
-                      { backgroundColor: `${priorityColor}18` },
-                    ]}
-                  >
-                    <Text
-                      style={[styles.priorityTagText, { color: priorityColor }]}
-                    >
-                      {rem.priority}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })
-          )}
-        </View>
-
-        {/* 7. OVERVIEW CARD: RECENT ACTIVITIES */}
-        <View
-          style={[
-            styles.overviewCard,
-            { backgroundColor: theme.card, borderColor: theme.border },
-          ]}
-        >
-          <View style={styles.cardHeaderRow}>
-            <View style={styles.cardTitleGroup}>
-              <View
-                style={[styles.moduleDot, { backgroundColor: '#7C3AED' }]}
-              />
-              <Text style={[styles.cardTitle, { color: theme.textPrimary }]}>
-                Recent Activities
-              </Text>
-            </View>
-            <TouchableOpacity
-              onPress={() => router.push('/(tabs)/tracker')}
-              style={styles.seeAllBtn}
-            >
-              <Text style={[styles.seeAllText, { color: '#7C3AED' }]}>
-                Tracker
-              </Text>
-              <ChevronRight size={15} color="#7C3AED" />
-            </TouchableOpacity>
-          </View>
-
-          {recentActivities.length === 0 ? (
-            <Text style={[styles.emptyText, { color: theme.textMuted }]}>
-              No daily activities logged yet.
-            </Text>
-          ) : (
-            recentActivities.map((act, idx) => {
-              const isDone = act.status === 'completed';
-              return (
-                <TouchableOpacity
-                  key={act.id}
-                  onPress={() => toggleActivityStatus(act.id)}
-                  style={[
-                    styles.listItemRow,
-                    idx < recentActivities.length - 1 && {
-                      borderBottomWidth: 1,
-                      borderBottomColor: theme.divider,
-                    },
-                  ]}
-                >
-                  {isDone ? (
-                    <CheckCircle2 size={20} color="#7C3AED" />
-                  ) : (
-                    <Circle size={20} color={theme.textMuted} />
-                  )}
-                  <View style={{ flex: 1 }}>
-                    <Text
-                      style={[
-                        styles.itemTitle,
+                        styles.txnIconWrap,
                         {
-                          color: theme.textPrimary,
-                          textDecorationLine: isDone ? 'line-through' : 'none',
+                          backgroundColor: isIncome
+                            ? theme.incomeBg
+                            : theme.expenseBg,
                         },
                       ]}
-                      numberOfLines={1}
                     >
-                      {act.title}
-                    </Text>
+                      {isIncome ? (
+                        <ArrowDownLeft size={16} color={theme.income} />
+                      ) : (
+                        <ArrowUpRight size={16} color={theme.expense} />
+                      )}
+                    </View>
+
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={[styles.itemTitle, { color: theme.textPrimary }]}
+                        numberOfLines={1}
+                      >
+                        {t.title}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.itemSubtitle,
+                          { color: theme.textMuted },
+                        ]}
+                      >
+                        {t.category} • {t.paymentMethod} •{' '}
+                        {formatDisplayDate(
+                          t.dateISO,
+                          settings.preferredCalendar,
+                          settings.language
+                        )}
+                      </Text>
+                    </View>
+
                     <Text
                       style={[
-                        styles.itemSubtitle,
-                        { color: theme.textSecondary },
+                        styles.amountBadgeText,
+                        { color: isIncome ? theme.income : theme.expense },
                       ]}
                     >
-                      {act.category} •{' '}
-                      {formatDisplayDate(
-                        act.dateISO,
-                        settings.preferredCalendar,
-                        settings.language
+                      {isIncome ? '+' : '−'}
+                      {formatCurrency(
+                        t.amount,
+                        settings.currency,
+                        false,
+                        privateMode
                       )}
                     </Text>
                   </View>
-                  <View
+                );
+              })
+            )}
+          </CardWithHeader>
+
+          {/* 10. UPCOMING REMINDERS CARD */}
+          <CardWithHeader
+            title="Upcoming Reminders"
+            subtitle="Scheduled Nepal Standard Time alerts"
+            isDark={isDark}
+            headerActionIcon={<Plus size={14} color="#EA580C" />}
+            headerActionText="Add"
+            onHeaderActionPress={() => setReminderModalVisible(true)}
+            footerText="Manage all reminders"
+            onFooterPress={() => router.push('/(tabs)/reminders')}
+            accentColor="#EA580C"
+          >
+            {upcomingReminders.length === 0 ? (
+              <Text style={[styles.emptyText, { color: theme.textMuted }]}>
+                All caught up! No pending reminders.
+              </Text>
+            ) : (
+              upcomingReminders.map((rem, idx) => {
+                const priorityColor =
+                  rem.priority === 'High'
+                    ? '#EF4444'
+                    : rem.priority === 'Medium'
+                    ? '#D97706'
+                    : '#2563EB';
+                return (
+                  <TouchableOpacity
+                    key={rem.id}
+                    onPress={() => toggleReminderCompleted(rem.id)}
                     style={[
-                      styles.metricPill,
-                      { backgroundColor: isDark ? '#231B38' : '#EDE9FE' },
+                      styles.listItemRow,
+                      idx < upcomingReminders.length - 1 && {
+                        borderBottomWidth: 1,
+                        borderBottomColor: theme.divider,
+                      },
                     ]}
                   >
-                    <Text style={[styles.metricPillText, { color: '#7C3AED' }]}>
-                      {act.numericValue} {act.unit}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })
-          )}
-        </View>
+                    <Circle size={20} color="#EA580C" />
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={[styles.itemTitle, { color: theme.textPrimary }]}
+                        numberOfLines={1}
+                      >
+                        {rem.title}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.itemSubtitle,
+                          { color: theme.textMuted },
+                        ]}
+                      >
+                        {formatDisplayDate(
+                          rem.dateISO,
+                          settings.preferredCalendar,
+                          settings.language
+                        )}{' '}
+                        •{' '}
+                        {formatTimeString(rem.timeString, settings.timeFormat)}{' '}
+                        NPT
+                      </Text>
+                    </View>
+                    <View
+                      style={[
+                        styles.priorityTag,
+                        { backgroundColor: `${priorityColor}1F` },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.priorityTagText,
+                          { color: priorityColor },
+                        ]}
+                      >
+                        {rem.priority}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })
+            )}
+          </CardWithHeader>
 
-        {/* 8. OVERVIEW CARD: ITEM SUMMARY */}
-        <TouchableOpacity
-          activeOpacity={0.9}
-          onPress={() => router.push('/(tabs)/items')}
-          style={[
-            styles.overviewCard,
-            { backgroundColor: theme.card, borderColor: theme.border },
-          ]}
-        >
-          <View style={styles.cardHeaderRow}>
-            <View style={styles.cardTitleGroup}>
-              <View
-                style={[styles.moduleDot, { backgroundColor: '#2563EB' }]}
-              />
-              <Text style={[styles.cardTitle, { color: theme.textPrimary }]}>
-                Item Inventory Summary
-              </Text>
-            </View>
-            <View style={styles.seeAllBtn}>
-              <Text style={[styles.seeAllText, { color: '#2563EB' }]}>
-                Inventory
-              </Text>
-              <ChevronRight size={15} color="#2563EB" />
-            </View>
-          </View>
-
-          <View style={styles.itemStatsGrid}>
-            <View
-              style={[
-                styles.itemStatBox,
-                { backgroundColor: isDark ? '#15253B' : '#E8F1FC' },
-              ]}
-            >
-              <Text style={[styles.itemStatVal, { color: '#2563EB' }]}>
-                {itemSummary.totalCount}
-              </Text>
-              <Text
-                style={[styles.itemStatLabel, { color: theme.textSecondary }]}
-              >
-                Total Units
-              </Text>
-            </View>
-
-            <View
-              style={[
-                styles.itemStatBox,
-                { backgroundColor: isDark ? '#132A1E' : '#E8F5E9' },
-              ]}
-            >
-              <Text style={[styles.itemStatVal, { color: '#16A34A' }]}>
-                {itemSummary.owned}
-              </Text>
-              <Text
-                style={[styles.itemStatLabel, { color: theme.textSecondary }]}
-              >
-                Owned
-              </Text>
-            </View>
-
-            <View
-              style={[
-                styles.itemStatBox,
-                { backgroundColor: isDark ? '#301C12' : '#FFF0E6' },
-              ]}
-            >
-              <Text style={[styles.itemStatVal, { color: '#EA580C' }]}>
-                {itemSummary.lent + itemSummary.borrowed}
-              </Text>
-              <Text
-                style={[styles.itemStatLabel, { color: theme.textSecondary }]}
-              >
-                Lent / Borrowed
-              </Text>
-            </View>
-          </View>
-
-          <View
-            style={[
-              styles.assetValueBanner,
-              {
-                backgroundColor: theme.inputBg,
-                borderColor: theme.border,
-              },
-            ]}
+          {/* 11. RECENT DAILY ACTIVITIES CARD */}
+          <CardWithHeader
+            title="Daily Activities & Habits"
+            isDark={isDark}
+            headerActionIcon={<Plus size={14} color="#6D28D9" />}
+            headerActionText="Log"
+            onHeaderActionPress={() => setActivityModalVisible(true)}
+            footerText="Open Activity Tracker"
+            onFooterPress={() => router.push('/(tabs)/tracker')}
+            accentColor="#6D28D9"
           >
-            <Text
-              style={[styles.assetValueLabel, { color: theme.textSecondary }]}
-            >
-              Estimated Asset Value:
-            </Text>
-            <Text
-              style={[styles.assetValueAmount, { color: theme.textPrimary }]}
-            >
-              {formatCurrency(itemSummary.totalValue, settings.currency)}
-            </Text>
-          </View>
-        </TouchableOpacity>
+            {recentActivities.length === 0 ? (
+              <Text style={[styles.emptyText, { color: theme.textMuted }]}>
+                No daily activities logged yet.
+              </Text>
+            ) : (
+              recentActivities.map((act, idx) => {
+                const isDone = act.status === 'completed';
+                return (
+                  <TouchableOpacity
+                    key={act.id}
+                    onPress={() => toggleActivityStatus(act.id)}
+                    style={[
+                      styles.listItemRow,
+                      idx < recentActivities.length - 1 && {
+                        borderBottomWidth: 1,
+                        borderBottomColor: theme.divider,
+                      },
+                    ]}
+                  >
+                    {isDone ? (
+                      <CheckCircle2 size={20} color="#6D28D9" />
+                    ) : (
+                      <Circle size={20} color={theme.textMuted} />
+                    )}
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={[
+                          styles.itemTitle,
+                          {
+                            color: theme.textPrimary,
+                            textDecorationLine: isDone
+                              ? 'line-through'
+                              : 'none',
+                          },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {act.title}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.itemSubtitle,
+                          { color: theme.textMuted },
+                        ]}
+                      >
+                        {act.category} •{' '}
+                        {formatDisplayDate(
+                          act.dateISO,
+                          settings.preferredCalendar,
+                          settings.language
+                        )}
+                      </Text>
+                    </View>
+                    <View
+                      style={[
+                        styles.metricPill,
+                        {
+                          backgroundColor: isDark
+                            ? 'rgba(167, 139, 250, 0.18)'
+                            : '#EDE9FE',
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[styles.metricPillText, { color: '#6D28D9' }]}
+                      >
+                        {act.numericValue} {act.unit}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })
+            )}
+          </CardWithHeader>
 
-        {/* Footer Tagline */}
-        <View style={styles.footerWrap}>
-          <Text style={[styles.footerBrand, { color: theme.textMuted }]}>
-            VAULT • Your life. Your records. Your control.
-          </Text>
+          {/* 12. NET WORTH & PERSONAL ITEMS INVENTORY CARD */}
+          <CardWithHeader
+            title="Assets & Personal Items"
+            subtitle="Inventory valuation & lending status"
+            isDark={isDark}
+            headerActionIcon={<Plus size={14} color="#1D4ED8" />}
+            headerActionText="Add Item"
+            onHeaderActionPress={() => setItemModalVisible(true)}
+            footerText="Open Item Inventory"
+            onFooterPress={() => router.push('/(tabs)/items')}
+            accentColor="#1D4ED8"
+          >
+            <View style={styles.itemStatsGrid}>
+              <View
+                style={[
+                  styles.itemStatBox,
+                  { backgroundColor: isDark ? '#132034' : '#E8F1FC' },
+                ]}
+              >
+                <Text style={[styles.itemStatVal, { color: '#1D4ED8' }]}>
+                  {itemSummary.totalCount}
+                </Text>
+                <Text
+                  style={[styles.itemStatLabel, { color: theme.textMuted }]}
+                >
+                  Total Units
+                </Text>
+              </View>
+
+              <View
+                style={[
+                  styles.itemStatBox,
+                  { backgroundColor: isDark ? '#12241A' : '#E8F5E9' },
+                ]}
+              >
+                <Text style={[styles.itemStatVal, { color: '#37A13B' }]}>
+                  {itemSummary.owned}
+                </Text>
+                <Text
+                  style={[styles.itemStatLabel, { color: theme.textMuted }]}
+                >
+                  Owned
+                </Text>
+              </View>
+
+              <View
+                style={[
+                  styles.itemStatBox,
+                  { backgroundColor: isDark ? '#291910' : '#FFF0E6' },
+                ]}
+              >
+                <Text style={[styles.itemStatVal, { color: '#EA580C' }]}>
+                  {itemSummary.lent + itemSummary.borrowed}
+                </Text>
+                <Text
+                  style={[styles.itemStatLabel, { color: theme.textMuted }]}
+                >
+                  Lent / Borrowed
+                </Text>
+              </View>
+            </View>
+
+            <View
+              style={[
+                styles.assetValueBanner,
+                {
+                  backgroundColor: theme.inputBg,
+                  borderColor: theme.border,
+                },
+              ]}
+            >
+              <Text
+                style={[styles.assetValueLabel, { color: theme.textMuted }]}
+              >
+                Estimated Asset Portfolio
+              </Text>
+              <CurrencyDisplayer
+                amount={itemSummary.totalValue}
+                currency={settings.currency}
+                isDark={isDark}
+                privateMode={privateMode}
+                size="md"
+              />
+            </View>
+          </CardWithHeader>
         </View>
       </ScrollView>
 
-      {/* Modals for Quick Actions */}
+      {/* Monekin Floating New Transaction Button (`NewTransactionButton`) */}
+      <TouchableOpacity
+        activeOpacity={0.9}
+        onPress={() => openQuickTxn('expense')}
+        style={[
+          styles.fabButton,
+          { backgroundColor: palette.accent },
+        ]}
+      >
+        <Plus size={20} color="#FFFFFF" strokeWidth={2.6} />
+        <Text style={styles.fabText}>New</Text>
+      </TouchableOpacity>
+
+      {/* Modals */}
       <TransactionFormModal
         visible={txnModalVisible}
         initialType={txnModalType}
@@ -809,7 +1151,7 @@ export default function DashboardScreen() {
         selectedDateISO={inspectedDateISO}
         onSelectDate={(iso) => setInspectedDateISO(iso)}
         onClose={() => setCalendarModalVisible(false)}
-        accentColor="#0F172A"
+        accentColor={palette.accent}
         title="Nepali Bikram Sambat Calendar (पात्रो)"
       />
     </SafeAreaView>
@@ -821,218 +1163,199 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 18,
-    paddingTop: 10,
-    paddingBottom: 32,
+    paddingTop: 8,
+    paddingBottom: 90,
   },
-  headerContainer: {
+  headerGutter: {
+    paddingHorizontal: 16,
+  },
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 14,
+    gap: 10,
   },
-  brandRow: {
+  welcomeTouch: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    paddingVertical: 4,
   },
-  logoBox: {
+  userAvatar: {
     width: 44,
     height: 44,
-    borderRadius: 14,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 3,
   },
-  titleTagRow: {
+  userAvatarText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  welcomeHint: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  userNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    marginTop: 1,
   },
-  brandName: {
-    fontSize: 20,
-    fontWeight: '900',
-    letterSpacing: 1.8,
+  userNameText: {
+    fontSize: 18,
+    fontWeight: '800',
   },
-  offlineBadge: {
+  vaultTagPill: {
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 6,
   },
-  offlineBadgeText: {
+  vaultTagText: {
     fontSize: 9,
-    fontWeight: '800',
-    color: '#16A34A',
-    letterSpacing: 0.5,
+    fontWeight: '900',
+    letterSpacing: 0.8,
   },
-  greetingText: {
-    fontSize: 13,
-    fontWeight: '600',
-    marginTop: 1,
+  headerBtnsGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  settingsBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    borderWidth: 1,
+  circleIconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  financeCard: {
-    borderRadius: 24,
-    padding: 20,
-    marginBottom: 18,
-    elevation: 6,
-  },
-  financeTopRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
+  evolutionBlock: {
     marginBottom: 16,
   },
-  balanceLabel: {
-    color: '#94A3B8',
+  evolutionHeaderInset: {
+    paddingHorizontal: 16,
+  },
+  evolutionLabel: {
     fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.7,
+    fontWeight: '800',
+    letterSpacing: 0.8,
     marginBottom: 4,
   },
-  balanceAmount: {
-    color: '#FFFFFF',
-    fontSize: 28,
-    fontWeight: '900',
-  },
-  walletIconCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    backgroundColor: 'rgba(74, 222, 128, 0.14)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  incomeExpenseSplit: {
+  evolutionValueRow: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 16,
-    padding: 12,
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  chartWrapper: {
+    marginTop: 8,
+    marginBottom: 10,
+  },
+  contentGutter: {
+    paddingHorizontal: 16,
+  },
+  flowCardsRow: {
+    flexDirection: 'row',
+    gap: 12,
     marginBottom: 14,
   },
-  splitBox: {
+  flowCard: {
     flex: 1,
+    borderRadius: 20,
+    padding: 15,
+    borderWidth: 1,
   },
-  splitDivider: {
-    width: 1,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    marginHorizontal: 12,
-  },
-  splitLabelRow: {
+  flowCardTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 4,
+    gap: 8,
+    marginBottom: 10,
   },
-  splitArrowCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 7,
+  flowIconBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  splitLabelText: {
-    color: '#CBD5E1',
+  flowLabelText: {
     fontSize: 11,
-    fontWeight: '600',
-  },
-  splitValueText: {
-    fontSize: 15,
     fontWeight: '800',
+    letterSpacing: 0.6,
   },
-  financeQuickButtonsRow: {
-    flexDirection: 'row',
-    gap: 10,
+  flowAmountWrap: {
+    marginBottom: 8,
   },
-  financeQuickBtn: {
-    flex: 1,
+  quickPillsScroll: {
+    gap: 8,
+    paddingBottom: 16,
+  },
+  quickPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: 6,
-    paddingVertical: 11,
-    borderRadius: 13,
-  },
-  financeQuickBtnText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  sectionBlock: {
-    marginBottom: 18,
-  },
-  sectionHeading: {
-    fontSize: 15,
-    fontWeight: '800',
-    marginBottom: 10,
-  },
-  quickActionsRow: {
-    gap: 10,
-    paddingRight: 8,
-  },
-  quickActionCard: {
-    width: 106,
-    paddingVertical: 12,
-    paddingHorizontal: 10,
-    borderRadius: 18,
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+    borderRadius: 999,
     borderWidth: 1,
-    alignItems: 'center',
-    gap: 8,
   },
-  quickActionIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+  quickPillText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  accountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 11,
+    gap: 12,
+  },
+  accountIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  quickActionLabel: {
-    fontSize: 12,
-    fontWeight: '800',
-    textAlign: 'center',
-  },
-  overviewCard: {
-    borderRadius: 22,
-    padding: 16,
-    borderWidth: 1,
-    marginBottom: 16,
-    elevation: 1,
-  },
-  cardHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  cardTitleGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  moduleDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  seeAllBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-  },
-  seeAllText: {
-    fontSize: 12,
+  accountNameText: {
+    fontSize: 14,
     fontWeight: '700',
+  },
+  accountMetaText: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  healthCardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 18,
+    paddingTop: 4,
+  },
+  healthTextCol: {
+    flex: 1,
+  },
+  healthBadgesWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 6,
+  },
+  healthBadgePill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  healthBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  healthDescrText: {
+    fontSize: 12,
+    lineHeight: 17,
   },
   emptyText: {
     fontSize: 13,
@@ -1046,9 +1369,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   txnIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 11,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1066,30 +1389,31 @@ const styles = StyleSheet.create({
   },
   priorityTag: {
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingVertical: 3.5,
+    borderRadius: 999,
   },
   priorityTagText: {
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 10,
+    fontWeight: '800',
   },
   metricPill: {
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 10,
+    borderRadius: 999,
   },
   metricPillText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '800',
   },
   itemStatsGrid: {
     flexDirection: 'row',
     gap: 10,
     marginBottom: 12,
+    marginTop: 4,
   },
   itemStatBox: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 11,
     borderRadius: 14,
     alignItems: 'center',
   },
@@ -1108,23 +1432,28 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
   },
   assetValueLabel: {
     fontSize: 12,
     fontWeight: '600',
   },
-  assetValueAmount: {
+  fabButton: {
+    position: 'absolute',
+    right: 18,
+    bottom: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 18,
+    paddingVertical: 13,
+    borderRadius: 999,
+    elevation: 6,
+  },
+  fabText: {
+    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '800',
-  },
-  footerWrap: {
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  footerBrand: {
-    fontSize: 11,
-    fontWeight: '600',
   },
 });

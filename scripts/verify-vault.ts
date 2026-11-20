@@ -7,7 +7,11 @@ import {
   formatNPTTime,
   buildBSMonthGrid,
 } from '../src/utils/nepaliDate.ts';
-import { formatCurrency } from '../src/utils/currency.ts';
+import {
+  formatCurrency,
+  formatCurrencyParts,
+  getFinanceHealthMeta,
+} from '../src/utils/currency.ts';
 import {
   sanitizeDecimalInput,
   sanitizeIntegerInput,
@@ -191,5 +195,19 @@ const int1 = sanitizeIntegerInput('00', 1);
 assert(int1.value === 1, `Expected fallback 1 for zero quantity, got ${int1.value}`);
 const int2 = sanitizeIntegerInput('15px', 1);
 assert(int2.text === '15' && int2.value === 15, `Expected 15, got ${int2.value}`);
-console.log('7. Numeric & Decimal Input Sanitizers: PASSED\n');
+console.log('7. Numeric & Decimal Input Sanitizers: PASSED');
+
+// 8. Verify Monekin CurrencyDisplayer Split Parts, Private Mode Masking & FinanceHealthMeta
+const parts = formatCurrencyParts(107200.5, 'NPR', false, false);
+assert(
+  parts.symbol === 'NPR' &&
+    parts.integerPart === '1,07,200' &&
+    parts.decimalPart === '.50',
+  `Unexpected currency parts: ${JSON.stringify(parts)}`
+);
+const masked = formatCurrencyParts(107200.5, 'NPR', false, true);
+assert(masked.integerPart === '••••••', 'Private mode masking failed');
+const healthExcel = getFinanceHealthMeta(85);
+assert(healthExcel.label === 'EXCELLENT' && healthExcel.color === '#37A13B', 'FinanceHealthMeta failed');
+console.log('8. Monekin CurrencyDisplayer, Private Mode & Financial Health Score Engine: PASSED\n');
 console.log('✅ ALL VAULT CORE & ARCHITECTURAL CHECKS PASSED!');

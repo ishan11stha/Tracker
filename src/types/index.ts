@@ -162,6 +162,7 @@ export interface AppSettings {
   timeFormat: '12h' | '24h';
   notificationsEnabled: boolean;
   theme: 'light' | 'dark';
+  privateMode?: boolean;
 }
 
 export const appSettingsSchema = z.object({
@@ -173,6 +174,7 @@ export const appSettingsSchema = z.object({
   timeFormat: z.enum(['12h', '24h']),
   notificationsEnabled: z.boolean(),
   theme: z.enum(['light', 'dark']),
+  privateMode: z.boolean().optional(),
 });
 
 export const vaultBackupSchema = z.object({

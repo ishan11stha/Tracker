@@ -20,6 +20,7 @@ import {
   Check,
   Clock,
   Download,
+  EyeOff,
   FileSpreadsheet,
   Globe,
   Moon,
@@ -528,6 +529,37 @@ export default function SettingsScreen() {
                 updateSettings({ theme: val ? 'dark' : 'light' })
               }
               trackColor={{ false: '#CBD5E1', true: '#16A34A' }}
+            />
+          </View>
+
+          {/* Private Mode Toggle (Monekin PrivateModeService) */}
+          <View
+            style={[
+              styles.switchRow,
+              { borderTopColor: theme.divider },
+            ]}
+          >
+            <View style={styles.inlineIconLabel}>
+              <EyeOff size={18} color="#0F3375" />
+              <View>
+                <Text
+                  style={[styles.settingLabel, { color: theme.textPrimary }]}
+                >
+                  Private Mode (Hide Balances)
+                </Text>
+                <Text
+                  style={[styles.settingHint, { color: theme.textSecondary }]}
+                >
+                  Mask currency amounts as •••••• across all screens
+                </Text>
+              </View>
+            </View>
+            <Switch
+              value={Boolean(settings.privateMode)}
+              onValueChange={(val) =>
+                updateSettings({ privateMode: val })
+              }
+              trackColor={{ false: '#CBD5E1', true: '#0F3375' }}
             />
           </View>
 

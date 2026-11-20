@@ -32,6 +32,7 @@ import {
 import { ACTIVITY_CATEGORIES, ActivityRecord } from '../../types';
 import { ActivityFormModal } from '../../components/ActivityFormModal';
 import { NepaliCalendarModal } from '../../components/NepaliCalendarModal';
+import { FinanceHealthGauge } from '../../components/monekin/MonekinCharts';
 
 export default function ActivityTrackerScreen() {
   const {
@@ -65,7 +66,6 @@ export default function ActivityTrackerScreen() {
       if (viewMode === 'daily') {
         return act.dateISO === selectedDateISO;
       }
-      // Monthly view: match BS year & month if BS preferred, or AD year & month
       if (settings.preferredCalendar === 'BS') {
         const bs = adToBs(act.dateISO);
         return bs.year === selectedBS.year && bs.month === selectedBS.month;
@@ -136,10 +136,10 @@ export default function ActivityTrackerScreen() {
         <View style={styles.headerRow}>
           <View>
             <Text style={[styles.screenTitle, { color: theme.textPrimary }]}>
-              Activity Tracker
+              Activity & Habits
             </Text>
             <Text
-              style={[styles.screenSubtitle, { color: theme.textSecondary }]}
+              style={[styles.screenSubtitle, { color: theme.textMuted }]}
             >
               दैनिक क्रियाकलाप तथा बानी ट्र्याकर
             </Text>
@@ -151,7 +151,7 @@ export default function ActivityTrackerScreen() {
             }}
             style={[styles.addBtn, { backgroundColor: palette.accent }]}
           >
-            <Plus size={16} color="#FFFFFF" />
+            <Plus size={15} color="#FFFFFF" strokeWidth={2.5} />
             <Text style={styles.addBtnText}>Log Activity</Text>
           </TouchableOpacity>
         </View>
@@ -160,10 +160,15 @@ export default function ActivityTrackerScreen() {
         <View
           style={[
             styles.dateControlCard,
-            { backgroundColor: theme.card, borderColor: palette.accentBorder },
+            { backgroundColor: theme.card, borderColor: theme.border },
           ]}
         >
-          <View style={styles.viewModeToggle}>
+          <View
+            style={[
+              styles.viewModeToggle,
+              { backgroundColor: theme.surfaceContainerHigh },
+            ]}
+          >
             <TouchableOpacity
               onPress={() => setViewMode('daily')}
               style={[
@@ -176,7 +181,7 @@ export default function ActivityTrackerScreen() {
                   styles.viewModeText,
                   {
                     color:
-                      viewMode === 'daily' ? '#FFFFFF' : theme.textSecondary,
+                      viewMode === 'daily' ? '#FFFFFF' : theme.textMuted,
                   },
                 ]}
               >
@@ -196,7 +201,7 @@ export default function ActivityTrackerScreen() {
                   styles.viewModeText,
                   {
                     color:
-                      viewMode === 'monthly' ? '#FFFFFF' : theme.textSecondary,
+                      viewMode === 'monthly' ? '#FFFFFF' : theme.textMuted,
                   },
                 ]}
               >
@@ -224,7 +229,7 @@ export default function ActivityTrackerScreen() {
                     )} (मासिक सारांश)`}
               </Text>
               <Text
-                style={[styles.activeDateSub, { color: theme.textSecondary }]}
+                style={[styles.activeDateSub, { color: theme.textMuted }]}
               >
                 {formatADDateFull(selectedDateISO)}
               </Text>
@@ -235,63 +240,47 @@ export default function ActivityTrackerScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Activity Stats Card */}
+        {/* Monekin 270° Circular Completion Gauge Card */}
         <View
           style={[
             styles.statsCard,
             { backgroundColor: theme.card, borderColor: theme.border },
           ]}
         >
-          <View style={styles.statsRow}>
-            <View style={styles.statCol}>
-              <Text style={[styles.statVal, { color: palette.accent }]}>
-                {summary.total}
-              </Text>
-              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
-                Total Entries
-              </Text>
-            </View>
-
-            <View style={styles.statCol}>
-              <Text style={[styles.statVal, { color: '#16A34A' }]}>
-                {summary.completed}
-              </Text>
-              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
-                Completed
-              </Text>
-            </View>
-
-            <View style={styles.statCol}>
-              <Text style={[styles.statVal, { color: '#D97706' }]}>
-                {summary.pending}
-              </Text>
-              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
-                Pending
-              </Text>
-            </View>
-
-            <View style={styles.statCol}>
-              <Text style={[styles.statVal, { color: theme.textPrimary }]}>
-                {summary.completionRate}%
-              </Text>
-              <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
-                Completion
-              </Text>
-            </View>
-          </View>
-
-          <View
-            style={[styles.progressTrack, { backgroundColor: theme.inputBg }]}
-          >
-            <View
-              style={[
-                styles.progressFill,
-                {
-                  width: `${summary.completionRate}%`,
-                  backgroundColor: palette.accent,
-                },
-              ]}
+          <View style={styles.gaugeSummaryRow}>
+            <FinanceHealthGauge
+              score={summary.completionRate}
+              size={88}
+              isDark={isDark}
             />
+            <View style={styles.statsGridRight}>
+              <View style={styles.statMiniBox}>
+                <Text style={[styles.statVal, { color: palette.accent }]}>
+                  {summary.total}
+                </Text>
+                <Text style={[styles.statLabel, { color: theme.textMuted }]}>
+                  Total Logs
+                </Text>
+              </View>
+
+              <View style={styles.statMiniBox}>
+                <Text style={[styles.statVal, { color: '#37A13B' }]}>
+                  {summary.completed}
+                </Text>
+                <Text style={[styles.statLabel, { color: theme.textMuted }]}>
+                  Completed
+                </Text>
+              </View>
+
+              <View style={styles.statMiniBox}>
+                <Text style={[styles.statVal, { color: '#D97706' }]}>
+                  {summary.pending}
+                </Text>
+                <Text style={[styles.statLabel, { color: theme.textMuted }]}>
+                  Pending
+                </Text>
+              </View>
+            </View>
           </View>
         </View>
 
@@ -341,7 +330,7 @@ export default function ActivityTrackerScreen() {
               No activities logged for this{' '}
               {viewMode === 'daily' ? 'day' : 'month'}
             </Text>
-            <Text style={[styles.emptySub, { color: theme.textSecondary }]}>
+            <Text style={[styles.emptySub, { color: theme.textMuted }]}>
               Tap "Log Activity" to record workouts, study hours, hydration, or
               daily habits.
             </Text>
@@ -388,7 +377,7 @@ export default function ActivityTrackerScreen() {
                     <Text
                       style={[
                         styles.activityCategory,
-                        { color: theme.textSecondary },
+                        { color: theme.textMuted },
                       ]}
                     >
                       {act.category}
@@ -434,13 +423,13 @@ export default function ActivityTrackerScreen() {
                         }}
                         style={styles.iconBtn}
                       >
-                        <Edit3 size={15} color={theme.textSecondary} />
+                        <Edit3 size={15} color={theme.textMuted} />
                       </TouchableOpacity>
                       <TouchableOpacity
                         onPress={() => handleDelete(act)}
                         style={styles.iconBtn}
                       >
-                        <Trash2 size={15} color="#DC2626" />
+                        <Trash2 size={15} color="#EF4444" />
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -492,8 +481,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 18,
-    paddingTop: 12,
+    paddingHorizontal: 16,
+    paddingTop: 10,
     paddingBottom: 32,
   },
   headerRow: {
@@ -503,8 +492,8 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   screenTitle: {
-    fontSize: 22,
-    fontWeight: '900',
+    fontSize: 21,
+    fontWeight: '800',
   },
   screenSubtitle: {
     fontSize: 12,
@@ -516,12 +505,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 5,
     paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 12,
+    paddingVertical: 9,
+    borderRadius: 999,
   },
   addBtnText: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800',
   },
   dateControlCard: {
@@ -532,13 +521,14 @@ const styles = StyleSheet.create({
   },
   viewModeToggle: {
     flexDirection: 'row',
-    gap: 8,
+    padding: 4,
+    borderRadius: 999,
     marginBottom: 10,
   },
   viewModeBtn: {
     flex: 1,
-    paddingVertical: 9,
-    borderRadius: 10,
+    paddingVertical: 8,
+    borderRadius: 999,
     alignItems: 'center',
   },
   viewModeText: {
@@ -571,17 +561,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 14,
   },
-  statsRow: {
+  gaugeSummaryRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  statCol: {
     alignItems: 'center',
+    gap: 16,
+  },
+  statsGridRight: {
     flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  statMiniBox: {
+    alignItems: 'center',
   },
   statVal: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '900',
   },
   statLabel: {
@@ -589,23 +583,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 2,
   },
-  progressTrack: {
-    height: 8,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 4,
-  },
   filterRow: {
     gap: 8,
-    paddingBottom: 12,
+    paddingBottom: 14,
   },
   filterChip: {
-    paddingHorizontal: 13,
+    paddingHorizontal: 14,
     paddingVertical: 7,
-    borderRadius: 10,
+    borderRadius: 999,
     borderWidth: 1,
   },
   filterChipText: {
@@ -613,7 +598,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   emptyCard: {
-    borderRadius: 18,
+    borderRadius: 20,
     padding: 26,
     borderWidth: 1,
     alignItems: 'center',
@@ -629,8 +614,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   activityCard: {
-    borderRadius: 18,
-    padding: 14,
+    borderRadius: 20,
+    padding: 15,
     borderWidth: 1,
     marginBottom: 10,
   },
@@ -644,7 +629,7 @@ const styles = StyleSheet.create({
   },
   activityTitle: {
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   activityCategory: {
     fontSize: 12,
@@ -662,7 +647,7 @@ const styles = StyleSheet.create({
   numericBadge: {
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 10,
+    borderRadius: 999,
   },
   numericBadgeText: {
     fontSize: 12,
