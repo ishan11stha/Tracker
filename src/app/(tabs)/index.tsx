@@ -56,6 +56,7 @@ import {
   BalanceEvolutionChart,
   CategoryDonutChart,
   FinanceHealthGauge,
+  ScopeDistributionChart,
   getFinanceHealthMeta,
 } from '../../components/monekin/MonekinCharts';
 import { AccountScope, PaymentMethod, TransactionType } from '../../types';
@@ -97,10 +98,21 @@ export default function DashboardScreen() {
     return 'Good evening, welcome back';
   }, [initialNpt.hours, settings.language]);
 
+  const [overviewScope, setOverviewScope] =
+    useState<'All' | 'Personal' | 'Family'>('All');
+
+  // Transactions filtered by selected top overview scope (All vs Personal vs Family)
+  const scopedTransactions = useMemo(() => {
+    if (overviewScope === 'All') return transactions;
+    return transactions.filter(
+      (t) => (t.accountScope || 'Personal') === overviewScope
+    );
+  }, [transactions, overviewScope]);
+
   // All-time total balance: Total Balance = Total Income - Total Expenses
   const allTimeSummary = useMemo(
-    () => calculateFinancialSummary(transactions),
-    [transactions]
+    () => calculateFinancialSummary(scopedTransactions),
+    [scopedTransactions]
   );
 
   // Period-filtered transactions & previous-period comparison (Monekin `DatePeriodState`)
@@ -120,7 +132,7 @@ export default function DashboardScreen() {
     const todayParts = initialNpt.isoDate.split('-').map(Number);
     const todayUTC = Date.UTC(todayParts[0], todayParts[1] - 1, todayParts[2]);
 
-    const currentList = transactions.filter((t) => {
+    const currentList = scopedTransactions.filter((t) => {
       if (!periodDef.days) return true;
       const parts = t.dateISO.split('-').map(Number);
       const tUTC = Date.UTC(parts[0], parts[1] - 1, parts[2]);
@@ -128,7 +140,7 @@ export default function DashboardScreen() {
       return diffDays >= 0 && diffDays <= periodDef.days;
     });
 
-    const prevList = transactions.filter((t) => {
+    const prevList = scopedTransactions.filter((t) => {
       if (!periodDef.days) return false;
       const parts = t.dateISO.split('-').map(Number);
       const tUTC = Date.UTC(parts[0], parts[1] - 1, parts[2]);
@@ -145,7 +157,7 @@ export default function DashboardScreen() {
     };
 
     // Build chronological running balance points for the SVG Area Chart
-    const sortedAsc = [...transactions].sort((a, b) =>
+    const sortedAsc = [...scopedTransactions].sort((a, b) =>
       a.dateISO.localeCompare(b.dateISO)
     );
     let running = 0;
@@ -171,7 +183,7 @@ export default function DashboardScreen() {
           : 0,
       evolutionPoints: pts,
     };
-  }, [transactions, selectedPeriod, initialNpt.isoDate, allTimeSummary.totalIncome]);
+  }, [scopedTransactions, selectedPeriod, initialNpt.isoDate, allTimeSummary.totalIncome]);
 
   const [accountScopeFilter, setAccountScopeFilter] =
     useState<'All' | 'Personal' | 'Family'>('All');
@@ -181,6 +193,12 @@ export default function DashboardScreen() {
     () => calculateAccountBalances(accounts, transactions),
     [accounts, transactions]
   );
+
+  const displayedHeroBalance = useMemo(() => {
+    if (overviewScope === 'Personal') return accountSummary.personalTotal;
+    if (overviewScope === 'Family') return accountSummary.familyTotal;
+    return accountSummary.grandTotal;
+  }, [overviewScope, accountSummary]);
 
   const displayedAccounts = useMemo(() => {
     if (accountScopeFilter === 'Personal') {
@@ -237,11 +255,31 @@ export default function DashboardScreen() {
       .sort((a, b) => b.amount - a.amount);
   }, [periodTransactions]);
 
-  // Slices for life tracker cards
-  const recentTransactions = useMemo(
-    () => transactions.slice(0, 4),
-    [transactions]
-  );
+  const [recentScope, setRecentScope] =
+    useState<'All' | 'Personal' | 'Family'>('All');
+  const [recentSort, setRecentSort] = useState<
+    'date_desc' | 'date_asc' | 'amount_desc' | 'amount_asc'
+  >('date_desc');
+
+  // Slices for life tracker cards (with Scope Filter & Sorting)
+  const recentTransactions = useMemo(() => {
+    let list = transactions.filter((t) => {
+      if (recentScope !== 'All' && (t.accountScope || 'Personal') !== recentScope) {
+        return false;
+      }
+      return true;
+    });
+
+    list = [...list].sort((a, b) => {
+      if (recentSort === 'date_desc') return b.dateISO.localeCompare(a.dateISO);
+      if (recentSort === 'date_asc') return a.dateISO.localeCompare(b.dateISO);
+      if (recentSort === 'amount_desc') return b.amount - a.amount;
+      if (recentSort === 'amount_asc') return a.amount - b.amount;
+      return 0;
+    });
+
+    return list.slice(0, 5);
+  }, [transactions, recentScope, recentSort]);
 
   const upcomingReminders = useMemo(
     () =>
@@ -410,13 +448,70 @@ export default function DashboardScreen() {
         {/* 3. MONEKIN `EvolutionCard` BALANCE HERO (Full-Bleed SVG Area Chart + DateRangeChips) */}
         <View style={styles.evolutionBlock}>
           <View style={styles.evolutionHeaderInset}>
-            <Text style={[styles.evolutionLabel, { color: theme.textMuted }]}>
-              TOTAL BALANCE (कुल मौज्दात)
-            </Text>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 4,
+              }}
+            >
+              <Text style={[styles.evolutionLabel, { color: theme.textMuted }]}>
+                {overviewScope === 'Personal'
+                  ? 'PERSONAL BALANCE (आफ्नो)'
+                  : overviewScope === 'Family'
+                  ? 'FAMILY BALANCE (परिवार)'
+                  : 'TOTAL NET WORTH (कुल मौज्दात)'}
+              </Text>
+
+              {/* Scope Switcher */}
+              <View
+                style={[
+                  styles.scopeMiniTabs,
+                  {
+                    backgroundColor: isDark ? '#1F2937' : '#F1F5F9',
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
+                {(['All', 'Personal', 'Family'] as const).map((sc) => {
+                  const isSel = overviewScope === sc;
+                  return (
+                    <TouchableOpacity
+                      key={sc}
+                      onPress={() => setOverviewScope(sc)}
+                      style={[
+                        styles.scopeMiniTab,
+                        isSel && {
+                          backgroundColor:
+                            sc === 'Personal'
+                              ? '#2563EB'
+                              : sc === 'Family'
+                              ? '#7C3AED'
+                              : palette.accent,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.scopeMiniTabText,
+                          {
+                            color: isSel ? '#FFFFFF' : theme.textMuted,
+                            fontWeight: isSel ? '800' : '600',
+                          },
+                        ]}
+                      >
+                        {sc}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
 
             <View style={styles.evolutionValueRow}>
               <CurrencyDisplayer
-                amount={allTimeSummary.totalBalance}
+                amount={displayedHeroBalance}
                 currency={settings.currency}
                 isDark={isDark}
                 privateMode={privateMode}
@@ -926,7 +1021,26 @@ export default function DashboardScreen() {
             />
           </CardWithHeader>
 
-          {/* 9. RECENT TRANSACTIONS CARD */}
+          {/* 8b. PERSONAL vs FAMILY PORTFOLIO ALLOCATION CHART */}
+          <CardWithHeader
+            title="Personal vs Family Portfolio"
+            subtitle="Current asset share & net worth comparison"
+            isDark={isDark}
+            onHeaderActionPress={() => router.push('/(tabs)/money')}
+            accentColor="#2563EB"
+            footerText="Open detailed financial breakdown"
+            onFooterPress={() => router.push('/(tabs)/money')}
+          >
+            <ScopeDistributionChart
+              personalAmount={accountSummary.personalTotal}
+              familyAmount={accountSummary.familyTotal}
+              currency={settings.currency}
+              isDark={isDark}
+              privateMode={privateMode}
+            />
+          </CardWithHeader>
+
+          {/* 9. RECENT TRANSACTIONS CARD (With Scope Filtering & Sorting) */}
           <CardWithHeader
             title="Recent Movements"
             isDark={isDark}
@@ -934,13 +1048,101 @@ export default function DashboardScreen() {
             onHeaderActionPress={() => router.push('/(tabs)/money')}
             accentColor="#37A13B"
           >
+            {/* Quick Filter & Sorting Controls */}
+            <View style={styles.recentControlsRow}>
+              {/* Scope filter */}
+              <View style={styles.recentScopePills}>
+                {(['All', 'Personal', 'Family'] as const).map((sc) => {
+                  const isSel = recentScope === sc;
+                  return (
+                    <TouchableOpacity
+                      key={sc}
+                      onPress={() => setRecentScope(sc)}
+                      style={[
+                        styles.filterMiniPill,
+                        isSel && {
+                          backgroundColor:
+                            sc === 'Personal'
+                              ? '#2563EB'
+                              : sc === 'Family'
+                              ? '#7C3AED'
+                              : isDark
+                              ? '#374151'
+                              : '#E2E8F0',
+                        },
+                        !isSel && {
+                          borderColor: theme.border,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.filterMiniPillText,
+                          {
+                            color: isSel ? '#FFFFFF' : theme.textMuted,
+                            fontWeight: isSel ? '800' : '600',
+                          },
+                        ]}
+                      >
+                        {sc === 'Personal' ? 'Personal' : sc}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Sort pills */}
+              <View style={styles.recentSortPills}>
+                {[
+                  { key: 'date_desc', label: 'Newest' },
+                  { key: 'amount_desc', label: 'Highest' },
+                ].map((s) => {
+                  const isSel = recentSort === s.key;
+                  return (
+                    <TouchableOpacity
+                      key={s.key}
+                      onPress={() =>
+                        setRecentSort(
+                          s.key as
+                            | 'date_desc'
+                            | 'date_asc'
+                            | 'amount_desc'
+                            | 'amount_asc'
+                        )
+                      }
+                      style={[
+                        styles.sortMiniPill,
+                        isSel && {
+                          backgroundColor: isDark ? '#1F2937' : '#F1F5F9',
+                          borderColor: palette.accent,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.sortMiniPillText,
+                          {
+                            color: isSel ? palette.accent : theme.textMuted,
+                            fontWeight: isSel ? '800' : '600',
+                          },
+                        ]}
+                      >
+                        {s.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
             {recentTransactions.length === 0 ? (
               <Text style={[styles.emptyText, { color: theme.textMuted }]}>
-                No transactions recorded yet.
+                No transactions recorded for this filter.
               </Text>
             ) : (
               recentTransactions.map((t, idx) => {
                 const isIncome = t.type === 'income';
+                const scope = t.accountScope || 'Personal';
                 return (
                   <View
                     key={t.id}
@@ -970,12 +1172,51 @@ export default function DashboardScreen() {
                     </View>
 
                     <View style={{ flex: 1 }}>
-                      <Text
-                        style={[styles.itemTitle, { color: theme.textPrimary }]}
-                        numberOfLines={1}
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 6,
+                        }}
                       >
-                        {t.title}
-                      </Text>
+                        <Text
+                          style={[
+                            styles.itemTitle,
+                            { color: theme.textPrimary, flexShrink: 1 },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {t.title}
+                        </Text>
+                        <View
+                          style={[
+                            styles.scopeBadge,
+                            {
+                              backgroundColor:
+                                scope === 'Personal'
+                                  ? isDark
+                                    ? '#1E3A8A'
+                                    : '#DBEAFE'
+                                  : isDark
+                                  ? '#4C1D95'
+                                  : '#EDE9FE',
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.scopeBadgeText,
+                              {
+                                color:
+                                  scope === 'Personal' ? '#2563EB' : '#7C3AED',
+                              },
+                            ]}
+                          >
+                            {scope}
+                          </Text>
+                        </View>
+                      </View>
+
                       <Text
                         style={[
                           styles.itemSubtitle,
@@ -1629,5 +1870,58 @@ const styles = StyleSheet.create({
   scopeBadgeText: {
     fontSize: 10,
     fontWeight: '800',
+  },
+  scopeMiniTabs: {
+    flexDirection: 'row',
+    borderRadius: 8,
+    borderWidth: 1,
+    padding: 2,
+    gap: 3,
+  },
+  scopeMiniTab: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  scopeMiniTabText: {
+    fontSize: 10,
+  },
+  recentControlsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: 10,
+    marginBottom: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(150, 150, 150, 0.12)',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  recentScopePills: {
+    flexDirection: 'row',
+    gap: 5,
+  },
+  filterMiniPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  filterMiniPillText: {
+    fontSize: 10,
+  },
+  recentSortPills: {
+    flexDirection: 'row',
+    gap: 5,
+  },
+  sortMiniPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  sortMiniPillText: {
+    fontSize: 10,
   },
 });

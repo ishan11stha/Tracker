@@ -19,6 +19,7 @@ import {
   X,
 } from 'lucide-react-native';
 import {
+  calculateAccountBalances,
   calculateFinancialSummary,
   useVaultStore,
 } from '../../store/useVaultStore';
@@ -29,25 +30,36 @@ import {
   formatBSDateNepali,
   getNowInNPT,
 } from '../../utils/nepaliDate';
-import { Transaction, TransactionType } from '../../types';
+import { AccountScope, Transaction, TransactionType } from '../../types';
 import { TransactionFormModal } from '../../components/TransactionFormModal';
 import {
   CardWithHeader,
   CurrencyDisplayer,
   TrendingValueChip,
 } from '../../components/monekin/MonekinComponents';
-import { CategoryDonutChart } from '../../components/monekin/MonekinCharts';
+import {
+  CategoryDonutChart,
+  ScopeDistributionChart,
+} from '../../components/monekin/MonekinCharts';
 
 type TimeRangeKey = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'all';
+type SortOption =
+  | 'date_desc'
+  | 'date_asc'
+  | 'amount_desc'
+  | 'amount_asc'
+  | 'title_asc';
 
 export default function MoneyManagerScreen() {
-  const { settings, transactions, removeTransaction } = useVaultStore();
+  const { settings, accounts, transactions, removeTransaction } = useVaultStore();
   const isDark = settings.theme === 'dark';
   const privateMode = Boolean(settings.privateMode);
   const theme = getThemeColors(isDark);
   const palette = getSectionPalette('money', isDark);
 
   const [timeRange, setTimeRange] = useState<TimeRangeKey>('monthly');
+  const [scopeFilter, setScopeFilter] = useState<'all' | AccountScope>('all');
+  const [sortBy, setSortBy] = useState<SortOption>('date_desc');
   const [typeFilter, setTypeFilter] = useState<'all' | TransactionType>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
@@ -59,6 +71,12 @@ export default function MoneyManagerScreen() {
 
   const nptToday = useMemo(() => getNowInNPT(), []);
   const todayBS = useMemo(() => adToBs(nptToday.isoDate), [nptToday.isoDate]);
+
+  // Multi-wallet & Scope Balances (Personal: Bank 5000, Cash 50; Family: Bank 500, Cash 100)
+  const accountSummary = useMemo(
+    () => calculateAccountBalances(accounts, transactions),
+    [accounts, transactions]
+  );
 
   // Overall all-time balance: Total Balance = Total Income - Total Expenses
   const allTimeSummary = useMemo(
@@ -132,7 +150,13 @@ export default function MoneyManagerScreen() {
   }, [transactions]);
 
   const filteredTransactions = useMemo(() => {
-    return periodTransactions.filter((t) => {
+    let list = periodTransactions.filter((t) => {
+      if (
+        scopeFilter !== 'all' &&
+        (t.accountScope || 'Personal') !== scopeFilter
+      ) {
+        return false;
+      }
       if (typeFilter !== 'all' && t.type !== typeFilter) return false;
       if (selectedCategory !== 'All' && t.category !== selectedCategory)
         return false;
@@ -142,12 +166,31 @@ export default function MoneyManagerScreen() {
           t.title.toLowerCase().includes(q) ||
           t.category.toLowerCase().includes(q) ||
           (t.description || '').toLowerCase().includes(q) ||
-          t.paymentMethod.toLowerCase().includes(q)
+          t.paymentMethod.toLowerCase().includes(q) ||
+          (t.accountScope || 'Personal').toLowerCase().includes(q)
         );
       }
       return true;
     });
-  }, [periodTransactions, typeFilter, selectedCategory, searchQuery]);
+
+    list = [...list].sort((a, b) => {
+      if (sortBy === 'date_desc') return b.dateISO.localeCompare(a.dateISO);
+      if (sortBy === 'date_asc') return a.dateISO.localeCompare(b.dateISO);
+      if (sortBy === 'amount_desc') return b.amount - a.amount;
+      if (sortBy === 'amount_asc') return a.amount - b.amount;
+      if (sortBy === 'title_asc') return a.title.localeCompare(b.title);
+      return 0;
+    });
+
+    return list;
+  }, [
+    periodTransactions,
+    scopeFilter,
+    typeFilter,
+    selectedCategory,
+    searchQuery,
+    sortBy,
+  ]);
 
   // Monekin Date-Grouped Ledger: Group filtered transactions by `dateISO` with daily net total
   const dateGroupedTransactions = useMemo(() => {
@@ -382,6 +425,139 @@ export default function MoneyManagerScreen() {
           })}
         </View>
 
+        {/* Personal vs Family Portfolio & Details Breakdown */}
+        <CardWithHeader
+          title="Personal vs Family Portfolio"
+          subtitle="Ownership distribution & account details"
+          isDark={isDark}
+          accentColor="#2563EB"
+        >
+          <ScopeDistributionChart
+            personalAmount={accountSummary.personalTotal}
+            familyAmount={accountSummary.familyTotal}
+            currency={settings.currency}
+            isDark={isDark}
+            privateMode={privateMode}
+          />
+
+          {/* Details by Personal or Family */}
+          <View style={styles.scopeDetailsGrid}>
+            {/* Personal Details */}
+            <View
+              style={[
+                styles.scopeDetailCard,
+                {
+                  backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                  borderColor: isDark ? '#334155' : '#E2E8F0',
+                },
+              ]}
+            >
+              <View style={styles.scopeDetailHeader}>
+                <View
+                  style={[styles.scopeColorDot, { backgroundColor: '#2563EB' }]}
+                />
+                <Text
+                  style={[
+                    styles.scopeDetailTitle,
+                    { color: theme.textPrimary },
+                  ]}
+                >
+                  Personal (Own)
+                </Text>
+              </View>
+              <Text style={[styles.scopeDetailTotal, { color: '#2563EB' }]}>
+                {formatCurrency(
+                  accountSummary.personalTotal,
+                  settings.currency,
+                  false,
+                  privateMode
+                )}
+              </Text>
+              <View style={styles.scopeSubRows}>
+                {accountSummary.personalAccounts.map((a) => (
+                  <View key={a.id} style={styles.scopeSubRow}>
+                    <Text
+                      style={[styles.scopeSubLabel, { color: theme.textMuted }]}
+                    >
+                      {a.name}:
+                    </Text>
+                    <Text
+                      style={[
+                        styles.scopeSubVal,
+                        { color: theme.textPrimary },
+                      ]}
+                    >
+                      {formatCurrency(
+                        a.currentBalance,
+                        settings.currency,
+                        false,
+                        privateMode
+                      )}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            {/* Family Details */}
+            <View
+              style={[
+                styles.scopeDetailCard,
+                {
+                  backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                  borderColor: isDark ? '#334155' : '#E2E8F0',
+                },
+              ]}
+            >
+              <View style={styles.scopeDetailHeader}>
+                <View
+                  style={[styles.scopeColorDot, { backgroundColor: '#7C3AED' }]}
+                />
+                <Text
+                  style={[
+                    styles.scopeDetailTitle,
+                    { color: theme.textPrimary },
+                  ]}
+                >
+                  Family
+                </Text>
+              </View>
+              <Text style={[styles.scopeDetailTotal, { color: '#7C3AED' }]}>
+                {formatCurrency(
+                  accountSummary.familyTotal,
+                  settings.currency,
+                  false,
+                  privateMode
+                )}
+              </Text>
+              <View style={styles.scopeSubRows}>
+                {accountSummary.familyAccounts.map((a) => (
+                  <View key={a.id} style={styles.scopeSubRow}>
+                    <Text
+                      style={[styles.scopeSubLabel, { color: theme.textMuted }]}
+                    >
+                      {a.name}:
+                    </Text>
+                    <Text
+                      style={[
+                        styles.scopeSubVal,
+                        { color: theme.textPrimary },
+                      ]}
+                    >
+                      {formatCurrency(
+                        a.currentBalance,
+                        settings.currency,
+                        false,
+                        privateMode
+                      )}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          </View>
+        </CardWithHeader>
+
         {/* Monekin Category Distribution Card (`PieChartByCategories`) */}
         <CardWithHeader
           title="Movements by Category"
@@ -421,6 +597,104 @@ export default function MoneyManagerScreen() {
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Scope Filter Tabs */}
+        <View style={styles.scopeFilterRow}>
+          {(
+            [
+              { key: 'all', label: 'All Scopes' },
+              { key: 'Personal', label: 'Personal (Own)' },
+              { key: 'Family', label: 'Family' },
+            ] as const
+          ).map((sf) => {
+            const active = scopeFilter === sf.key;
+            return (
+              <TouchableOpacity
+                key={sf.key}
+                onPress={() => setScopeFilter(sf.key)}
+                style={[
+                  styles.scopeFilterBtn,
+                  active && {
+                    backgroundColor:
+                      sf.key === 'Personal'
+                        ? '#2563EB'
+                        : sf.key === 'Family'
+                        ? '#7C3AED'
+                        : palette.accent,
+                  },
+                  !active && {
+                    backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.scopeFilterBtnText,
+                    {
+                      color: active ? '#FFFFFF' : theme.textMuted,
+                      fontWeight: active ? '800' : '600',
+                    },
+                  ]}
+                >
+                  {sf.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* Sorting Chips Row */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.sortChipsRow}
+        >
+          <View style={styles.sortHintTag}>
+            <Text style={[styles.sortHintText, { color: theme.textMuted }]}>
+              Sort by:
+            </Text>
+          </View>
+          {(
+            [
+              { key: 'date_desc', label: 'Newest ↓' },
+              { key: 'date_asc', label: 'Oldest ↑' },
+              { key: 'amount_desc', label: 'Highest 💰' },
+              { key: 'amount_asc', label: 'Lowest 🪙' },
+              { key: 'title_asc', label: 'Name A–Z' },
+            ] as const
+          ).map((st) => {
+            const isSel = sortBy === st.key;
+            return (
+              <TouchableOpacity
+                key={st.key}
+                onPress={() => setSortBy(st.key)}
+                style={[
+                  styles.sortChip,
+                  isSel && {
+                    backgroundColor: isDark ? '#1F2937' : '#F1F5F9',
+                    borderColor: palette.accent,
+                  },
+                  !isSel && {
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.sortChipText,
+                    {
+                      color: isSel ? palette.accent : theme.textMuted,
+                      fontWeight: isSel ? '800' : '600',
+                    },
+                  ]}
+                >
+                  {st.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
 
         {/* Type & Category Filter Chips */}
         <ScrollView
@@ -585,12 +859,43 @@ export default function MoneyManagerScreen() {
                     </View>
 
                     <View style={{ flex: 1 }}>
-                      <Text
-                        style={[styles.txnTitle, { color: theme.textPrimary }]}
-                        numberOfLines={1}
-                      >
-                        {t.title}
-                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text
+                          style={[styles.txnTitle, { color: theme.textPrimary, flexShrink: 1 }]}
+                          numberOfLines={1}
+                        >
+                          {t.title}
+                        </Text>
+                        <View
+                          style={[
+                            styles.scopeTag,
+                            {
+                              backgroundColor:
+                                t.accountScope === 'Family'
+                                  ? isDark
+                                    ? '#4C1D95'
+                                    : '#EDE9FE'
+                                  : isDark
+                                  ? '#1E3A8A'
+                                  : '#DBEAFE',
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.scopeTagText,
+                              {
+                                color:
+                                  t.accountScope === 'Family'
+                                    ? '#A78BFA'
+                                    : '#60A5FA',
+                              },
+                            ]}
+                          >
+                            {t.accountScope === 'Family' ? 'Family' : 'Personal'}
+                          </Text>
+                        </View>
+                      </View>
                       <Text
                         style={[styles.txnMeta, { color: theme.textMuted }]}
                       >
@@ -864,5 +1169,98 @@ const styles = StyleSheet.create({
   },
   iconActionBtn: {
     padding: 3,
+  },
+  scopeDetailsGrid: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 14,
+  },
+  scopeDetailCard: {
+    flex: 1,
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+  },
+  scopeDetailHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
+  },
+  scopeColorDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  scopeDetailTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  scopeDetailTotal: {
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+  scopeSubRows: {
+    gap: 4,
+  },
+  scopeSubRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  scopeSubLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  scopeSubVal: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  scopeFilterRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 10,
+  },
+  scopeFilterBtn: {
+    flex: 1,
+    paddingVertical: 7,
+    borderRadius: 999,
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  scopeFilterBtnText: {
+    fontSize: 12,
+  },
+  sortChipsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingBottom: 10,
+  },
+  sortHintTag: {
+    paddingRight: 4,
+  },
+  sortHintText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  sortChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  sortChipText: {
+    fontSize: 11,
+  },
+  scopeTag: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  scopeTagText: {
+    fontSize: 10,
+    fontWeight: '800',
   },
 });

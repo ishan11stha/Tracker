@@ -179,7 +179,7 @@ const validBackup = vaultBackupSchema.safeParse({
     preferredCalendar: 'BS',
     timeFormat: '12h',
     notificationsEnabled: true,
-    theme: 'light',
+    theme: 'dark',
   },
   transactions: [],
   items: [],

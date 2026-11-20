@@ -148,7 +148,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   preferredCalendar: 'BS',
   timeFormat: '12h',
   notificationsEnabled: true,
-  theme: 'light',
+  theme: 'dark',
 };
 
 export const useVaultStore = create<VaultState>((set, get) => ({

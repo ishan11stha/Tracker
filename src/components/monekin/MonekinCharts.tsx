@@ -343,7 +343,168 @@ export const CategoryDonutChart: React.FC<CategoryDonutChartProps> = ({
   );
 };
 
+/**
+ * 4. Monekin `ScopeDistributionChart` (Personal vs Family comparative visualization)
+ * Dual-color proportional pill bar, percentage chips & live currency displays.
+ */
+export interface ScopeDistributionChartProps {
+  personalAmount: number;
+  familyAmount: number;
+  currency: 'NPR' | 'USD' | 'INR';
+  isDark: boolean;
+  privateMode?: boolean;
+  metricLabel?: string;
+}
+
+export const ScopeDistributionChart: React.FC<ScopeDistributionChartProps> = ({
+  personalAmount,
+  familyAmount,
+  currency,
+  isDark,
+  privateMode = false,
+  metricLabel = 'Net Balance',
+}) => {
+  const theme = getThemeColors(isDark);
+  const pSafe = Math.max(0, personalAmount);
+  const fSafe = Math.max(0, familyAmount);
+  const total = pSafe + fSafe;
+  const personalPct = total > 0 ? Math.round((pSafe / total) * 100) : 50;
+  const familyPct = total > 0 ? 100 - personalPct : 50;
+
+  return (
+    <View style={styles.scopeDistContainer}>
+      {/* Proportional Segmented Bar */}
+      <View
+        style={[
+          styles.scopeBarWrapper,
+          {
+            backgroundColor: isDark ? '#1F2937' : '#F1F5F9',
+          },
+        ]}
+      >
+        <View
+          style={[
+            styles.scopeBarSegment,
+            {
+              flex: Math.max(personalPct, 5),
+              backgroundColor: '#2563EB',
+              borderTopLeftRadius: 10,
+              borderBottomLeftRadius: 10,
+              borderTopRightRadius: familyPct === 0 ? 10 : 2,
+              borderBottomRightRadius: familyPct === 0 ? 10 : 2,
+            },
+          ]}
+        />
+        <View style={{ width: 4 }} />
+        <View
+          style={[
+            styles.scopeBarSegment,
+            {
+              flex: Math.max(familyPct, 5),
+              backgroundColor: '#7C3AED',
+              borderTopRightRadius: 10,
+              borderBottomRightRadius: 10,
+              borderTopLeftRadius: personalPct === 0 ? 10 : 2,
+              borderBottomLeftRadius: personalPct === 0 ? 10 : 2,
+            },
+          ]}
+        />
+      </View>
+
+      {/* Legend & Stats Row */}
+      <View style={styles.scopeDistLegend}>
+        <View style={styles.scopeLegendItem}>
+          <View style={[styles.scopeColorDot, { backgroundColor: '#2563EB' }]} />
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={[styles.scopeLegendTitle, { color: theme.textPrimary }]}>
+                Personal (Own)
+              </Text>
+              <View
+                style={[
+                  styles.pctPill,
+                  { backgroundColor: isDark ? '#1E3A8A' : '#DBEAFE' },
+                ]}
+              >
+                <Text style={[styles.pctPillText, { color: '#2563EB' }]}>
+                  {personalPct}%
+                </Text>
+              </View>
+            </View>
+            <Text style={[styles.scopeLegendAmount, { color: '#2563EB' }]}>
+              {formatCurrency(personalAmount, currency, false, privateMode)}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.scopeLegendItem}>
+          <View style={[styles.scopeColorDot, { backgroundColor: '#7C3AED' }]} />
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={[styles.scopeLegendTitle, { color: theme.textPrimary }]}>
+                Family
+              </Text>
+              <View
+                style={[
+                  styles.pctPill,
+                  { backgroundColor: isDark ? '#4C1D95' : '#EDE9FE' },
+                ]}
+              >
+                <Text style={[styles.pctPillText, { color: '#7C3AED' }]}>
+                  {familyPct}%
+                </Text>
+              </View>
+            </View>
+            <Text style={[styles.scopeLegendAmount, { color: '#7C3AED' }]}>
+              {formatCurrency(familyAmount, currency, false, privateMode)}
+            </Text>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+};
+
 const styles = StyleSheet.create({
+  scopeDistContainer: {
+    paddingVertical: 4,
+  },
+  scopeBarWrapper: {
+    flexDirection: 'row',
+    height: 14,
+    borderRadius: 10,
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  scopeBarSegment: {
+    height: '100%',
+  },
+  scopeDistLegend: {
+    flexDirection: 'row',
+    gap: 16,
+    justifyContent: 'space-between',
+  },
+  scopeLegendItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  scopeColorDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginTop: 4,
+  },
+  scopeLegendTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  scopeLegendAmount: {
+    fontSize: 13,
+    fontWeight: '800',
+    marginTop: 2,
+  },
   gaugeCenter: {
     position: 'absolute',
     alignItems: 'center',

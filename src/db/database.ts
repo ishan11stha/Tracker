@@ -253,6 +253,25 @@ async function seedInitialData(db: SQLite.SQLiteDatabase): Promise<void> {
   const twoDaysAgoISO = toISO(twoDaysAgoDate);
 
   await db.withTransactionAsync(async () => {
+    // Check existing settings: if theme is light or not set, default to dark
+    const existingSettingsRow = await db.getFirstAsync<{ value: string }>(
+      `SELECT value FROM settings WHERE key = 'app_settings'`
+    );
+    if (existingSettingsRow?.value) {
+      try {
+        const parsed = JSON.parse(existingSettingsRow.value);
+        if (parsed.theme === 'light') {
+          parsed.theme = 'dark';
+          await db.runAsync(
+            `UPDATE settings SET value = ? WHERE key = 'app_settings'`,
+            [JSON.stringify(parsed)]
+          );
+        }
+      } catch {
+        // ignore JSON parse error
+      }
+    }
+
     const defaultSettings: AppSettings = {
       userName: 'Aarav Sharma',
       userTitle: 'Kathmandu, Nepal',
@@ -261,7 +280,7 @@ async function seedInitialData(db: SQLite.SQLiteDatabase): Promise<void> {
       preferredCalendar: 'BS',
       timeFormat: '12h',
       notificationsEnabled: true,
-      theme: 'light',
+      theme: 'dark',
     };
 
     await db.runAsync(
@@ -587,7 +606,7 @@ export async function dbGetSettings(): Promise<AppSettings> {
     preferredCalendar: 'BS',
     timeFormat: '12h',
     notificationsEnabled: true,
-    theme: 'light',
+    theme: 'dark',
   };
 }
 
