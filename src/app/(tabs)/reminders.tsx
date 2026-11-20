@@ -196,7 +196,7 @@ export default function RemindersScreen() {
                 key: 'completed',
                 label: `Done (${categorized.completed.length})`,
               },
-              { key: 'calendar', label: 'पात्रो (Calendar)' },
+              { key: 'calendar', label: 'Calendar' },
             ] as { key: ReminderTabKey; label: string }[]
           ).map((t) => {
             const active = activeTab === t.key;

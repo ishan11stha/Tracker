@@ -331,9 +331,18 @@ export default function ActivityTrackerScreen() {
               {viewMode === 'daily' ? 'day' : 'month'}
             </Text>
             <Text style={[styles.emptySub, { color: theme.textMuted }]}>
-              Tap "Log Activity" to record workouts, study hours, hydration, or
-              daily habits.
+              {selectedCategory !== 'All'
+                ? `No activities logged under "${selectedCategory}".`
+                : 'Tap "Log Activity" to record workouts, study hours, hydration, or daily habits.'}
             </Text>
+            {selectedCategory !== 'All' && (
+              <TouchableOpacity
+                onPress={() => setSelectedCategory('All')}
+                style={[styles.resetFilterBtn, { backgroundColor: palette.accent }]}
+              >
+                <Text style={styles.resetFilterBtnText}>Show All Categories</Text>
+              </TouchableOpacity>
+            )}
           </View>
         ) : (
           filteredActivities.map((act) => {
@@ -665,5 +674,18 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingTop: 8,
     borderTopWidth: 1,
+  },
+  resetFilterBtn: {
+    marginTop: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  resetFilterBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

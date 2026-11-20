@@ -311,9 +311,21 @@ export default function ItemTrackerScreen() {
               No items found
             </Text>
             <Text style={[styles.emptySub, { color: theme.textMuted }]}>
-              Tap "Add Item" to record electronics, books, documents, or lent
-              belongings.
+              {searchQuery || statusFilter !== 'All'
+                ? 'No items match your active search or status filter.'
+                : 'Tap "Add Item" to record electronics, books, documents, or lent belongings.'}
             </Text>
+            {(searchQuery.trim().length > 0 || statusFilter !== 'All') && (
+              <TouchableOpacity
+                onPress={() => {
+                  setSearchQuery('');
+                  setStatusFilter('All');
+                }}
+                style={[styles.resetFilterBtn, { backgroundColor: palette.accent }]}
+              >
+                <Text style={styles.resetFilterBtnText}>Reset Filters</Text>
+              </TouchableOpacity>
+            )}
           </View>
         ) : (
           filteredItems.map((item) => {
@@ -862,5 +874,18 @@ const styles = StyleSheet.create({
   logTime: {
     fontSize: 11,
     marginTop: 2,
+  },
+  resetFilterBtn: {
+    marginTop: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  resetFilterBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

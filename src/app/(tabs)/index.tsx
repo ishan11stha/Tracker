@@ -56,7 +56,6 @@ import {
   BalanceEvolutionChart,
   CategoryDonutChart,
   FinanceHealthGauge,
-  ScopeDistributionChart,
   getFinanceHealthMeta,
 } from '../../components/monekin/MonekinCharts';
 import { AccountScope, PaymentMethod, TransactionType } from '../../types';
@@ -185,10 +184,7 @@ export default function DashboardScreen() {
     };
   }, [scopedTransactions, selectedPeriod, initialNpt.isoDate, allTimeSummary.totalIncome]);
 
-  const [accountScopeFilter, setAccountScopeFilter] =
-    useState<'All' | 'Personal' | 'Family'>('All');
-
-  // Multi-wallet & Scope Balances (Personal: Bank 5000, Cash 50; Family: Bank 500, Cash 100)
+  // Multi-wallet & Scope Balances
   const accountSummary = useMemo(
     () => calculateAccountBalances(accounts, transactions),
     [accounts, transactions]
@@ -201,14 +197,14 @@ export default function DashboardScreen() {
   }, [overviewScope, accountSummary]);
 
   const displayedAccounts = useMemo(() => {
-    if (accountScopeFilter === 'Personal') {
+    if (overviewScope === 'Personal') {
       return accountSummary.personalAccounts;
     }
-    if (accountScopeFilter === 'Family') {
+    if (overviewScope === 'Family') {
       return accountSummary.familyAccounts;
     }
     return [...accountSummary.personalAccounts, ...accountSummary.familyAccounts];
-  }, [accountScopeFilter, accountSummary]);
+  }, [overviewScope, accountSummary]);
 
   // Monekin `FinanceHealthCard` score (0-100) from savings rate, cash flow, and task completion
   const financeHealthScore = useMemo(() => {
@@ -255,16 +251,14 @@ export default function DashboardScreen() {
       .sort((a, b) => b.amount - a.amount);
   }, [periodTransactions]);
 
-  const [recentScope, setRecentScope] =
-    useState<'All' | 'Personal' | 'Family'>('All');
   const [recentSort, setRecentSort] = useState<
     'date_desc' | 'date_asc' | 'amount_desc' | 'amount_asc'
   >('date_desc');
 
-  // Slices for life tracker cards (with Scope Filter & Sorting)
+  // Slices for life tracker cards (synchronized with top overviewScope & Sorting)
   const recentTransactions = useMemo(() => {
     let list = transactions.filter((t) => {
-      if (recentScope !== 'All' && (t.accountScope || 'Personal') !== recentScope) {
+      if (overviewScope !== 'All' && (t.accountScope || 'Personal') !== overviewScope) {
         return false;
       }
       return true;
@@ -279,7 +273,7 @@ export default function DashboardScreen() {
     });
 
     return list.slice(0, 5);
-  }, [transactions, recentScope, recentSort]);
+  }, [transactions, overviewScope, recentSort]);
 
   const upcomingReminders = useMemo(
     () =>
@@ -804,46 +798,6 @@ export default function DashboardScreen() {
               </View>
             </View>
 
-            {/* Scope Filter Tabs */}
-            <View style={styles.scopeTabsRow}>
-              {(['All', 'Personal', 'Family'] as const).map((scopeKey) => {
-                const isSelected = accountScopeFilter === scopeKey;
-                return (
-                  <TouchableOpacity
-                    key={scopeKey}
-                    onPress={() => setAccountScopeFilter(scopeKey)}
-                    style={[
-                      styles.scopeTabBtn,
-                      isSelected && {
-                        backgroundColor:
-                          scopeKey === 'Personal'
-                            ? '#2563EB'
-                            : scopeKey === 'Family'
-                              ? '#7C3AED'
-                              : palette.accent,
-                      },
-                      !isSelected && {
-                        backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
-                        borderColor: theme.border,
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.scopeTabText,
-                        {
-                          color: isSelected ? '#FFFFFF' : theme.textMuted,
-                          fontWeight: isSelected ? '800' : '600',
-                        },
-                      ]}
-                    >
-                      {scopeKey === 'Personal' ? 'Personal (Own)' : scopeKey}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
             {displayedAccounts.length === 0 ? (
               <Text style={[styles.emptyText, { color: theme.textMuted }]}>
                 No accounts found in this view.
@@ -1010,75 +964,20 @@ export default function DashboardScreen() {
             />
           </CardWithHeader>
 
-          {/* 8b. PERSONAL vs FAMILY PORTFOLIO ALLOCATION CHART */}
-          <CardWithHeader
-            title="Personal vs Family Portfolio"
-            subtitle="Current asset share & net worth comparison"
-            isDark={isDark}
-            onHeaderActionPress={() => router.push('/(tabs)/money')}
-            accentColor="#2563EB"
-            footerText="Open detailed financial breakdown"
-            onFooterPress={() => router.push('/(tabs)/money')}
-          >
-            <ScopeDistributionChart
-              personalAmount={accountSummary.personalTotal}
-              familyAmount={accountSummary.familyTotal}
-              currency={settings.currency}
-              isDark={isDark}
-              privateMode={privateMode}
-            />
-          </CardWithHeader>
-
-          {/* 9. RECENT TRANSACTIONS CARD (With Scope Filtering & Sorting) */}
+          {/* 9. RECENT TRANSACTIONS CARD (Synchronized with Overview Scope) */}
           <CardWithHeader
             title="Recent Movements"
+            subtitle={overviewScope === 'All' ? 'All Portfolios' : `${overviewScope} Portfolio`}
             isDark={isDark}
             headerActionText="View All"
             onHeaderActionPress={() => router.push('/(tabs)/money')}
             accentColor="#37A13B"
           >
-            {/* Quick Filter & Sorting Controls */}
+            {/* Quick Sorting Controls */}
             <View style={styles.recentControlsRow}>
-              {/* Scope filter */}
-              <View style={styles.recentScopePills}>
-                {(['All', 'Personal', 'Family'] as const).map((sc) => {
-                  const isSel = recentScope === sc;
-                  return (
-                    <TouchableOpacity
-                      key={sc}
-                      onPress={() => setRecentScope(sc)}
-                      style={[
-                        styles.filterMiniPill,
-                        isSel && {
-                          backgroundColor:
-                            sc === 'Personal'
-                              ? '#2563EB'
-                              : sc === 'Family'
-                                ? '#7C3AED'
-                                : isDark
-                                  ? '#374151'
-                                  : '#E2E8F0',
-                        },
-                        !isSel && {
-                          borderColor: theme.border,
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.filterMiniPillText,
-                          {
-                            color: isSel ? '#FFFFFF' : theme.textMuted,
-                            fontWeight: isSel ? '800' : '600',
-                          },
-                        ]}
-                      >
-                        {sc === 'Personal' ? 'Personal' : sc}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+              <Text style={[styles.recentSubtitle, { color: theme.textMuted }]}>
+                Showing latest 5 movements
+              </Text>
 
               {/* Sort pills */}
               <View style={styles.recentSortPills}>
@@ -1886,18 +1785,9 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
   },
-  recentScopePills: {
-    flexDirection: 'row',
-    gap: 5,
-  },
-  filterMiniPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3.5,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  filterMiniPillText: {
-    fontSize: 10,
+  recentSubtitle: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   recentSortPills: {
     flexDirection: 'row',

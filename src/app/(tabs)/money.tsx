@@ -145,9 +145,12 @@ export default function MoneyManagerScreen() {
 
   const allCategories = useMemo(() => {
     const set = new Set<string>(['All']);
-    transactions.forEach((t) => set.add(t.category));
+    transactions.forEach((t) => {
+      if (typeFilter !== 'all' && t.type !== typeFilter) return;
+      set.add(t.category);
+    });
     return Array.from(set);
-  }, [transactions]);
+  }, [transactions, typeFilter]);
 
   const filteredTransactions = useMemo(() => {
     let list = periodTransactions.filter((t) => {
@@ -713,7 +716,10 @@ export default function MoneyManagerScreen() {
             return (
               <TouchableOpacity
                 key={tf.key}
-                onPress={() => setTypeFilter(tf.key)}
+                onPress={() => {
+                  setTypeFilter(tf.key);
+                  setSelectedCategory('All');
+                }}
                 style={[
                   styles.filterChip,
                   {
@@ -773,8 +779,24 @@ export default function MoneyManagerScreen() {
               No matching transactions
             </Text>
             <Text style={[styles.emptySub, { color: theme.textMuted }]}>
-              Try switching the period filter or add a new income/expense entry.
+              {searchQuery || selectedCategory !== 'All' || typeFilter !== 'all' || scopeFilter !== 'all' || timeRange !== 'all'
+                ? 'No transactions found with the active filters.'
+                : 'No transactions recorded yet in this period.'}
             </Text>
+            {(searchQuery.trim().length > 0 || selectedCategory !== 'All' || typeFilter !== 'all' || scopeFilter !== 'all' || timeRange !== 'all') && (
+              <TouchableOpacity
+                onPress={() => {
+                  setSearchQuery('');
+                  setSelectedCategory('All');
+                  setTypeFilter('all');
+                  setScopeFilter('all');
+                  setTimeRange('all');
+                }}
+                style={[styles.resetFilterBtn, { backgroundColor: palette.accent }]}
+              >
+                <Text style={styles.resetFilterBtnText}>Reset All Filters</Text>
+              </TouchableOpacity>
+            )}
           </View>
         ) : (
           dateGroupedTransactions.map((group) => (
@@ -1262,5 +1284,18 @@ const styles = StyleSheet.create({
   scopeTagText: {
     fontSize: 10,
     fontWeight: '800',
+  },
+  resetFilterBtn: {
+    marginTop: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  resetFilterBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

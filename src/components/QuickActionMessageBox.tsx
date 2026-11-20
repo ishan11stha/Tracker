@@ -290,8 +290,8 @@ export function QuickActionMessageBox({
 
 const styles = StyleSheet.create({
   container: {
-    marginHorizontal: 16,
-    marginVertical: 12,
+    marginHorizontal: 0,
+    marginVertical: 10,
     borderRadius: 20,
     padding: 12,
     borderWidth: 1,
