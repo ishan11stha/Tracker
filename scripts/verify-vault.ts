@@ -380,4 +380,43 @@ assert(freshStartBalances.familyTotal === 600, `Expected fresh Family Total 600,
 assert(freshStartBalances.grandTotal === 5650, `Expected fresh Grand Total 5650, got ${freshStartBalances.grandTotal}`);
 console.log('11. Fresh Start Initial Wallets State (Zero Transactions): PASSED\n');
 
+// 12. Security & Form Validation Boundary Tests
+const invalidZeroTxn = transactionSchema.safeParse({
+  type: 'expense',
+  title: 'Invalid Zero',
+  amount: 0,
+  category: 'Shopping',
+  dateISO: '2026-11-20',
+  paymentMethod: 'Cash',
+});
+assert(!invalidZeroTxn.success, 'Expected zero amount transaction to fail validation');
+
+const invalidTitleTxn = transactionSchema.safeParse({
+  type: 'expense',
+  title: '   ',
+  amount: 500,
+  category: 'Shopping',
+  dateISO: '2026-11-20',
+  paymentMethod: 'Cash',
+});
+assert(!invalidTitleTxn.success, 'Expected blank title transaction to fail validation');
+
+const invalidItem = itemSchema.safeParse({
+  name: '',
+  category: 'Electronics',
+  purchasePrice: -50,
+  purchaseDateISO: '2026-11-20',
+  quantity: 0,
+  location: '',
+  status: 'Owned',
+});
+assert(!invalidItem.success, 'Expected negative price / zero quantity item to fail validation');
+console.log('12. Security & Form Validation Boundaries: PASSED');
+
+// 13. Currency Formatting & Lakh/Crore System Stress Testing
+assert(formatCurrency(-5400, 'NPR') === '- NPR 5,400', `Unexpected negative format: ${formatCurrency(-5400, 'NPR')}`);
+assert(formatCurrency(10000000, 'NPR') === 'NPR 1,00,00,000', `Expected 1 Crore format, got ${formatCurrency(10000000, 'NPR')}`);
+assert(formatCurrency(0, 'NPR') === 'NPR 0', `Expected zero format, got ${formatCurrency(0, 'NPR')}`);
+console.log('13. Currency Formatting & Lakh/Crore Stress Tests: PASSED\n');
+
 console.log('✅ ALL VAULT CORE & ARCHITECTURAL CHECKS PASSED!');

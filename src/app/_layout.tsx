@@ -26,7 +26,16 @@ export default function RootLayout() {
         ]}
       >
         <StatusBar style={isDark ? 'light' : 'dark'} />
-        <View style={styles.logoBadge}>
+        <View
+          style={[
+            styles.logoBadge,
+            {
+              backgroundColor: isDark ? '#1E293B' : '#0F172A',
+              borderColor: isDark ? '#334155' : 'transparent',
+              borderWidth: isDark ? 1 : 0,
+            },
+          ]}
+        >
           <Text style={styles.logoBadgeText}>V</Text>
         </View>
         <Text style={[styles.brandTitle, { color: theme.textPrimary }]}>
@@ -37,7 +46,7 @@ export default function RootLayout() {
         </Text>
         <ActivityIndicator
           size="large"
-          color="#0F172A"
+          color={isDark ? '#60A5FA' : '#0F172A'}
           style={{ marginTop: 24 }}
         />
       </View>

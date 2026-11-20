@@ -314,8 +314,22 @@ export const useVaultStore = create<VaultState>((set, get) => ({
     set({ isSubmitting: true, error: null });
     try {
       const now = new Date().toISOString();
+      const accounts = get().accounts;
+      let accountId = data.accountId;
+      if (!accountId && accounts.length > 0) {
+        const scope = data.accountScope || 'Personal';
+        const matched = accounts.find((a) => {
+          if (a.scope !== scope) return false;
+          if (data.paymentMethod === 'Bank Transfer' && a.paymentMethod === 'Bank Transfer') return true;
+          if (data.paymentMethod === 'Cash' && a.paymentMethod === 'Cash') return true;
+          return a.paymentMethod === data.paymentMethod;
+        });
+        accountId = matched ? matched.id : accounts.find((a) => a.scope === scope)?.id || accounts[0]?.id;
+      }
+
       const newTxn: Transaction = {
         ...data,
+        accountId,
         id: `txn_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
         createdAt: now,
         updatedAt: now,
@@ -341,9 +355,25 @@ export const useVaultStore = create<VaultState>((set, get) => ({
         set({ isSubmitting: false });
         return;
       }
+
+      const accounts = get().accounts;
+      let accountId = data.accountId || existing.accountId;
+      if (accounts.length > 0) {
+        const scope = data.accountScope || existing.accountScope || 'Personal';
+        const payment = data.paymentMethod || existing.paymentMethod;
+        const matched = accounts.find((a) => {
+          if (a.scope !== scope) return false;
+          if (payment === 'Bank Transfer' && a.paymentMethod === 'Bank Transfer') return true;
+          if (payment === 'Cash' && a.paymentMethod === 'Cash') return true;
+          return a.paymentMethod === payment;
+        });
+        if (matched) accountId = matched.id;
+      }
+
       const updated: Transaction = {
         ...existing,
         ...data,
+        accountId,
         updatedAt: new Date().toISOString(),
       };
       await dbUpdateTransaction(updated);
