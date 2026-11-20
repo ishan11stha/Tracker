@@ -394,18 +394,6 @@ export default function DashboardScreen() {
                   >
                     {settings.userName || 'Tap to set name'}
                   </Text>
-                  <View
-                    style={[
-                      styles.vaultTagPill,
-                      { backgroundColor: palette.accentSoft },
-                    ]}
-                  >
-                    <Text
-                      style={[styles.vaultTagText, { color: palette.accent }]}
-                    >
-                      VAULT
-                    </Text>
-                  </View>
                 </View>
               </View>
             </TouchableOpacity>
