@@ -2,7 +2,14 @@ import { z } from 'zod';
 
 export type TransactionType = 'income' | 'expense';
 
-export type PaymentMethod = 'Cash' | 'eSewa' | 'Khalti' | 'Bank Transfer' | 'Card' | 'ConnectIPS' | 'Other';
+export type PaymentMethod =
+  | 'Cash'
+  | 'eSewa'
+  | 'Khalti'
+  | 'Bank Transfer'
+  | 'Card'
+  | 'ConnectIPS'
+  | 'Other';
 
 export interface Transaction {
   id: string;
@@ -19,15 +26,27 @@ export interface Transaction {
 
 export const transactionSchema = z.object({
   type: z.enum(['income', 'expense']),
-  title: z.string().trim().min(1, 'Transaction title is required').max(100, 'Title too long'),
+  title: z
+    .string()
+    .trim()
+    .min(1, 'Transaction title is required')
+    .max(100, 'Title too long'),
   amount: z
-    .number({ invalid_type_error: 'Enter a valid amount' })
+    .number()
     .positive('Amount must be greater than 0')
     .max(1000000000, 'Amount exceeds maximum limit'),
   category: z.string().trim().min(1, 'Category is required'),
   dateISO: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
-  paymentMethod: z.enum(['Cash', 'eSewa', 'Khalti', 'Bank Transfer', 'Card', 'ConnectIPS', 'Other']),
-  description: z.string().max(500, 'Notes cannot exceed 500 characters').optional().default(''),
+  paymentMethod: z.enum([
+    'Cash',
+    'eSewa',
+    'Khalti',
+    'Bank Transfer',
+    'Card',
+    'ConnectIPS',
+    'Other',
+  ]),
+  description: z.string().max(500, 'Notes cannot exceed 500 characters'),
 });
 
 export type ItemStatus = 'Owned' | 'Borrowed' | 'Lent' | 'Sold' | 'Returned';
@@ -59,17 +78,17 @@ export interface ItemHistoryLog {
 
 export const itemSchema = z.object({
   name: z.string().trim().min(1, 'Item name is required').max(100),
-  description: z.string().max(500).optional().default(''),
+  description: z.string().max(500),
   category: z.string().trim().min(1, 'Category is required'),
-  purchasePrice: z
-    .number({ invalid_type_error: 'Enter a valid price' })
-    .min(0, 'Price cannot be negative'),
-  purchaseDateISO: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid purchase date'),
+  purchasePrice: z.number().min(0, 'Price cannot be negative'),
+  purchaseDateISO: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid purchase date'),
   quantity: z
-    .number({ invalid_type_error: 'Enter a valid quantity' })
+    .number()
     .int('Quantity must be a whole number')
     .min(1, 'Quantity must be at least 1'),
-  imageUri: z.string().optional().default(''),
+  imageUri: z.string(),
   location: z.string().trim().min(1, 'Location is required').max(100),
   status: z.enum(['Owned', 'Borrowed', 'Lent', 'Sold', 'Returned']),
 });
@@ -92,17 +111,22 @@ export interface ActivityRecord {
 
 export const activitySchema = z.object({
   title: z.string().trim().min(1, 'Activity title is required').max(100),
-  description: z.string().max(500).optional().default(''),
+  description: z.string().max(500),
   category: z.string().trim().min(1, 'Category is required'),
   dateISO: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
   timeString: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time (HH:MM)'),
-  numericValue: z.number({ invalid_type_error: 'Enter a valid number' }).min(0, 'Cannot be negative'),
-  unit: z.string().trim().max(30).optional().default('mins'),
+  numericValue: z.number().min(0, 'Cannot be negative'),
+  unit: z.string().trim().max(30),
   status: z.enum(['completed', 'pending']),
 });
 
 export type ReminderPriority = 'Low' | 'Medium' | 'High';
-export type ReminderRecurrence = 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
+export type ReminderRecurrence =
+  | 'none'
+  | 'daily'
+  | 'weekly'
+  | 'monthly'
+  | 'yearly';
 
 export interface ReminderItem {
   id: string;
@@ -121,7 +145,7 @@ export interface ReminderItem {
 
 export const reminderSchema = z.object({
   title: z.string().trim().min(1, 'Reminder title is required').max(100),
-  description: z.string().max(500).optional().default(''),
+  description: z.string().max(500),
   dateISO: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
   timeString: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time (HH:MM)'),
   priority: z.enum(['Low', 'Medium', 'High']),
@@ -139,6 +163,68 @@ export interface AppSettings {
   notificationsEnabled: boolean;
   theme: 'light' | 'dark';
 }
+
+export const appSettingsSchema = z.object({
+  userName: z.string().trim().min(1).max(100),
+  userTitle: z.string().trim().max(100),
+  currency: z.enum(['NPR', 'USD', 'INR']),
+  language: z.enum(['ne', 'en']),
+  preferredCalendar: z.enum(['BS', 'AD']),
+  timeFormat: z.enum(['12h', '24h']),
+  notificationsEnabled: z.boolean(),
+  theme: z.enum(['light', 'dark']),
+});
+
+export const vaultBackupSchema = z.object({
+  version: z.number().int().min(1),
+  exportedAt: z.string(),
+  settings: appSettingsSchema,
+  transactions: z.array(
+    transactionSchema.extend({
+      id: z.string().min(1),
+      createdAt: z.string(),
+      updatedAt: z.string(),
+    })
+  ),
+  items: z.array(
+    itemSchema.extend({
+      id: z.string().min(1),
+      createdAt: z.string(),
+      updatedAt: z.string(),
+    })
+  ),
+  itemHistory: z.array(
+    z.object({
+      id: z.string().min(1),
+      itemId: z.string().min(1),
+      action: z.string(),
+      previousStatus: z
+        .enum(['Owned', 'Borrowed', 'Lent', 'Sold', 'Returned'])
+        .nullable()
+        .optional()
+        .transform((val) => val ?? undefined),
+      newStatus: z.enum(['Owned', 'Borrowed', 'Lent', 'Sold', 'Returned']),
+      note: z.string(),
+      timestamp: z.string(),
+    })
+  ),
+  activities: z.array(
+    activitySchema.extend({
+      id: z.string().min(1),
+      createdAt: z.string(),
+      updatedAt: z.string(),
+    })
+  ),
+  reminders: z.array(
+    reminderSchema.extend({
+      id: z.string().min(1),
+      isCompleted: z.boolean(),
+      notificationId: z.string().optional(),
+      createdAt: z.string(),
+      updatedAt: z.string(),
+    })
+  ),
+});
 
 export const INCOME_CATEGORIES = [
   'Salary',
@@ -205,6 +291,17 @@ export const ACTIVITY_CATEGORIES = [
   'Custom',
 ];
 
+export const COMMON_ACTIVITY_UNITS = [
+  'mins',
+  'hrs',
+  'km',
+  'steps',
+  'pages',
+  'glasses',
+  'kcal',
+  'sessions',
+];
+
 export const REMINDER_CATEGORIES = [
   'Bills & Finance',
   'Work & Deadlines',
@@ -213,4 +310,18 @@ export const REMINDER_CATEGORIES = [
   'Event & Festival',
   'Maintenance',
   'Other',
+];
+
+export const REMINDER_PRIORITIES: { label: ReminderPriority; color: string }[] = [
+  { label: 'Low', color: '#2563EB' },
+  { label: 'Medium', color: '#D97706' },
+  { label: 'High', color: '#DC2626' },
+];
+
+export const REMINDER_RECURRENCES: { key: ReminderRecurrence; label: string }[] = [
+  { key: 'none', label: 'Once' },
+  { key: 'daily', label: 'Daily' },
+  { key: 'weekly', label: 'Weekly' },
+  { key: 'monthly', label: 'Monthly' },
+  { key: 'yearly', label: 'Yearly' },
 ];

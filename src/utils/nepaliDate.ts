@@ -341,21 +341,26 @@ export function bsToAd(bsYear: number, bsMonth: number, bsDay: number): {
   weekday: number;
   isoDate: string;
 } {
+  const clampedYear = Math.min(2099, Math.max(2000, Math.trunc(bsYear)));
+  const clampedMonth = Math.min(12, Math.max(1, Math.trunc(bsMonth)));
+  const maxDay = getDaysInBSMonth(clampedYear, clampedMonth);
+  const clampedDay = Math.min(maxDay, Math.max(1, Math.trunc(bsDay)));
+
   let totalDays = 0;
 
-  for (let y = 2000; y < bsYear; y++) {
+  for (let y = 2000; y < clampedYear; y++) {
     const months = BS_CALENDAR_DATA[y];
     if (months) {
       totalDays += months.reduce((acc, d) => acc + d, 0);
     }
   }
 
-  const currentYearMonths = BS_CALENDAR_DATA[bsYear] || BS_CALENDAR_DATA[2083];
-  for (let m = 0; m < bsMonth - 1; m++) {
+  const currentYearMonths = BS_CALENDAR_DATA[clampedYear] || BS_CALENDAR_DATA[2083];
+  for (let m = 0; m < clampedMonth - 1; m++) {
     totalDays += currentYearMonths[m];
   }
 
-  totalDays += bsDay - 1;
+  totalDays += clampedDay - 1;
 
   const targetUTC = ANCHOR_AD_UTC + totalDays * 24 * 60 * 60 * 1000;
   const d = new Date(targetUTC);

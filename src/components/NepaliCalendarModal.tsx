@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Modal,
   Pressable,
@@ -74,6 +74,23 @@ export const NepaliCalendarModal: React.FC<NepaliCalendarModalProps> = ({
   const [viewADYear, setViewADYear] = useState<number>(initialADParts[0]);
   const [viewADMonth, setViewADMonth] = useState<number>(initialADParts[1]);
   const [showYearPicker, setShowYearPicker] = useState(false);
+
+  useEffect(() => {
+    if (visible) {
+      setViewBSYear(initialBS.year);
+      setViewBSMonth(initialBS.month);
+      setViewADYear(initialADParts[0]);
+      setViewADMonth(initialADParts[1]);
+      setCalendarMode(settings.preferredCalendar);
+      setShowYearPicker(false);
+    }
+  }, [
+    visible,
+    initialBS.year,
+    initialBS.month,
+    initialADParts,
+    settings.preferredCalendar,
+  ]);
 
   const selectedBS = useMemo(() => adToBs(initialISO), [initialISO]);
 

@@ -38,6 +38,10 @@ import {
   formatBSDateNepali,
   getNowInNPT,
 } from '../utils/nepaliDate';
+import {
+  sanitizeDecimalInput,
+  sanitizeIntegerInput,
+} from '../utils/numberInput';
 import { NepaliCalendarModal } from './NepaliCalendarModal';
 
 interface ItemFormModalProps {
@@ -190,7 +194,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
       onRequestClose={onClose}
     >
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={[styles.overlay, { backgroundColor: theme.modalOverlay }]}
       >
         <Pressable style={styles.backdrop} onPress={onClose} />
@@ -322,10 +326,9 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
                 <TextInput
                   value={qtyInput}
                   onChangeText={(txt) => {
-                    const cleaned = txt.replace(/[^0-9]/g, '');
-                    setQtyInput(cleaned);
-                    const n = parseInt(cleaned, 10);
-                    setValue('quantity', Number.isFinite(n) && n > 0 ? n : 1, {
+                    const { text, value } = sanitizeIntegerInput(txt, 1);
+                    setQtyInput(text);
+                    setValue('quantity', value, {
                       shouldValidate: true,
                     });
                   }}
@@ -352,10 +355,9 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
               <TextInput
                 value={priceInput}
                 onChangeText={(txt) => {
-                  const cleaned = txt.replace(/[^0-9.]/g, '');
-                  setPriceInput(cleaned);
-                  const n = parseFloat(cleaned);
-                  setValue('purchasePrice', Number.isFinite(n) ? n : 0, {
+                  const { text, value } = sanitizeDecimalInput(txt);
+                  setPriceInput(text);
+                  setValue('purchasePrice', value, {
                     shouldValidate: true,
                   });
                 }}
@@ -568,7 +570,9 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
 
             <TouchableOpacity
               disabled={isSubmitting}
-              onPress={handleSubmit(onSubmit)}
+              onPress={() => {
+                handleSubmit(onSubmit)();
+              }}
               style={[
                 styles.submitBtn,
                 {
@@ -606,7 +610,11 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
   },
   sheet: {
     borderTopLeftRadius: 28,

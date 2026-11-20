@@ -10,14 +10,32 @@ import {
 import { getNowInNPT } from '../utils/nepaliDate';
 
 let dbInstance: SQLite.SQLiteDatabase | null = null;
+let dbInitPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
+/**
+ * Thread/concurrency-safe singleton database accessor.
+ * Ensures concurrent callers on app startup share one initialization transaction.
+ */
 export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   if (dbInstance) {
     return dbInstance;
   }
-  dbInstance = await SQLite.openDatabaseAsync('vault_app.db');
-  await initializeSchema(dbInstance);
-  return dbInstance;
+  if (dbInitPromise) {
+    return dbInitPromise;
+  }
+  dbInitPromise = (async () => {
+    const db = await SQLite.openDatabaseAsync('vault_app.db');
+    await initializeSchema(db);
+    dbInstance = db;
+    return db;
+  })();
+
+  try {
+    return await dbInitPromise;
+  } catch (err) {
+    dbInitPromise = null;
+    throw err;
+  }
 }
 
 async function initializeSchema(db: SQLite.SQLiteDatabase): Promise<void> {

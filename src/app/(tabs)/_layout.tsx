@@ -8,8 +8,8 @@ import {
   Package,
   Wallet,
 } from 'lucide-react-native';
-import { useVaultStore } from '../../src/store/useVaultStore';
-import { getSectionPalette, getThemeColors } from '../../src/theme/colors';
+import { useVaultStore } from '../../store/useVaultStore';
+import { getSectionPalette, getThemeColors } from '../../theme/colors';
 
 export default function TabsLayout() {
   const { settings } = useVaultStore();
@@ -47,7 +47,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: settings.language === 'ne' ? 'गृह (Home)' : 'Home',
+          title: 'Home',
           tabBarActiveTintColor: dashboardPalette.accent,
           tabBarIcon: ({ color, focused }) => (
             <View
@@ -65,7 +65,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="money"
         options={{
-          title: settings.language === 'ne' ? 'रकम (Money)' : 'Money',
+          title: 'Money',
           tabBarActiveTintColor: moneyPalette.accent,
           tabBarIcon: ({ color, focused }) => (
             <View
@@ -87,7 +87,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="items"
         options={{
-          title: settings.language === 'ne' ? 'सामान (Items)' : 'Items',
+          title: 'Items',
           tabBarActiveTintColor: itemsPalette.accent,
           tabBarIcon: ({ color, focused }) => (
             <View
@@ -109,7 +109,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="tracker"
         options={{
-          title: settings.language === 'ne' ? 'दैनिकी (Tracker)' : 'Tracker',
+          title: 'Tracker',
           tabBarActiveTintColor: trackerPalette.accent,
           tabBarIcon: ({ color, focused }) => (
             <View
@@ -131,8 +131,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="reminders"
         options={{
-          title:
-            settings.language === 'ne' ? 'रिमाइन्डर' : 'Reminders',
+          title: 'Reminders',
           tabBarActiveTintColor: remindersPalette.accent,
           tabBarIcon: ({ color, focused }) => (
             <View

@@ -3,9 +3,9 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { useVaultStore } from '../src/store/useVaultStore';
-import { getThemeColors } from '../src/theme/colors';
-import { requestNotificationPermissions } from '../src/utils/notifications';
+import { useVaultStore } from '../store/useVaultStore';
+import { getThemeColors } from '../theme/colors';
+import { requestNotificationPermissions } from '../utils/notifications';
 
 export default function RootLayout() {
   const { isHydrated, hydrateFromDB, settings } = useVaultStore();
@@ -46,10 +46,7 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar
-        style={isDark ? 'light' : 'dark'}
-        backgroundColor={isDark ? '#0F172A' : '#F5F6F8'}
-      />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <Stack
         screenOptions={{
           headerShown: false,

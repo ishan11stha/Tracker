@@ -1,6 +1,7 @@
-import * as FileSystem from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { VaultBackupPayload } from '../db/database';
+import { vaultBackupSchema } from '../types';
 import { adToBs, formatBSDateEnglish, formatBSDateNepali } from './nepaliDate';
 
 function escapeCSV(val: unknown): string {
@@ -8,7 +9,9 @@ function escapeCSV(val: unknown): string {
   return `"${str}"`;
 }
 
-export async function exportVaultDataToCSV(payload: VaultBackupPayload): Promise<string> {
+export async function exportVaultDataToCSV(
+  payload: VaultBackupPayload
+): Promise<string> {
   const lines: string[] = [];
 
   lines.push('=== VAULT PERSONAL FINANCE & LIFE TRACKER — DATA EXPORT ===');
@@ -112,40 +115,61 @@ export async function exportVaultDataToCSV(payload: VaultBackupPayload): Promise
   }
 
   const csvContent = '\uFEFF' + lines.join('\n');
-  const dir = FileSystem.documentDirectory || FileSystem.cacheDirectory || '';
   const fileName = `VAULT_Export_${new Date().toISOString().slice(0, 10)}.csv`;
-  const fileUri = `${dir}${fileName}`;
+  const csvFile = new File(Paths.document, fileName);
 
-  await FileSystem.writeAsStringAsync(fileUri, csvContent, {
-    encoding: FileSystem.EncodingType.UTF8,
-  });
+  await csvFile.write(csvContent);
 
   if (await Sharing.isAvailableAsync()) {
-    await Sharing.shareAsync(fileUri, {
+    await Sharing.shareAsync(csvFile.uri, {
       mimeType: 'text/csv',
       dialogTitle: 'Export VAULT Records (CSV)',
     });
   }
 
-  return fileUri;
+  return csvFile.uri;
 }
 
-export async function exportVaultBackupJSON(payload: VaultBackupPayload): Promise<string> {
+export async function exportVaultBackupJSON(
+  payload: VaultBackupPayload
+): Promise<string> {
   const jsonContent = JSON.stringify(payload, null, 2);
-  const dir = FileSystem.documentDirectory || FileSystem.cacheDirectory || '';
   const fileName = `VAULT_Backup_${new Date().toISOString().slice(0, 10)}.json`;
-  const fileUri = `${dir}${fileName}`;
+  const jsonFile = new File(Paths.document, fileName);
 
-  await FileSystem.writeAsStringAsync(fileUri, jsonContent, {
-    encoding: FileSystem.EncodingType.UTF8,
-  });
+  await jsonFile.write(jsonContent);
 
   if (await Sharing.isAvailableAsync()) {
-    await Sharing.shareAsync(fileUri, {
+    await Sharing.shareAsync(jsonFile.uri, {
       mimeType: 'application/json',
       dialogTitle: 'Save VAULT Backup File (JSON)',
     });
   }
 
-  return fileUri;
+  return jsonFile.uri;
+}
+
+/**
+ * Strictly validates and sanitizes a JSON backup string before SQLite restoration.
+ */
+export function parseAndValidateBackupJSON(rawText: string): VaultBackupPayload {
+  let rawObj: unknown;
+  try {
+    rawObj = JSON.parse(rawText);
+  } catch {
+    throw new Error('The selected file is not valid JSON.');
+  }
+
+  const result = vaultBackupSchema.safeParse(rawObj);
+  if (!result.success) {
+    const firstIssue = result.error.issues[0];
+    const path = firstIssue?.path.join('.') || 'payload';
+    throw new Error(
+      `Invalid VAULT backup format at "${path}": ${
+        firstIssue?.message || 'Schema mismatch'
+      }`
+    );
+  }
+
+  return result.data;
 }

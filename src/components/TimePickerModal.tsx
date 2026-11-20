@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Modal,
   Pressable,
@@ -40,8 +40,23 @@ export const TimePickerModal: React.FC<TimePickerModalProps> = ({
     Number.isFinite(initM) ? initM : 0
   );
 
-  const hours = Array.from({ length: 24 }, (_, i) => i);
-  const minutes = Array.from({ length: 12 }, (_, i) => i * 5);
+  useEffect(() => {
+    if (visible) {
+      const [h, m] = (value24 || '09:00').split(':').map(Number);
+      setSelectedHour(Number.isFinite(h) && h >= 0 && h < 24 ? h : 9);
+      setSelectedMinute(Number.isFinite(m) && m >= 0 && m < 60 ? m : 0);
+    }
+  }, [visible, value24]);
+
+  const hours = useMemo(() => Array.from({ length: 24 }, (_, i) => i), []);
+  const minutes = useMemo(() => {
+    const base = Array.from({ length: 12 }, (_, i) => i * 5);
+    if (!base.includes(selectedMinute)) {
+      base.push(selectedMinute);
+      base.sort((a, b) => a - b);
+    }
+    return base;
+  }, [selectedMinute]);
 
   const current24 = `${String(selectedHour).padStart(2, '0')}:${String(
     selectedMinute

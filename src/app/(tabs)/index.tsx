@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -13,11 +13,9 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   Bell,
-  Calendar,
   CheckCircle2,
   ChevronRight,
   Circle,
-  Clock,
   Package,
   Plus,
   Settings,
@@ -27,25 +25,21 @@ import {
 import {
   calculateFinancialSummary,
   useVaultStore,
-} from '../../src/store/useVaultStore';
-import { getSectionPalette, getThemeColors } from '../../src/theme/colors';
+} from '../../store/useVaultStore';
+import { getSectionPalette, getThemeColors } from '../../theme/colors';
 import {
-  adToBs,
-  formatADDateFull,
-  formatBSDateEnglish,
-  formatBSDateNepali,
   formatDisplayDate,
-  formatNPTTime,
   formatTimeString,
   getNowInNPT,
-} from '../../src/utils/nepaliDate';
-import { formatCurrency } from '../../src/utils/currency';
-import { TransactionFormModal } from '../../src/components/TransactionFormModal';
-import { ItemFormModal } from '../../src/components/ItemFormModal';
-import { ActivityFormModal } from '../../src/components/ActivityFormModal';
-import { ReminderFormModal } from '../../src/components/ReminderFormModal';
-import { NepaliCalendarModal } from '../../src/components/NepaliCalendarModal';
-import { TransactionType } from '../../src/types';
+} from '../../utils/nepaliDate';
+import { formatCurrency } from '../../utils/currency';
+import { NepaliDateClockBanner } from '../../components/NepaliDateClockBanner';
+import { TransactionFormModal } from '../../components/TransactionFormModal';
+import { ItemFormModal } from '../../components/ItemFormModal';
+import { ActivityFormModal } from '../../components/ActivityFormModal';
+import { ReminderFormModal } from '../../components/ReminderFormModal';
+import { NepaliCalendarModal } from '../../components/NepaliCalendarModal';
+import { TransactionType } from '../../types';
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -63,25 +57,11 @@ export default function DashboardScreen() {
   const theme = getThemeColors(isDark);
   const palette = getSectionPalette('dashboard', isDark);
 
-  // Live Nepal Standard Time clock state (updates every second)
-  const [nowDate, setNowDate] = useState<Date>(() => new Date());
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setNowDate(new Date());
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const nptInfo = useMemo(() => getNowInNPT(nowDate), [nowDate]);
-  const currentBS = useMemo(() => adToBs(nptInfo.isoDate), [nptInfo.isoDate]);
-  const liveNPTString = useMemo(
-    () => formatNPTTime(settings.timeFormat, true, nowDate),
-    [settings.timeFormat, nowDate]
-  );
+  const initialNpt = useMemo(() => getNowInNPT(), []);
 
   // Greeting in Nepali / English based on Nepal local hour
   const greeting = useMemo(() => {
-    const h = nptInfo.hours;
+    const h = initialNpt.hours;
     if (settings.language === 'ne') {
       if (h < 12) return 'शुभ प्रभात (Good Morning)';
       if (h < 17) return 'शुभ दिन (Good Afternoon)';
@@ -90,7 +70,7 @@ export default function DashboardScreen() {
     if (h < 12) return 'Good Morning';
     if (h < 17) return 'Good Afternoon';
     return 'Good Evening';
-  }, [nptInfo.hours, settings.language]);
+  }, [initialNpt.hours, settings.language]);
 
   // Financial Summary: Total Balance = Total Income - Total Expenses
   const financialSummary = useMemo(
@@ -141,12 +121,17 @@ export default function DashboardScreen() {
   const [activityModalVisible, setActivityModalVisible] = useState(false);
   const [reminderModalVisible, setReminderModalVisible] = useState(false);
   const [calendarModalVisible, setCalendarModalVisible] = useState(false);
-  const [inspectedDateISO, setInspectedDateISO] = useState(nptInfo.isoDate);
+  const [inspectedDateISO, setInspectedDateISO] = useState(initialNpt.isoDate);
 
-  const openQuickTxn = (type: TransactionType) => {
+  const openQuickTxn = useCallback((type: TransactionType) => {
     setTxnModalType(type);
     setTxnModalVisible(true);
-  };
+  }, []);
+
+  const handleOpenCalendar = useCallback((todayISO: string) => {
+    setInspectedDateISO(todayISO);
+    setCalendarModalVisible(true);
+  }, []);
 
   return (
     <SafeAreaView
@@ -203,66 +188,12 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* 2. NEPALI DATE & LIVE NPT CLOCK HERO BANNER (HIGH PRIORITY) */}
-        <TouchableOpacity
-          activeOpacity={0.88}
-          onPress={() => {
-            setInspectedDateISO(nptInfo.isoDate);
-            setCalendarModalVisible(true);
-          }}
-          style={[
-            styles.nepaliDateCard,
-            {
-              backgroundColor: theme.card,
-              borderColor: theme.border,
-            },
-          ]}
-        >
-          <View style={styles.nepaliDateTopRow}>
-            <View style={styles.bsPill}>
-              <Calendar size={13} color="#DC2626" />
-              <Text style={styles.bsPillText}>
-                बिक्रम सम्बत् (Bikram Sambat)
-              </Text>
-            </View>
-
-            <View
-              style={[
-                styles.liveClockBadge,
-                { backgroundColor: isDark ? '#0F172A' : '#F1F5F9' },
-              ]}
-            >
-              <View style={styles.pulseDot} />
-              <Clock size={12} color={theme.textPrimary} />
-              <Text
-                style={[styles.liveClockText, { color: theme.textPrimary }]}
-              >
-                {liveNPTString}
-              </Text>
-            </View>
-          </View>
-
-          {/* Primary Nepali Date: e.g. २०८३ मंसिर ४, शुक्रबार */}
-          <Text style={[styles.nepaliDateHeadline, { color: theme.textPrimary }]}>
-            {formatBSDateNepali(currentBS, true)}
-          </Text>
-
-          {/* Secondary Gregorian Date + Romanized BS */}
-          <View style={styles.nepaliDateFooterRow}>
-            <Text
-              style={[
-                styles.gregorianSubText,
-                { color: theme.textSecondary },
-              ]}
-            >
-              {formatADDateFull(nptInfo.isoDate)} •{' '}
-              {formatBSDateEnglish(currentBS, false)} BS
-            </Text>
-            <Text style={[styles.calendarCta, { color: theme.info }]}>
-              पात्रो हेर्नुहोस् →
-            </Text>
-          </View>
-        </TouchableOpacity>
+        {/* 2. NEPALI DATE & LIVE NPT CLOCK HERO BANNER (Isolated 1s Re-render) */}
+        <NepaliDateClockBanner
+          timeFormat={settings.timeFormat}
+          isDark={isDark}
+          onPressCalendar={handleOpenCalendar}
+        />
 
         {/* 3. FINANCIAL OVERVIEW CARD */}
         <View
@@ -946,69 +877,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  nepaliDateCard: {
-    borderRadius: 22,
-    padding: 16,
-    borderWidth: 1,
-    marginBottom: 16,
-    elevation: 2,
-  },
-  nepaliDateTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  bsPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#FEE2E2',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
-  },
-  bsPillText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#991B1B',
-  },
-  liveClockBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
-  },
-  pulseDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#16A34A',
-  },
-  liveClockText: {
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  nepaliDateHeadline: {
-    fontSize: 23,
-    fontWeight: '900',
-    marginBottom: 4,
-  },
-  nepaliDateFooterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  gregorianSubText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  calendarCta: {
-    fontSize: 12,
-    fontWeight: '700',
   },
   financeCard: {
     borderRadius: 24,

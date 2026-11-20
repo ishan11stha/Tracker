@@ -154,12 +154,43 @@ export const useVaultStore = create<VaultState>((set, get) => ({
   },
 
   updateSettings: async (partial) => {
+    const prevSettings = get().settings;
     const nextSettings: AppSettings = {
-      ...get().settings,
+      ...prevSettings,
       ...partial,
     };
     set({ settings: nextSettings });
     await dbSaveSettings(nextSettings);
+
+    // If notificationsEnabled changed, sync all pending reminder notifications
+    if (
+      partial.notificationsEnabled !== undefined &&
+      partial.notificationsEnabled !== prevSettings.notificationsEnabled
+    ) {
+      const currentReminders = get().reminders;
+      const updatedReminders: ReminderItem[] = [];
+
+      for (const rem of currentReminders) {
+        if (rem.isCompleted) {
+          updatedReminders.push(rem);
+          continue;
+        }
+        if (!nextSettings.notificationsEnabled) {
+          if (rem.notificationId) {
+            await cancelReminderNotification(rem.notificationId);
+          }
+          const cleared = { ...rem, notificationId: '' };
+          await dbUpdateReminder(cleared);
+          updatedReminders.push(cleared);
+        } else {
+          const newNotifId = await scheduleReminderNotification(rem, true);
+          const scheduled = { ...rem, notificationId: newNotifId };
+          await dbUpdateReminder(scheduled);
+          updatedReminders.push(scheduled);
+        }
+      }
+      set({ reminders: updatedReminders });
+    }
   },
 
   // Transactions
@@ -480,8 +511,29 @@ export const useVaultStore = create<VaultState>((set, get) => ({
   },
 
   restoreFromBackup: async (payload) => {
+    // Cancel any existing scheduled notifications before overwriting database
+    for (const existing of get().reminders) {
+      if (existing.notificationId) {
+        await cancelReminderNotification(existing.notificationId);
+      }
+    }
     await dbRestoreBackup(payload);
     await get().hydrateFromDB();
+
+    // Reschedule active reminders if notifications are enabled
+    if (get().settings.notificationsEnabled) {
+      const hydratedReminders = get().reminders;
+      for (const rem of hydratedReminders) {
+        if (!rem.isCompleted) {
+          const notifId = await scheduleReminderNotification(rem, true);
+          if (notifId !== (rem.notificationId || '')) {
+            await dbUpdateReminder({ ...rem, notificationId: notifId });
+          }
+        }
+      }
+      const refreshed = await dbGetAllReminders();
+      set({ reminders: refreshed });
+    }
   },
 }));
 

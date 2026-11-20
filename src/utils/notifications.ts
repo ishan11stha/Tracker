@@ -1,6 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
-import { ReminderItem } from '../types';
+import { ReminderItem, ReminderRecurrence } from '../types';
 import { adToBs, formatBSDateNepali } from './nepaliDate';
 
 Notifications.setNotificationHandler({
@@ -45,8 +45,99 @@ export function getNPTTargetDate(dateISO: string, timeString: string): Date {
   const [hours, minutes] = timeString.split(':').map(Number);
   // NPT is UTC + 5h 45m (345 mins)
   const utcMillis =
-    Date.UTC(year, month - 1, day, hours, minutes, 0) - 345 * 60 * 1000;
+    Date.UTC(year, month - 1, day, hours || 0, minutes || 0, 0) -
+    345 * 60 * 1000;
   return new Date(utcMillis);
+}
+
+/**
+ * Computes the next future trigger Date for a reminder according to its recurrence rule
+ */
+export function computeNextOccurrenceDate(
+  dateISO: string,
+  timeString: string,
+  recurrence: ReminderRecurrence,
+  now: Date = new Date()
+): Date | null {
+  const baseDate = getNPTTargetDate(dateISO, timeString);
+  if (baseDate.getTime() > now.getTime()) {
+    return baseDate;
+  }
+  if (recurrence === 'none') {
+    return null;
+  }
+
+  const dayMs = 86400000;
+  const elapsedMs = now.getTime() - baseDate.getTime();
+
+  if (recurrence === 'daily') {
+    const daysToAdd = Math.floor(elapsedMs / dayMs) + 1;
+    return new Date(baseDate.getTime() + daysToAdd * dayMs);
+  }
+
+  if (recurrence === 'weekly') {
+    const weekMs = 7 * dayMs;
+    const weeksToAdd = Math.floor(elapsedMs / weekMs) + 1;
+    return new Date(baseDate.getTime() + weeksToAdd * weekMs);
+  }
+
+  const [year, month, day] = dateISO.split('-').map(Number);
+  const [hours, minutes] = timeString.split(':').map(Number);
+
+  if (recurrence === 'monthly') {
+    let candidateYear = year;
+    let candidateMonth = month;
+    for (let i = 0; i < 240; i++) {
+      candidateMonth += 1;
+      if (candidateMonth > 12) {
+        candidateMonth = 1;
+        candidateYear += 1;
+      }
+      const maxDays = new Date(
+        Date.UTC(candidateYear, candidateMonth, 0)
+      ).getUTCDate();
+      const clampedDay = Math.min(day, maxDays);
+      const candidateUTC =
+        Date.UTC(
+          candidateYear,
+          candidateMonth - 1,
+          clampedDay,
+          hours || 0,
+          minutes || 0,
+          0
+        ) -
+        345 * 60 * 1000;
+      if (candidateUTC > now.getTime()) {
+        return new Date(candidateUTC);
+      }
+    }
+  }
+
+  if (recurrence === 'yearly') {
+    let candidateYear = year;
+    for (let i = 0; i < 50; i++) {
+      candidateYear += 1;
+      const maxDays = new Date(
+        Date.UTC(candidateYear, month, 0)
+      ).getUTCDate();
+      const clampedDay = Math.min(day, maxDays);
+      const candidateUTC =
+        Date.UTC(
+          candidateYear,
+          month - 1,
+          clampedDay,
+          hours || 0,
+          minutes || 0,
+          0
+        ) -
+        345 * 60 * 1000;
+      if (candidateUTC > now.getTime()) {
+        return new Date(candidateUTC);
+      }
+    }
+  }
+
+  return null;
 }
 
 export async function scheduleReminderNotification(
@@ -65,27 +156,25 @@ export async function scheduleReminderNotification(
       await cancelReminderNotification(reminder.notificationId);
     }
 
-    const targetDate = getNPTTargetDate(reminder.dateISO, reminder.timeString);
-    const now = new Date();
+    const triggerDate = computeNextOccurrenceDate(
+      reminder.dateISO,
+      reminder.timeString,
+      reminder.recurrence
+    );
 
-    if (targetDate.getTime() <= now.getTime() && reminder.recurrence === 'none') {
+    if (!triggerDate) {
       return '';
     }
 
     const bs = adToBs(reminder.dateISO);
     const bsFormatted = formatBSDateNepali(bs, false);
 
-    let triggerDate = targetDate;
-    if (triggerDate.getTime() <= now.getTime()) {
-      // Advance to future occurrence for recurring reminders
-      const diffDays = Math.ceil((now.getTime() - triggerDate.getTime()) / 86400000);
-      triggerDate = new Date(triggerDate.getTime() + Math.max(1, diffDays) * 86400000);
-    }
-
     const id = await Notifications.scheduleNotificationAsync({
       content: {
         title: `VAULT • ${reminder.title}`,
-        body: `${reminder.description ? reminder.description + ' • ' : ''}${bsFormatted} (${reminder.timeString} NPT)`,
+        body: `${
+          reminder.description ? reminder.description + ' • ' : ''
+        }${bsFormatted} (${reminder.timeString} NPT)`,
         data: { reminderId: reminder.id, priority: reminder.priority },
         sound: 'default',
       },
@@ -102,7 +191,9 @@ export async function scheduleReminderNotification(
   }
 }
 
-export async function cancelReminderNotification(notificationId?: string): Promise<void> {
+export async function cancelReminderNotification(
+  notificationId?: string
+): Promise<void> {
   if (!notificationId) return;
   try {
     await Notifications.cancelScheduledNotificationAsync(notificationId);

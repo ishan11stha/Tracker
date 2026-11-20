@@ -16,6 +16,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Bell, Calendar, Check, Clock, Repeat, X } from 'lucide-react-native';
 import {
   REMINDER_CATEGORIES,
+  REMINDER_PRIORITIES,
+  REMINDER_RECURRENCES,
   ReminderItem,
   ReminderPriority,
   ReminderRecurrence,
@@ -48,20 +50,6 @@ interface ReminderFormValues {
   category: string;
   recurrence: ReminderRecurrence;
 }
-
-const PRIORITIES: { label: ReminderPriority; color: string }[] = [
-  { label: 'Low', color: '#2563EB' },
-  { label: 'Medium', color: '#D97706' },
-  { label: 'High', color: '#DC2626' },
-];
-
-const RECURRENCES: { key: ReminderRecurrence; label: string }[] = [
-  { key: 'none', label: 'Once' },
-  { key: 'daily', label: 'Daily' },
-  { key: 'weekly', label: 'Weekly' },
-  { key: 'monthly', label: 'Monthly' },
-  { key: 'yearly', label: 'Yearly' },
-];
 
 export const ReminderFormModal: React.FC<ReminderFormModalProps> = ({
   visible,
@@ -154,7 +142,7 @@ export const ReminderFormModal: React.FC<ReminderFormModalProps> = ({
       onRequestClose={onClose}
     >
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={[styles.overlay, { backgroundColor: theme.modalOverlay }]}
       >
         <Pressable style={styles.backdrop} onPress={onClose} />
@@ -281,7 +269,7 @@ export const ReminderFormModal: React.FC<ReminderFormModalProps> = ({
                 Priority *
               </Text>
               <View style={styles.priorityRow}>
-                {PRIORITIES.map((p) => {
+                {REMINDER_PRIORITIES.map((p) => {
                   const selected = currentPriority === p.label;
                   return (
                     <TouchableOpacity
@@ -318,7 +306,7 @@ export const ReminderFormModal: React.FC<ReminderFormModalProps> = ({
                 </Text>
               </View>
               <View style={styles.chipsWrap}>
-                {RECURRENCES.map((rec) => {
+                {REMINDER_RECURRENCES.map((rec) => {
                   const selected = currentRecurrence === rec.key;
                   return (
                     <TouchableOpacity
@@ -415,7 +403,9 @@ export const ReminderFormModal: React.FC<ReminderFormModalProps> = ({
 
             <TouchableOpacity
               disabled={isSubmitting}
-              onPress={handleSubmit(onSubmit)}
+              onPress={() => {
+                handleSubmit(onSubmit)();
+              }}
               style={[
                 styles.submitBtn,
                 {
@@ -459,7 +449,11 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
   },
   sheet: {
     borderTopLeftRadius: 28,

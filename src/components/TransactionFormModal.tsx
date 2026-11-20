@@ -37,6 +37,7 @@ import {
   formatBSDateNepali,
   getNowInNPT,
 } from '../utils/nepaliDate';
+import { sanitizeDecimalInput } from '../utils/numberInput';
 import { NepaliCalendarModal } from './NepaliCalendarModal';
 
 interface TransactionFormModalProps {
@@ -167,7 +168,7 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
       onRequestClose={onClose}
     >
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={[styles.overlay, { backgroundColor: theme.modalOverlay }]}
       >
         <Pressable style={styles.backdrop} onPress={onClose} />
@@ -288,10 +289,9 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
                 <TextInput
                   value={amountInput}
                   onChangeText={(txt) => {
-                    const cleaned = txt.replace(/[^0-9.]/g, '');
-                    setAmountInput(cleaned);
-                    const num = parseFloat(cleaned);
-                    setValue('amount', Number.isFinite(num) ? num : 0, {
+                    const { text, value } = sanitizeDecimalInput(txt);
+                    setAmountInput(text);
+                    setValue('amount', value, {
                       shouldValidate: true,
                     });
                   }}
@@ -488,7 +488,9 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
             {/* Submit Button */}
             <TouchableOpacity
               disabled={isSubmitting}
-              onPress={handleSubmit(onSubmit)}
+              onPress={() => {
+                handleSubmit(onSubmit)();
+              }}
               style={[
                 styles.submitBtn,
                 {
@@ -531,7 +533,11 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
   },
   sheet: {
     borderTopLeftRadius: 28,

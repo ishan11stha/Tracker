@@ -1,25 +1,58 @@
 {
   "expo": {
-    "name": "Tracker",
-    "slug": "Tracker",
+    "name": "VAULT",
+    "slug": "vault-personal-tracker",
+    "scheme": "vault",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "ios": {
-      "supportsTablet": true
+    "userInterfaceStyle": "automatic",
+    "platforms": [
+      "android"
+    ],
+    "androidStatusBar": {
+      "backgroundColor": "#F5F6F8",
+      "barStyle": "dark-content"
     },
     "android": {
+      "package": "com.vault.lifetracker",
+      "versionCode": 1,
+      "softwareKeyboardLayoutMode": "pan",
+      "permissions": [
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "SCHEDULE_EXACT_ALARM",
+        "POST_NOTIFICATIONS",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ],
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#0F172A",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    }
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#EA580C"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "VAULT accesses your photos so you can attach images to your tracked personal items.",
+          "cameraPermission": "VAULT uses your camera so you can photograph personal items for your inventory."
+        }
+      ],
+      "expo-sharing"
+    ]
   }
 }

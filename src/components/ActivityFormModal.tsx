@@ -16,6 +16,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Calendar, Check, Clock, X } from 'lucide-react-native';
 import {
   ACTIVITY_CATEGORIES,
+  COMMON_ACTIVITY_UNITS,
   ActivityRecord,
   ActivityStatus,
   activitySchema,
@@ -28,6 +29,7 @@ import {
   formatTimeString,
   getNowInNPT,
 } from '../utils/nepaliDate';
+import { sanitizeDecimalInput } from '../utils/numberInput';
 import { NepaliCalendarModal } from './NepaliCalendarModal';
 import { TimePickerModal } from './TimePickerModal';
 
@@ -47,8 +49,6 @@ interface ActivityFormValues {
   unit: string;
   status: ActivityStatus;
 }
-
-const COMMON_UNITS = ['mins', 'hrs', 'km', 'steps', 'pages', 'glasses', 'kcal', 'sessions'];
 
 export const ActivityFormModal: React.FC<ActivityFormModalProps> = ({
   visible,
@@ -153,7 +153,7 @@ export const ActivityFormModal: React.FC<ActivityFormModalProps> = ({
       onRequestClose={onClose}
     >
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={[styles.overlay, { backgroundColor: theme.modalOverlay }]}
       >
         <Pressable style={styles.backdrop} onPress={onClose} />
@@ -272,10 +272,9 @@ export const ActivityFormModal: React.FC<ActivityFormModalProps> = ({
                 <TextInput
                   value={numInput}
                   onChangeText={(txt) => {
-                    const cleaned = txt.replace(/[^0-9.]/g, '');
-                    setNumInput(cleaned);
-                    const n = parseFloat(cleaned);
-                    setValue('numericValue', Number.isFinite(n) ? n : 0, {
+                    const { text, value } = sanitizeDecimalInput(txt);
+                    setNumInput(text);
+                    setValue('numericValue', value, {
                       shouldValidate: true,
                     });
                   }}
@@ -323,7 +322,7 @@ export const ActivityFormModal: React.FC<ActivityFormModalProps> = ({
             {/* Quick Unit Chips */}
             <View style={[styles.fieldGroup, { marginTop: -4 }]}>
               <View style={styles.chipsWrap}>
-                {COMMON_UNITS.map((u) => {
+                {COMMON_ACTIVITY_UNITS.map((u) => {
                   const selected = currentUnit === u;
                   return (
                     <TouchableOpacity
@@ -485,7 +484,9 @@ export const ActivityFormModal: React.FC<ActivityFormModalProps> = ({
 
             <TouchableOpacity
               disabled={isSubmitting}
-              onPress={handleSubmit(onSubmit)}
+              onPress={() => {
+                handleSubmit(onSubmit)();
+              }}
               style={[
                 styles.submitBtn,
                 {
@@ -529,7 +530,11 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
   },
   sheet: {
     borderTopLeftRadius: 28,
