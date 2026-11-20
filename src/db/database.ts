@@ -8,7 +8,6 @@ import {
   ReminderItem,
   Transaction,
 } from '../types';
-import { getNowInNPT } from '../utils/nepaliDate';
 
 let dbInstance: SQLite.SQLiteDatabase | null = null;
 let dbInitPromise: Promise<SQLite.SQLiteDatabase> | null = null;
@@ -158,6 +157,23 @@ async function initializeSchema(db: SQLite.SQLiteDatabase): Promise<void> {
     await seedDefaultAccounts(db);
   }
 
+  // One-time automatic cleanup of old mock / seed data for a fresh start with user's own details
+  const cleanedSeeds = await db.getFirstAsync<{ value: string }>(
+    `SELECT value FROM settings WHERE key = 'has_fresh_cleaned_seeds'`
+  );
+  if (!cleanedSeeds) {
+    await db.withTransactionAsync(async () => {
+      await db.runAsync(`DELETE FROM item_history`);
+      await db.runAsync(`DELETE FROM items`);
+      await db.runAsync(`DELETE FROM transactions`);
+      await db.runAsync(`DELETE FROM activities`);
+      await db.runAsync(`DELETE FROM reminders`);
+      await db.runAsync(
+        `INSERT OR REPLACE INTO settings (key, value) VALUES ('has_fresh_cleaned_seeds', 'true')`
+      );
+    });
+  }
+
   // Check if initial seed / first-run setup has occurred
   const seeded = await db.getFirstAsync<{ value: string }>(
     `SELECT value FROM settings WHERE key = 'is_seeded'`
@@ -232,26 +248,6 @@ export async function seedDefaultAccounts(db: SQLite.SQLiteDatabase): Promise<vo
 }
 
 async function seedInitialData(db: SQLite.SQLiteDatabase): Promise<void> {
-  const npt = getNowInNPT();
-  const todayISO = npt.isoDate;
-  const nowStamp = new Date().toISOString();
-
-  // Compute yesterday and tomorrow ISO strings
-  const todayParts = todayISO.split('-').map(Number);
-  const todayUTC = Date.UTC(todayParts[0], todayParts[1] - 1, todayParts[2]);
-  const yesterdayDate = new Date(todayUTC - 86400000);
-  const tomorrowDate = new Date(todayUTC + 86400000);
-  const twoDaysAgoDate = new Date(todayUTC - 2 * 86400000);
-
-  const toISO = (d: Date) =>
-    `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(
-      d.getUTCDate()
-    ).padStart(2, '0')}`;
-
-  const yesterdayISO = toISO(yesterdayDate);
-  const tomorrowISO = toISO(tomorrowDate);
-  const twoDaysAgoISO = toISO(twoDaysAgoDate);
-
   await db.withTransactionAsync(async () => {
     // Check existing settings: if theme is light or not set, default to dark
     const existingSettingsRow = await db.getFirstAsync<{ value: string }>(
@@ -270,317 +266,46 @@ async function seedInitialData(db: SQLite.SQLiteDatabase): Promise<void> {
       } catch {
         // ignore JSON parse error
       }
+    } else {
+      const defaultSettings: AppSettings = {
+        userName: '',
+        userTitle: 'Kathmandu, Nepal',
+        currency: 'NPR',
+        language: 'en',
+        preferredCalendar: 'BS',
+        timeFormat: '12h',
+        notificationsEnabled: true,
+        theme: 'dark',
+      };
+
+      await db.runAsync(
+        `INSERT OR REPLACE INTO settings (key, value) VALUES ('app_settings', ?), ('is_seeded', 'true')`,
+        [JSON.stringify(defaultSettings)]
+      );
     }
 
-    const defaultSettings: AppSettings = {
-      userName: 'Aarav Sharma',
-      userTitle: 'Kathmandu, Nepal',
-      currency: 'NPR',
-      language: 'ne',
-      preferredCalendar: 'BS',
-      timeFormat: '12h',
-      notificationsEnabled: true,
-      theme: 'dark',
-    };
+    await seedDefaultAccounts(db);
+  });
+}
 
+/**
+ * Resets all user-entered data across all sections (transactions, items, history,
+ * activities, reminders) so the user has a fresh start with their own details.
+ * Re-seeds the 4 foundational accounts (Personal: Bank 5000, Cash 50; Family: Bank 500, Cash 100).
+ */
+export async function dbResetAllUserData(): Promise<void> {
+  const db = await getDatabase();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(`DELETE FROM item_history`);
+    await db.runAsync(`DELETE FROM items`);
+    await db.runAsync(`DELETE FROM transactions`);
+    await db.runAsync(`DELETE FROM activities`);
+    await db.runAsync(`DELETE FROM reminders`);
+    await db.runAsync(`DELETE FROM accounts`);
+    await seedDefaultAccounts(db);
     await db.runAsync(
-      `INSERT OR REPLACE INTO settings (key, value) VALUES ('app_settings', ?), ('is_seeded', 'true')`,
-      [JSON.stringify(defaultSettings)]
+      `INSERT OR REPLACE INTO settings (key, value) VALUES ('has_fresh_cleaned_seeds', 'true')`
     );
-
-    // Seed starter transactions so Dashboard and Charts are immediately alive and verifiable
-    const sampleTransactions: Transaction[] = [
-      {
-        id: 'txn_seed_1',
-        type: 'income',
-        title: 'Monthly Software Engineering Salary',
-        amount: 95000,
-        category: 'Salary',
-        dateISO: twoDaysAgoISO,
-        paymentMethod: 'Bank Transfer',
-        description: 'Monthly salary credited via Nabil Bank',
-        createdAt: nowStamp,
-        updatedAt: nowStamp,
-      },
-      {
-        id: 'txn_seed_2',
-        type: 'income',
-        title: 'UI/UX Design Consulting Project',
-        amount: 25000,
-        category: 'Freelance',
-        dateISO: yesterdayISO,
-        paymentMethod: 'eSewa',
-        description: 'Mobile app design delivery milestone',
-        createdAt: nowStamp,
-        updatedAt: nowStamp,
-      },
-      {
-        id: 'txn_seed_3',
-        type: 'expense',
-        title: 'Bhatbhateni Monthly Groceries',
-        amount: 8450,
-        category: 'Groceries',
-        dateISO: yesterdayISO,
-        paymentMethod: 'Khalti',
-        description: 'Rice, lentils, cooking oil, and fresh vegetables',
-        createdAt: nowStamp,
-        updatedAt: nowStamp,
-      },
-      {
-        id: 'txn_seed_4',
-        type: 'expense',
-        title: 'WorldLink Fiber Internet & Electricity',
-        amount: 3200,
-        category: 'Rent & Utilities',
-        dateISO: todayISO,
-        paymentMethod: 'eSewa',
-        description: '300 Mbps fiber plan + NEA electricity bill',
-        createdAt: nowStamp,
-        updatedAt: nowStamp,
-      },
-      {
-        id: 'txn_seed_5',
-        type: 'expense',
-        title: 'Himalayan Java Coffee & Lunch',
-        amount: 1150,
-        category: 'Food & Dining',
-        dateISO: todayISO,
-        paymentMethod: 'Cash',
-        description: 'Client catchup at Durbar Marg',
-        createdAt: nowStamp,
-        updatedAt: nowStamp,
-      },
-    ];
-
-    for (const t of sampleTransactions) {
-      await db.runAsync(
-        `INSERT INTO transactions (id, type, title, amount, category, dateISO, paymentMethod, description, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          t.id,
-          t.type,
-          t.title,
-          t.amount,
-          t.category,
-          t.dateISO,
-          t.paymentMethod,
-          t.description,
-          t.createdAt,
-          t.updatedAt,
-        ]
-      );
-    }
-
-    // Seed starter items
-    const sampleItems: PersonalItem[] = [
-      {
-        id: 'itm_seed_1',
-        name: 'MacBook Pro 14" M3',
-        description: 'Space Black, 18GB Unified Memory, 512GB SSD',
-        category: 'Electronics',
-        purchasePrice: 265000,
-        purchaseDateISO: twoDaysAgoISO,
-        quantity: 1,
-        imageUri: '',
-        location: 'Home Office Desk',
-        status: 'Owned',
-        createdAt: nowStamp,
-        updatedAt: nowStamp,
-      },
-      {
-        id: 'itm_seed_2',
-        name: 'Sony WH-1000XM5 Headphones',
-        description: 'Noise-canceling wireless headphones with travel case',
-        category: 'Electronics',
-        purchasePrice: 48500,
-        purchaseDateISO: yesterdayISO,
-        quantity: 1,
-        imageUri: '',
-        location: 'Backpack',
-        status: 'Owned',
-        createdAt: nowStamp,
-        updatedAt: nowStamp,
-      },
-      {
-        id: 'itm_seed_3',
-        name: 'Clean Architecture Book (Robert C. Martin)',
-        description: 'Lent to Suman for 2 weeks',
-        category: 'Books',
-        purchasePrice: 1450,
-        purchaseDateISO: twoDaysAgoISO,
-        quantity: 1,
-        imageUri: '',
-        location: 'With Suman K.',
-        status: 'Lent',
-        createdAt: nowStamp,
-        updatedAt: nowStamp,
-      },
-    ];
-
-    for (const item of sampleItems) {
-      await db.runAsync(
-        `INSERT INTO items (id, name, description, category, purchasePrice, purchaseDateISO, quantity, imageUri, location, status, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          item.id,
-          item.name,
-          item.description,
-          item.category,
-          item.purchasePrice,
-          item.purchaseDateISO,
-          item.quantity,
-          item.imageUri,
-          item.location,
-          item.status,
-          item.createdAt,
-          item.updatedAt,
-        ]
-      );
-
-      await db.runAsync(
-        `INSERT INTO item_history (id, itemId, action, previousStatus, newStatus, note, timestamp)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [
-          `hist_${item.id}`,
-          item.id,
-          'Created Item',
-          null,
-          item.status,
-          `Initial status set to ${item.status} at ${item.location}`,
-          nowStamp,
-        ]
-      );
-    }
-
-    // Seed starter activities
-    const sampleActivities: ActivityRecord[] = [
-      {
-        id: 'act_seed_1',
-        title: 'Morning Run & Mobility',
-        description: '5km jog around Patan & stretching routine',
-        category: 'Fitness & Health',
-        dateISO: todayISO,
-        timeString: '06:30',
-        numericValue: 45,
-        unit: 'mins',
-        status: 'completed',
-        createdAt: nowStamp,
-        updatedAt: nowStamp,
-      },
-      {
-        id: 'act_seed_2',
-        title: 'Deep Focus Architecture Sprint',
-        description: 'Offline-first SQLite & Nepali calendar system design',
-        category: 'Work & Deep Focus',
-        dateISO: todayISO,
-        timeString: '09:30',
-        numericValue: 120,
-        unit: 'mins',
-        status: 'completed',
-        createdAt: nowStamp,
-        updatedAt: nowStamp,
-      },
-      {
-        id: 'act_seed_3',
-        title: 'Evening Reading Session',
-        description: 'Read 30 pages of System Design Interview',
-        category: 'Reading & Study',
-        dateISO: todayISO,
-        timeString: '20:00',
-        numericValue: 30,
-        unit: 'pages',
-        status: 'pending',
-        createdAt: nowStamp,
-        updatedAt: nowStamp,
-      },
-    ];
-
-    for (const act of sampleActivities) {
-      await db.runAsync(
-        `INSERT INTO activities (id, title, description, category, dateISO, timeString, numericValue, unit, status, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          act.id,
-          act.title,
-          act.description,
-          act.category,
-          act.dateISO,
-          act.timeString,
-          act.numericValue,
-          act.unit,
-          act.status,
-          act.createdAt,
-          act.updatedAt,
-        ]
-      );
-    }
-
-    // Seed starter reminders
-    const sampleReminders: ReminderItem[] = [
-      {
-        id: 'rem_seed_1',
-        title: 'Pay Citizen Investment Trust (CIT) Installment',
-        description: 'Transfer monthly contribution via ConnectIPS',
-        dateISO: todayISO,
-        timeString: '17:00',
-        priority: 'High',
-        category: 'Bills & Finance',
-        recurrence: 'monthly',
-        isCompleted: false,
-        notificationId: '',
-        createdAt: nowStamp,
-        updatedAt: nowStamp,
-      },
-      {
-        id: 'rem_seed_2',
-        title: 'Collect Book from Suman',
-        description: 'Clean Architecture hardcover lent last week',
-        dateISO: tomorrowISO,
-        timeString: '14:00',
-        priority: 'Medium',
-        category: 'Personal & Family',
-        recurrence: 'none',
-        isCompleted: false,
-        notificationId: '',
-        createdAt: nowStamp,
-        updatedAt: nowStamp,
-      },
-      {
-        id: 'rem_seed_3',
-        title: 'Back Up Vault SQLite Database',
-        description: 'Weekly local JSON/CSV export verification',
-        dateISO: yesterdayISO,
-        timeString: '10:00',
-        priority: 'Low',
-        category: 'Maintenance',
-        recurrence: 'weekly',
-        isCompleted: true,
-        notificationId: '',
-        createdAt: nowStamp,
-        updatedAt: nowStamp,
-      },
-    ];
-
-    for (const rem of sampleReminders) {
-      await db.runAsync(
-        `INSERT INTO reminders (id, title, description, dateISO, timeString, priority, category, recurrence, isCompleted, notificationId, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          rem.id,
-          rem.title,
-          rem.description,
-          rem.dateISO,
-          rem.timeString,
-          rem.priority,
-          rem.category,
-          rem.recurrence,
-          rem.isCompleted ? 1 : 0,
-          rem.notificationId || '',
-          rem.createdAt,
-          rem.updatedAt,
-        ]
-      );
-    }
   });
 }
 
@@ -599,10 +324,10 @@ export async function dbGetSettings(): Promise<AppSettings> {
     }
   }
   return {
-    userName: 'Aarav Sharma',
+    userName: '',
     userTitle: 'Kathmandu, Nepal',
     currency: 'NPR',
-    language: 'ne',
+    language: 'en',
     preferredCalendar: 'BS',
     timeFormat: '12h',
     notificationsEnabled: true,

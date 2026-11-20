@@ -24,8 +24,10 @@ import {
   FileSpreadsheet,
   Globe,
   Moon,
+  RotateCcw,
   ShieldCheck,
   Sun,
+  Trash2,
   Upload,
   User,
   Wallet,
@@ -45,6 +47,7 @@ export default function SettingsScreen() {
     updateSettings,
     getFullBackupPayload,
     restoreFromBackup,
+    resetAllData,
     transactions,
     items,
     activities,
@@ -139,6 +142,31 @@ export default function SettingsScreen() {
         err instanceof Error ? err.message : 'Could not read backup file'
       );
     }
+  };
+
+  const handleResetAllData = () => {
+    Alert.alert(
+      'Reset All Sections & Start Fresh?',
+      'This will remove all transactions, inventory items, habit tracker logs, and reminders so you can start fresh with your own details.\n\nYour 4 starting wallets (Personal Bank 5,000, Cash 50; Family Bank 500, Cash 100) will be preserved.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset Everything',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await resetAllData();
+              Alert.alert(
+                'Fresh Start Ready',
+                'All sections have been reset. You are ready to enter your own personal details!'
+              );
+            } catch (err) {
+              Alert.alert('Error', 'Failed to reset data');
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -665,6 +693,52 @@ export default function SettingsScreen() {
               </Text>
               <Text style={[styles.dataActionSub, { color: '#9A3412' }]}>
                 Import a previously exported VAULT JSON backup
+              </Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {/* 5. Danger Zone: Reset All Sections & Start Fresh */}
+        <View
+          style={[
+            styles.card,
+            {
+              backgroundColor: isDark ? '#261214' : '#FEF2F2',
+              borderColor: isDark ? '#7F1D1D' : '#FECACA',
+            },
+          ]}
+        >
+          <View style={styles.cardTitleRow}>
+            <RotateCcw size={18} color="#DC2626" />
+            <Text style={[styles.cardTitle, { color: '#DC2626' }]}>
+              Fresh Start & Reset All Sections
+            </Text>
+          </View>
+
+          <Text
+            style={[
+              styles.dbStatsText,
+              { color: isDark ? '#FCA5A5' : '#991B1B', marginBottom: 14 },
+            ]}
+          >
+            Clear all dummy or old items, transactions, habits, and tasks across
+            all sections to begin completely fresh with your own details.
+          </Text>
+
+          <TouchableOpacity
+            onPress={handleResetAllData}
+            style={[
+              styles.dataActionBtn,
+              { backgroundColor: '#DC2626', borderColor: '#B91C1C' },
+            ]}
+          >
+            <Trash2 size={18} color="#FFFFFF" />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.dataActionTitle, { color: '#FFFFFF' }]}>
+                Reset All Sections & Start Fresh
+              </Text>
+              <Text style={[styles.dataActionSub, { color: '#FEE2E2' }]}>
+                Wipes all sections; resets Personal & Family wallets to fresh start
               </Text>
             </View>
           </TouchableOpacity>

@@ -335,7 +335,8 @@ export default function DashboardScreen() {
   }, [privateMode, updateSettings]);
 
   const userInitials = useMemo(() => {
-    const parts = (settings.userName || 'V').trim().split(/\s+/);
+    const raw = (settings.userName || 'My Vault').trim();
+    const parts = raw.split(/\s+/);
     return parts.length > 1
       ? `${parts[0][0]}${parts[1][0]}`.toUpperCase()
       : parts[0].slice(0, 2).toUpperCase();
@@ -391,7 +392,7 @@ export default function DashboardScreen() {
                     style={[styles.userNameText, { color: theme.textPrimary }]}
                     numberOfLines={1}
                   >
-                    {settings.userName}
+                    {settings.userName || 'Tap to set name'}
                   </Text>
                   <View
                     style={[

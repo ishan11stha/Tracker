@@ -371,5 +371,13 @@ assert(afterMovements.personalTotal === 250, `Expected Personal Total 250 (200 b
 assert(afterMovements.familyTotal === 900, `Expected Family Total 900 (800 bank + 100 cash), got ${afterMovements.familyTotal}`);
 assert(afterMovements.grandTotal === 1150, `Expected Grand Total 1150, got ${afterMovements.grandTotal}`);
 
-console.log('10. Multi-Account / Multi-Wallet Ownership & Scope Calculation: PASSED\n');
+console.log('10. Multi-Account / Multi-Wallet Ownership & Scope Calculation: PASSED');
+
+// 11. Fresh Start & Empty State Reset verification
+const freshStartBalances = calculateAccountBalances(initialAccounts, []);
+assert(freshStartBalances.personalTotal === 5050, `Expected fresh Personal Total 5050, got ${freshStartBalances.personalTotal}`);
+assert(freshStartBalances.familyTotal === 600, `Expected fresh Family Total 600, got ${freshStartBalances.familyTotal}`);
+assert(freshStartBalances.grandTotal === 5650, `Expected fresh Grand Total 5650, got ${freshStartBalances.grandTotal}`);
+console.log('11. Fresh Start Initial Wallets State (Zero Transactions): PASSED\n');
+
 console.log('✅ ALL VAULT CORE & ARCHITECTURAL CHECKS PASSED!');

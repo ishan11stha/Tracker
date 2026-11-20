@@ -18,6 +18,7 @@ import {
   dbInsertItem,
   dbInsertReminder,
   dbInsertTransaction,
+  dbResetAllUserData,
   dbRestoreBackup,
   dbSaveSettings,
   dbUpdateAccount,
@@ -135,16 +136,17 @@ interface VaultState {
     undoAction?: () => Promise<void>;
   }>;
 
-  // Backup & Restore
+  // Backup & Restore & Reset
   getFullBackupPayload: () => VaultBackupPayload;
   restoreFromBackup: (payload: VaultBackupPayload) => Promise<void>;
+  resetAllData: () => Promise<void>;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
-  userName: 'Aarav Sharma',
+  userName: '',
   userTitle: 'Kathmandu, Nepal',
   currency: 'NPR',
-  language: 'ne',
+  language: 'en',
   preferredCalendar: 'BS',
   timeFormat: '12h',
   notificationsEnabled: true,
@@ -784,6 +786,17 @@ export const useVaultStore = create<VaultState>((set, get) => ({
       const refreshed = await dbGetAllReminders();
       set({ reminders: refreshed });
     }
+  },
+
+  resetAllData: async () => {
+    // Cancel any active scheduled notifications before resetting
+    for (const existing of get().reminders) {
+      if (existing.notificationId) {
+        await cancelReminderNotification(existing.notificationId);
+      }
+    }
+    await dbResetAllUserData();
+    await get().hydrateFromDB();
   },
 }));
 
