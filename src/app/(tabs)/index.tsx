@@ -215,10 +215,10 @@ export default function DashboardScreen() {
     const savingsRatio =
       allTimeSummary.totalIncome > 0
         ? Math.max(
-            0,
-            (allTimeSummary.totalIncome - allTimeSummary.totalExpense) /
-              allTimeSummary.totalIncome
-          )
+          0,
+          (allTimeSummary.totalIncome - allTimeSummary.totalExpense) /
+          allTimeSummary.totalIncome
+        )
         : 0.5;
     const savingsPoints = Math.min(60, Math.round(savingsRatio * 75));
 
@@ -461,8 +461,8 @@ export default function DashboardScreen() {
                 {overviewScope === 'Personal'
                   ? 'PERSONAL BALANCE (आफ्नो)'
                   : overviewScope === 'Family'
-                  ? 'FAMILY BALANCE (परिवार)'
-                  : 'TOTAL NET WORTH (कुल मौज्दात)'}
+                    ? 'FAMILY BALANCE (परिवार)'
+                    : 'TOTAL NET WORTH (कुल मौज्दात)'}
               </Text>
 
               {/* Scope Switcher */}
@@ -488,8 +488,8 @@ export default function DashboardScreen() {
                             sc === 'Personal'
                               ? '#2563EB'
                               : sc === 'Family'
-                              ? '#7C3AED'
-                              : palette.accent,
+                                ? '#7C3AED'
+                                : palette.accent,
                         },
                       ]}
                     >
@@ -831,8 +831,8 @@ export default function DashboardScreen() {
                           scopeKey === 'Personal'
                             ? '#2563EB'
                             : scopeKey === 'Family'
-                            ? '#7C3AED'
-                            : palette.accent,
+                              ? '#7C3AED'
+                              : palette.accent,
                       },
                       !isSelected && {
                         backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
@@ -914,8 +914,8 @@ export default function DashboardScreen() {
                                   ? '#1E3A8A'
                                   : '#DBEAFE'
                                 : isDark
-                                ? '#4C1D95'
-                                : '#EDE9FE',
+                                  ? '#4C1D95'
+                                  : '#EDE9FE',
                           },
                         ]}
                       >
@@ -1066,10 +1066,10 @@ export default function DashboardScreen() {
                             sc === 'Personal'
                               ? '#2563EB'
                               : sc === 'Family'
-                              ? '#7C3AED'
-                              : isDark
-                              ? '#374151'
-                              : '#E2E8F0',
+                                ? '#7C3AED'
+                                : isDark
+                                  ? '#374151'
+                                  : '#E2E8F0',
                         },
                         !isSel && {
                           borderColor: theme.border,
@@ -1105,10 +1105,10 @@ export default function DashboardScreen() {
                       onPress={() =>
                         setRecentSort(
                           s.key as
-                            | 'date_desc'
-                            | 'date_asc'
-                            | 'amount_desc'
-                            | 'amount_asc'
+                          | 'date_desc'
+                          | 'date_asc'
+                          | 'amount_desc'
+                          | 'amount_asc'
                         )
                       }
                       style={[
@@ -1199,8 +1199,8 @@ export default function DashboardScreen() {
                                     ? '#1E3A8A'
                                     : '#DBEAFE'
                                   : isDark
-                                  ? '#4C1D95'
-                                  : '#EDE9FE',
+                                    ? '#4C1D95'
+                                    : '#EDE9FE',
                             },
                           ]}
                         >
@@ -1275,8 +1275,8 @@ export default function DashboardScreen() {
                   rem.priority === 'High'
                     ? '#EF4444'
                     : rem.priority === 'Medium'
-                    ? '#D97706'
-                    : '#2563EB';
+                      ? '#D97706'
+                      : '#2563EB';
                 return (
                   <TouchableOpacity
                     key={rem.id}
