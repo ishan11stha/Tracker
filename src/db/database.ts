@@ -174,6 +174,19 @@ async function initializeSchema(db: SQLite.SQLiteDatabase): Promise<void> {
     });
   }
 
+  // One-time automatic reset of initial balances for all 4 default wallets to 0
+  const zeroedWallets = await db.getFirstAsync<{ value: string }>(
+    `SELECT value FROM settings WHERE key = 'has_zeroed_default_wallets_v2'`
+  );
+  if (!zeroedWallets) {
+    await db.withTransactionAsync(async () => {
+      await db.runAsync(`UPDATE accounts SET initialBalance = 0;`);
+      await db.runAsync(
+        `INSERT OR REPLACE INTO settings (key, value) VALUES ('has_zeroed_default_wallets_v2', 'true')`
+      );
+    });
+  }
+
   // Check if initial seed / first-run setup has occurred
   const seeded = await db.getFirstAsync<{ value: string }>(
     `SELECT value FROM settings WHERE key = 'is_seeded'`
@@ -191,7 +204,7 @@ export async function seedDefaultAccounts(db: SQLite.SQLiteDatabase): Promise<vo
       id: 'acc_personal_bank',
       name: 'Bank',
       scope: 'Personal',
-      initialBalance: 5000,
+      initialBalance: 0,
       paymentMethod: 'Bank Transfer',
       color: '#1E40AF',
       createdAt: nowStamp,
@@ -201,7 +214,7 @@ export async function seedDefaultAccounts(db: SQLite.SQLiteDatabase): Promise<vo
       id: 'acc_personal_cash',
       name: 'Cash',
       scope: 'Personal',
-      initialBalance: 50,
+      initialBalance: 0,
       paymentMethod: 'Cash',
       color: '#059669',
       createdAt: nowStamp,
@@ -211,7 +224,7 @@ export async function seedDefaultAccounts(db: SQLite.SQLiteDatabase): Promise<vo
       id: 'acc_family_bank',
       name: 'Bank',
       scope: 'Family',
-      initialBalance: 500,
+      initialBalance: 0,
       paymentMethod: 'Bank Transfer',
       color: '#7C3AED',
       createdAt: nowStamp,
@@ -221,7 +234,7 @@ export async function seedDefaultAccounts(db: SQLite.SQLiteDatabase): Promise<vo
       id: 'acc_family_cash',
       name: 'Cash',
       scope: 'Family',
-      initialBalance: 100,
+      initialBalance: 0,
       paymentMethod: 'Cash',
       color: '#D97706',
       createdAt: nowStamp,

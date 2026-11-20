@@ -272,7 +272,7 @@ const initialAccounts: Account[] = [
     id: 'acc_personal_bank',
     name: 'Bank',
     scope: 'Personal',
-    initialBalance: 5000,
+    initialBalance: 0,
     paymentMethod: 'Bank Transfer',
     createdAt: '2026-11-20T00:00:00Z',
     updatedAt: '2026-11-20T00:00:00Z',
@@ -281,7 +281,7 @@ const initialAccounts: Account[] = [
     id: 'acc_personal_cash',
     name: 'Cash',
     scope: 'Personal',
-    initialBalance: 50,
+    initialBalance: 0,
     paymentMethod: 'Cash',
     createdAt: '2026-11-20T00:00:00Z',
     updatedAt: '2026-11-20T00:00:00Z',
@@ -290,7 +290,7 @@ const initialAccounts: Account[] = [
     id: 'acc_family_bank',
     name: 'Bank',
     scope: 'Family',
-    initialBalance: 500,
+    initialBalance: 0,
     paymentMethod: 'Bank Transfer',
     createdAt: '2026-11-20T00:00:00Z',
     updatedAt: '2026-11-20T00:00:00Z',
@@ -299,23 +299,23 @@ const initialAccounts: Account[] = [
     id: 'acc_family_cash',
     name: 'Cash',
     scope: 'Family',
-    initialBalance: 100,
+    initialBalance: 0,
     paymentMethod: 'Cash',
     createdAt: '2026-11-20T00:00:00Z',
     updatedAt: '2026-11-20T00:00:00Z',
   },
 ];
 
-// Baseline test: without any transactions
+// Baseline test: without any transactions (Clean Zero Starting Wallets)
 const baseline = calculateAccountBalances(initialAccounts, []);
-assert(baseline.personalTotal === 5050, `Expected Personal Total 5050, got ${baseline.personalTotal}`);
-assert(baseline.familyTotal === 600, `Expected Family Total 600, got ${baseline.familyTotal}`);
-assert(baseline.grandTotal === 5650, `Expected Grand Total 5650, got ${baseline.grandTotal}`);
+assert(baseline.personalTotal === 0, `Expected Personal Total 0, got ${baseline.personalTotal}`);
+assert(baseline.familyTotal === 0, `Expected Family Total 0, got ${baseline.familyTotal}`);
+assert(baseline.grandTotal === 0, `Expected Grand Total 0, got ${baseline.grandTotal}`);
 
 // Transaction test:
-// 1. Mom gave 200, added to Personal Bank -> Personal Bank becomes 5200 (Personal Total = 5250)
-// 2. Bought notebook 5000 from Personal Bank -> Personal Bank becomes 200 (Personal Total = 250)
-// 3. Family received 300 to Family Bank -> Family Bank becomes 800 (Family Total = 900)
+// 1. Mom gave 200, added to Personal Bank -> Personal Bank becomes 200 (Personal Total = 200)
+// 2. Bought notebook 50 from Personal Bank -> Personal Bank becomes 150 (Personal Total = 150)
+// 3. Family received 300 to Family Bank -> Family Bank becomes 300 (Family Total = 300)
 const sampleTxns: Transaction[] = [
   {
     id: 't1',
@@ -335,7 +335,7 @@ const sampleTxns: Transaction[] = [
     id: 't2',
     type: 'expense',
     title: 'Notebook',
-    amount: 5000,
+    amount: 50,
     category: 'Shopping',
     dateISO: '2026-11-20',
     paymentMethod: 'Bank Transfer',
@@ -365,20 +365,20 @@ const afterMovements = calculateAccountBalances(initialAccounts, sampleTxns);
 const pBank = afterMovements.personalAccounts.find((a) => a.id === 'acc_personal_bank')!;
 const fBank = afterMovements.familyAccounts.find((a) => a.id === 'acc_family_bank')!;
 
-assert(pBank.currentBalance === 200, `Expected Personal Bank 200 (5000 + 200 - 5000), got ${pBank.currentBalance}`);
-assert(fBank.currentBalance === 800, `Expected Family Bank 800 (500 + 300), got ${fBank.currentBalance}`);
-assert(afterMovements.personalTotal === 250, `Expected Personal Total 250 (200 bank + 50 cash), got ${afterMovements.personalTotal}`);
-assert(afterMovements.familyTotal === 900, `Expected Family Total 900 (800 bank + 100 cash), got ${afterMovements.familyTotal}`);
-assert(afterMovements.grandTotal === 1150, `Expected Grand Total 1150, got ${afterMovements.grandTotal}`);
+assert(pBank.currentBalance === 150, `Expected Personal Bank 150 (0 + 200 - 50), got ${pBank.currentBalance}`);
+assert(fBank.currentBalance === 300, `Expected Family Bank 300 (0 + 300), got ${fBank.currentBalance}`);
+assert(afterMovements.personalTotal === 150, `Expected Personal Total 150, got ${afterMovements.personalTotal}`);
+assert(afterMovements.familyTotal === 300, `Expected Family Total 300, got ${afterMovements.familyTotal}`);
+assert(afterMovements.grandTotal === 450, `Expected Grand Total 450, got ${afterMovements.grandTotal}`);
 
 console.log('10. Multi-Account / Multi-Wallet Ownership & Scope Calculation: PASSED');
 
 // 11. Fresh Start & Empty State Reset verification
 const freshStartBalances = calculateAccountBalances(initialAccounts, []);
-assert(freshStartBalances.personalTotal === 5050, `Expected fresh Personal Total 5050, got ${freshStartBalances.personalTotal}`);
-assert(freshStartBalances.familyTotal === 600, `Expected fresh Family Total 600, got ${freshStartBalances.familyTotal}`);
-assert(freshStartBalances.grandTotal === 5650, `Expected fresh Grand Total 5650, got ${freshStartBalances.grandTotal}`);
-console.log('11. Fresh Start Initial Wallets State (Zero Transactions): PASSED\n');
+assert(freshStartBalances.personalTotal === 0, `Expected fresh Personal Total 0, got ${freshStartBalances.personalTotal}`);
+assert(freshStartBalances.familyTotal === 0, `Expected fresh Family Total 0, got ${freshStartBalances.familyTotal}`);
+assert(freshStartBalances.grandTotal === 0, `Expected fresh Grand Total 0, got ${freshStartBalances.grandTotal}`);
+console.log('11. Fresh Start Zero-Balance Wallets (Zero Data): PASSED\n');
 
 // 12. Security & Form Validation Boundary Tests
 const invalidZeroTxn = transactionSchema.safeParse({

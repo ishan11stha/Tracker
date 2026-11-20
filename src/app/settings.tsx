@@ -147,7 +147,7 @@ export default function SettingsScreen() {
   const handleResetAllData = () => {
     Alert.alert(
       'Reset All Sections & Start Fresh?',
-      'This will remove all transactions, inventory items, habit tracker logs, and reminders so you can start fresh with your own details.\n\nYour 4 starting wallets (Personal Bank 5,000, Cash 50; Family Bank 500, Cash 100) will be preserved.',
+      'This will remove all transactions, inventory items, habit tracker logs, and reminders, and reset all 4 wallets (Personal Bank, Personal Cash, Family Bank, Family Cash) to 0.00 so you can start completely fresh with your own details.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
