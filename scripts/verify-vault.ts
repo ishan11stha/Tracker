@@ -17,6 +17,18 @@ import {
   sanitizeIntegerInput,
 } from '../src/utils/numberInput.ts';
 import {
+  parseQuickInput,
+  extractAmount,
+  detectPaymentAndScope,
+} from '../src/utils/nlpParser.ts';
+import {
+  calculateAccountBalances,
+} from '../src/utils/accountBalances.ts';
+import type {
+  Account,
+  Transaction,
+} from '../src/types/index.ts';
+import {
   transactionSchema,
   itemSchema,
   activitySchema,
@@ -209,5 +221,155 @@ const masked = formatCurrencyParts(107200.5, 'NPR', false, true);
 assert(masked.integerPart === '••••••', 'Private mode masking failed');
 const healthExcel = getFinanceHealthMeta(85);
 assert(healthExcel.label === 'EXCELLENT' && healthExcel.color === '#37A13B', 'FinanceHealthMeta failed');
-console.log('8. Monekin CurrencyDisplayer, Private Mode & Financial Health Score Engine: PASSED\n');
+console.log('8. Monekin CurrencyDisplayer, Private Mode & Financial Health Score Engine: PASSED');
+
+// 9. Verify Intelligent Natural Language Quick Input Parser (Exact user requirements)
+// Test A: "get by mom 200, add to bank"
+const parsedA = parseQuickInput('get by mom 200, add to bank');
+assert(parsedA.intent === 'income', `Expected intent 'income', got ${parsedA.intent}`);
+assert(parsedA.amount === 200, `Expected amount 200, got ${parsedA.amount}`);
+assert(parsedA.paymentMethod === 'Bank Transfer', `Expected 'Bank Transfer', got ${parsedA.paymentMethod}`);
+assert(parsedA.title.toLowerCase().includes('mom'), `Expected title containing 'mom', got ${parsedA.title}`);
+
+// Test B: "bought notebook, 5000"
+const parsedB = parseQuickInput('bought notebook, 5000');
+assert(parsedB.intent === 'expense', `Expected intent 'expense', got ${parsedB.intent}`);
+assert(parsedB.amount === 5000, `Expected amount 5000, got ${parsedB.amount}`);
+assert(parsedB.isItemAndExpense === true, 'Expected isItemAndExpense to be true for bought item');
+assert(parsedB.itemName === 'Notebook', `Expected itemName 'Notebook', got ${parsedB.itemName}`);
+assert(parsedB.category === 'Shopping' || parsedB.category === 'Books & Stationery', `Unexpected category ${parsedB.category}`);
+
+// Test C: "drank coffee 150 cash"
+const parsedC = parseQuickInput('drank coffee 150 cash');
+assert(parsedC.intent === 'expense', `Expected intent 'expense', got ${parsedC.intent}`);
+assert(parsedC.amount === 150, `Expected amount 150, got ${parsedC.amount}`);
+assert(parsedC.paymentMethod === 'Cash', `Expected paymentMethod 'Cash', got ${parsedC.paymentMethod}`);
+assert(parsedC.category === 'Food & Dining', `Expected category 'Food & Dining', got ${parsedC.category}`);
+
+// Test D: "5km run 30 mins"
+const parsedD = parseQuickInput('5km run 30 mins');
+assert(parsedD.intent === 'activity', `Expected intent 'activity', got ${parsedD.intent}`);
+assert(parsedD.numericValue === 5, `Expected numericValue 5, got ${parsedD.numericValue}`);
+assert(parsedD.unit === 'km', `Expected unit 'km', got ${parsedD.unit}`);
+
+// Test E: "remind me tomorrow 5pm to pay wifi"
+const parsedE = parseQuickInput('remind me tomorrow 5pm to pay wifi');
+assert(parsedE.intent === 'reminder', `Expected intent 'reminder', got ${parsedE.intent}`);
+assert(parsedE.timeString === '17:00', `Expected timeString '17:00', got ${parsedE.timeString}`);
+assert(parsedE.title.toLowerCase().includes('wifi'), `Expected title with wifi, got ${parsedE.title}`);
+
+// Test F: "family bank deposit 500"
+const parsedF = parseQuickInput('family bank deposit 500');
+assert(parsedF.intent === 'income', `Expected intent 'income', got ${parsedF.intent}`);
+assert(parsedF.amount === 500, `Expected amount 500, got ${parsedF.amount}`);
+assert(parsedF.accountScope === 'Family', `Expected accountScope 'Family', got ${parsedF.accountScope}`);
+
+console.log('9. Intelligent NLP Intent & Entity Parser Engine: PASSED');
+
+// 10. Multi-Account / Multi-Wallet Ownership & Scope Calculation Engine
+const initialAccounts: Account[] = [
+  {
+    id: 'acc_personal_bank',
+    name: 'Bank',
+    scope: 'Personal',
+    initialBalance: 5000,
+    paymentMethod: 'Bank Transfer',
+    createdAt: '2026-11-20T00:00:00Z',
+    updatedAt: '2026-11-20T00:00:00Z',
+  },
+  {
+    id: 'acc_personal_cash',
+    name: 'Cash',
+    scope: 'Personal',
+    initialBalance: 50,
+    paymentMethod: 'Cash',
+    createdAt: '2026-11-20T00:00:00Z',
+    updatedAt: '2026-11-20T00:00:00Z',
+  },
+  {
+    id: 'acc_family_bank',
+    name: 'Bank',
+    scope: 'Family',
+    initialBalance: 500,
+    paymentMethod: 'Bank Transfer',
+    createdAt: '2026-11-20T00:00:00Z',
+    updatedAt: '2026-11-20T00:00:00Z',
+  },
+  {
+    id: 'acc_family_cash',
+    name: 'Cash',
+    scope: 'Family',
+    initialBalance: 100,
+    paymentMethod: 'Cash',
+    createdAt: '2026-11-20T00:00:00Z',
+    updatedAt: '2026-11-20T00:00:00Z',
+  },
+];
+
+// Baseline test: without any transactions
+const baseline = calculateAccountBalances(initialAccounts, []);
+assert(baseline.personalTotal === 5050, `Expected Personal Total 5050, got ${baseline.personalTotal}`);
+assert(baseline.familyTotal === 600, `Expected Family Total 600, got ${baseline.familyTotal}`);
+assert(baseline.grandTotal === 5650, `Expected Grand Total 5650, got ${baseline.grandTotal}`);
+
+// Transaction test:
+// 1. Mom gave 200, added to Personal Bank -> Personal Bank becomes 5200 (Personal Total = 5250)
+// 2. Bought notebook 5000 from Personal Bank -> Personal Bank becomes 200 (Personal Total = 250)
+// 3. Family received 300 to Family Bank -> Family Bank becomes 800 (Family Total = 900)
+const sampleTxns: Transaction[] = [
+  {
+    id: 't1',
+    type: 'income',
+    title: 'Received from Mom',
+    amount: 200,
+    category: 'Gift',
+    dateISO: '2026-11-20',
+    paymentMethod: 'Bank Transfer',
+    accountId: 'acc_personal_bank',
+    accountScope: 'Personal',
+    description: '',
+    createdAt: '2026-11-20T01:00:00Z',
+    updatedAt: '2026-11-20T01:00:00Z',
+  },
+  {
+    id: 't2',
+    type: 'expense',
+    title: 'Notebook',
+    amount: 5000,
+    category: 'Shopping',
+    dateISO: '2026-11-20',
+    paymentMethod: 'Bank Transfer',
+    accountId: 'acc_personal_bank',
+    accountScope: 'Personal',
+    description: '',
+    createdAt: '2026-11-20T02:00:00Z',
+    updatedAt: '2026-11-20T02:00:00Z',
+  },
+  {
+    id: 't3',
+    type: 'income',
+    title: 'Family Contribution',
+    amount: 300,
+    category: 'Other Income',
+    dateISO: '2026-11-20',
+    paymentMethod: 'Bank Transfer',
+    accountId: 'acc_family_bank',
+    accountScope: 'Family',
+    description: '',
+    createdAt: '2026-11-20T03:00:00Z',
+    updatedAt: '2026-11-20T03:00:00Z',
+  },
+];
+
+const afterMovements = calculateAccountBalances(initialAccounts, sampleTxns);
+const pBank = afterMovements.personalAccounts.find((a) => a.id === 'acc_personal_bank')!;
+const fBank = afterMovements.familyAccounts.find((a) => a.id === 'acc_family_bank')!;
+
+assert(pBank.currentBalance === 200, `Expected Personal Bank 200 (5000 + 200 - 5000), got ${pBank.currentBalance}`);
+assert(fBank.currentBalance === 800, `Expected Family Bank 800 (500 + 300), got ${fBank.currentBalance}`);
+assert(afterMovements.personalTotal === 250, `Expected Personal Total 250 (200 bank + 50 cash), got ${afterMovements.personalTotal}`);
+assert(afterMovements.familyTotal === 900, `Expected Family Total 900 (800 bank + 100 cash), got ${afterMovements.familyTotal}`);
+assert(afterMovements.grandTotal === 1150, `Expected Grand Total 1150, got ${afterMovements.grandTotal}`);
+
+console.log('10. Multi-Account / Multi-Wallet Ownership & Scope Calculation: PASSED\n');
 console.log('✅ ALL VAULT CORE & ARCHITECTURAL CHECKS PASSED!');

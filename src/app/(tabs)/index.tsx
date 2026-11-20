@@ -26,6 +26,7 @@ import {
   Wallet,
 } from 'lucide-react-native';
 import {
+  calculateAccountBalances,
   calculateFinancialSummary,
   useVaultStore,
 } from '../../store/useVaultStore';
@@ -37,6 +38,7 @@ import {
 } from '../../utils/nepaliDate';
 import { formatCurrency } from '../../utils/currency';
 import { NepaliDateClockBanner } from '../../components/NepaliDateClockBanner';
+import { QuickActionMessageBox } from '../../components/QuickActionMessageBox';
 import { TransactionFormModal } from '../../components/TransactionFormModal';
 import { ItemFormModal } from '../../components/ItemFormModal';
 import { ActivityFormModal } from '../../components/ActivityFormModal';
@@ -56,13 +58,14 @@ import {
   FinanceHealthGauge,
   getFinanceHealthMeta,
 } from '../../components/monekin/MonekinCharts';
-import { PaymentMethod, TransactionType } from '../../types';
+import { AccountScope, PaymentMethod, TransactionType } from '../../types';
 
 export default function DashboardScreen() {
   const router = useRouter();
   const {
     settings,
     updateSettings,
+    accounts,
     transactions,
     items,
     activities,
@@ -170,41 +173,24 @@ export default function DashboardScreen() {
     };
   }, [transactions, selectedPeriod, initialNpt.isoDate, allTimeSummary.totalIncome]);
 
-  // Monekin `DashboardAccountList`: Group transactions by Payment Account / Wallet
-  const accountBalances = useMemo(() => {
-    const map: Record<
-      PaymentMethod,
-      { method: PaymentMethod; balance: number; txCount: number; color: string }
-    > = {
-      'Bank Transfer': {
-        method: 'Bank Transfer',
-        balance: 0,
-        txCount: 0,
-        color: '#0F3375',
-      },
-      eSewa: { method: 'eSewa', balance: 0, txCount: 0, color: '#37A13B' },
-      Khalti: { method: 'Khalti', balance: 0, txCount: 0, color: '#6D28D9' },
-      Cash: { method: 'Cash', balance: 0, txCount: 0, color: '#059669' },
-      ConnectIPS: {
-        method: 'ConnectIPS',
-        balance: 0,
-        txCount: 0,
-        color: '#2563EB',
-      },
-      Card: { method: 'Card', balance: 0, txCount: 0, color: '#D97706' },
-      Other: { method: 'Other', balance: 0, txCount: 0, color: '#64748B' },
-    };
+  const [accountScopeFilter, setAccountScopeFilter] =
+    useState<'All' | 'Personal' | 'Family'>('All');
 
-    for (const t of transactions) {
-      const entry = map[t.paymentMethod] || map.Other;
-      entry.txCount += 1;
-      entry.balance += t.type === 'income' ? t.amount : -t.amount;
+  // Multi-wallet & Scope Balances (Personal: Bank 5000, Cash 50; Family: Bank 500, Cash 100)
+  const accountSummary = useMemo(
+    () => calculateAccountBalances(accounts, transactions),
+    [accounts, transactions]
+  );
+
+  const displayedAccounts = useMemo(() => {
+    if (accountScopeFilter === 'Personal') {
+      return accountSummary.personalAccounts;
     }
-
-    return Object.values(map)
-      .filter((a) => a.txCount > 0)
-      .sort((a, b) => b.balance - a.balance);
-  }, [transactions]);
+    if (accountScopeFilter === 'Family') {
+      return accountSummary.familyAccounts;
+    }
+    return [...accountSummary.personalAccounts, ...accountSummary.familyAccounts];
+  }, [accountScopeFilter, accountSummary]);
 
   // Monekin `FinanceHealthCard` score (0-100) from savings rate, cash flow, and task completion
   const financeHealthScore = useMemo(() => {
@@ -639,10 +625,16 @@ export default function DashboardScreen() {
             </TouchableOpacity>
           </ScrollView>
 
-          {/* 6. MONEKIN `DashboardAccountList` ("My Accounts & Wallets") */}
+          {/* Quick Action NLP Message Box (Replacing simple New button) */}
+          <QuickActionMessageBox
+            isDark={isDark}
+            onOpenManualForm={() => openQuickTxn('income')}
+          />
+
+          {/* 6. MONEKIN `DashboardAccountList` ("My Accounts & Wallets" - Personal & Family) */}
           <CardWithHeader
             title="My Accounts & Wallets"
-            subtitle="Active payment methods & net balances"
+            subtitle="Personal & Family balances"
             isDark={isDark}
             headerActionIcon={<Plus size={14} color={palette.accent} />}
             headerActionText="New Txn"
@@ -651,19 +643,136 @@ export default function DashboardScreen() {
             onFooterPress={() => router.push('/(tabs)/money')}
             accentColor={palette.accent}
           >
-            {accountBalances.length === 0 ? (
+            {/* Net Worth Summary Strip */}
+            <View
+              style={[
+                styles.accountSummaryStrip,
+                {
+                  backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
+                  borderColor: theme.border,
+                },
+              ]}
+            >
+              <View style={styles.summaryScopeBox}>
+                <Text
+                  style={[styles.summaryScopeLabel, { color: theme.textMuted }]}
+                >
+                  Personal (Own)
+                </Text>
+                <CurrencyDisplayer
+                  amount={accountSummary.personalTotal}
+                  currency={settings.currency}
+                  isDark={isDark}
+                  privateMode={privateMode}
+                  size="sm"
+                  color="#2563EB"
+                />
+              </View>
+
+              <View
+                style={[
+                  styles.summaryDivider,
+                  { backgroundColor: theme.divider },
+                ]}
+              />
+
+              <View style={styles.summaryScopeBox}>
+                <Text
+                  style={[styles.summaryScopeLabel, { color: theme.textMuted }]}
+                >
+                  Family
+                </Text>
+                <CurrencyDisplayer
+                  amount={accountSummary.familyTotal}
+                  currency={settings.currency}
+                  isDark={isDark}
+                  privateMode={privateMode}
+                  size="sm"
+                  color="#7C3AED"
+                />
+              </View>
+
+              <View
+                style={[
+                  styles.summaryDivider,
+                  { backgroundColor: theme.divider },
+                ]}
+              />
+
+              <View style={styles.summaryScopeBox}>
+                <Text
+                  style={[styles.summaryScopeLabel, { color: theme.textMuted }]}
+                >
+                  Combined
+                </Text>
+                <CurrencyDisplayer
+                  amount={accountSummary.grandTotal}
+                  currency={settings.currency}
+                  isDark={isDark}
+                  privateMode={privateMode}
+                  size="sm"
+                  color={
+                    accountSummary.grandTotal >= 0
+                      ? theme.textPrimary
+                      : theme.expense
+                  }
+                />
+              </View>
+            </View>
+
+            {/* Scope Filter Tabs */}
+            <View style={styles.scopeTabsRow}>
+              {(['All', 'Personal', 'Family'] as const).map((scopeKey) => {
+                const isSelected = accountScopeFilter === scopeKey;
+                return (
+                  <TouchableOpacity
+                    key={scopeKey}
+                    onPress={() => setAccountScopeFilter(scopeKey)}
+                    style={[
+                      styles.scopeTabBtn,
+                      isSelected && {
+                        backgroundColor:
+                          scopeKey === 'Personal'
+                            ? '#2563EB'
+                            : scopeKey === 'Family'
+                            ? '#7C3AED'
+                            : palette.accent,
+                      },
+                      !isSelected && {
+                        backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+                        borderColor: theme.border,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.scopeTabText,
+                        {
+                          color: isSelected ? '#FFFFFF' : theme.textMuted,
+                          fontWeight: isSelected ? '800' : '600',
+                        },
+                      ]}
+                    >
+                      {scopeKey === 'Personal' ? 'Personal (Own)' : scopeKey}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {displayedAccounts.length === 0 ? (
               <Text style={[styles.emptyText, { color: theme.textMuted }]}>
-                No active accounts yet. Add an income or expense to populate.
+                No accounts found in this view.
               </Text>
             ) : (
-              accountBalances.slice(0, 4).map((acc, idx) => (
+              displayedAccounts.map((acc, idx) => (
                 <TouchableOpacity
-                  key={acc.method}
+                  key={acc.id}
                   activeOpacity={0.8}
                   onPress={() => router.push('/(tabs)/money')}
                   style={[
                     styles.accountRow,
-                    idx < Math.min(accountBalances.length, 4) - 1 && {
+                    idx < displayedAccounts.length - 1 && {
                       borderBottomWidth: 1,
                       borderBottomColor: theme.divider,
                     },
@@ -672,37 +781,83 @@ export default function DashboardScreen() {
                   <View
                     style={[
                       styles.accountIconCircle,
-                      { backgroundColor: `${acc.color}1C` },
+                      {
+                        backgroundColor:
+                          acc.scope === 'Personal' ? '#2563EB1C' : '#7C3AED1C',
+                      },
                     ]}
                   >
-                    {getAccountIcon(acc.method, acc.color)}
+                    {getAccountIcon(
+                      acc.paymentMethod,
+                      acc.scope === 'Personal' ? '#2563EB' : '#7C3AED'
+                    )}
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text
-                      style={[
-                        styles.accountNameText,
-                        { color: theme.textPrimary },
-                      ]}
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
                     >
-                      {acc.method}
-                    </Text>
+                      <Text
+                        style={[
+                          styles.accountNameText,
+                          { color: theme.textPrimary },
+                        ]}
+                      >
+                        {acc.name}
+                      </Text>
+                      <View
+                        style={[
+                          styles.scopeBadge,
+                          {
+                            backgroundColor:
+                              acc.scope === 'Personal'
+                                ? isDark
+                                  ? '#1E3A8A'
+                                  : '#DBEAFE'
+                                : isDark
+                                ? '#4C1D95'
+                                : '#EDE9FE',
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.scopeBadgeText,
+                            {
+                              color:
+                                acc.scope === 'Personal' ? '#2563EB' : '#7C3AED',
+                            },
+                          ]}
+                        >
+                          {acc.scope === 'Personal' ? 'Personal' : 'Family'}
+                        </Text>
+                      </View>
+                    </View>
                     <Text
                       style={[
                         styles.accountMetaText,
                         { color: theme.textMuted },
                       ]}
                     >
-                      {acc.txCount} {acc.txCount === 1 ? 'movement' : 'movements'}
+                      Initial: Rs.{' '}
+                      {acc.initialBalance.toLocaleString('en-IN')} •{' '}
+                      {acc.movementCount}{' '}
+                      {acc.movementCount === 1 ? 'movement' : 'movements'}
                     </Text>
                   </View>
                   <CurrencyDisplayer
-                    amount={acc.balance}
+                    amount={acc.currentBalance}
                     currency={settings.currency}
                     isDark={isDark}
                     privateMode={privateMode}
                     size="md"
                     color={
-                      acc.balance >= 0 ? theme.textPrimary : theme.expense
+                      acc.currentBalance >= 0
+                        ? theme.textPrimary
+                        : theme.expense
                     }
                   />
                 </TouchableOpacity>
@@ -1111,19 +1266,6 @@ export default function DashboardScreen() {
         </View>
       </ScrollView>
 
-      {/* Monekin Floating New Transaction Button (`NewTransactionButton`) */}
-      <TouchableOpacity
-        activeOpacity={0.9}
-        onPress={() => openQuickTxn('expense')}
-        style={[
-          styles.fabButton,
-          { backgroundColor: palette.accent },
-        ]}
-      >
-        <Plus size={20} color="#FFFFFF" strokeWidth={2.6} />
-        <Text style={styles.fabText}>New</Text>
-      </TouchableOpacity>
-
       {/* Modals */}
       <TransactionFormModal
         visible={txnModalVisible}
@@ -1439,21 +1581,53 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  fabButton: {
-    position: 'absolute',
-    right: 18,
-    bottom: 18,
+  accountSummaryStrip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 18,
-    paddingVertical: 13,
-    borderRadius: 999,
-    elevation: 6,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 12,
   },
-  fabText: {
-    color: '#FFFFFF',
-    fontSize: 14,
+  summaryScopeBox: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  summaryScopeLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    marginBottom: 2,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  summaryDivider: {
+    width: 1,
+    height: 28,
+  },
+  scopeTabsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  scopeTabBtn: {
+    flex: 1,
+    paddingVertical: 7,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scopeTabText: {
+    fontSize: 11,
+  },
+  scopeBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  scopeBadgeText: {
+    fontSize: 10,
     fontWeight: '800',
   },
 });

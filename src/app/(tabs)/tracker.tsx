@@ -225,8 +225,8 @@ export default function ActivityTrackerScreen() {
                 {viewMode === 'daily'
                   ? formatBSDateNepali(selectedBS, true)
                   : `${BS_MONTHS_NE[selectedBS.month - 1]} ${toNepaliDigits(
-                      selectedBS.year
-                    )} (मासिक सारांश)`}
+                    selectedBS.year
+                  )} (मासिक सारांश)`}
               </Text>
               <Text
                 style={[styles.activeDateSub, { color: theme.textMuted }]}

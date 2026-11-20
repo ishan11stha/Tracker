@@ -1,31 +1,39 @@
 import { create } from 'zustand';
 import {
   VaultBackupPayload,
+  dbDeleteAccount,
   dbDeleteActivity,
   dbDeleteItem,
   dbDeleteReminder,
   dbDeleteTransaction,
+  dbGetAllAccounts,
   dbGetAllActivities,
   dbGetAllItems,
   dbGetAllReminders,
   dbGetAllTransactions,
   dbGetItemHistory,
   dbGetSettings,
+  dbInsertAccount,
   dbInsertActivity,
   dbInsertItem,
   dbInsertReminder,
   dbInsertTransaction,
   dbRestoreBackup,
   dbSaveSettings,
+  dbUpdateAccount,
   dbUpdateActivity,
   dbUpdateItem,
   dbUpdateReminder,
   dbUpdateTransaction,
 } from '../db/database';
 import {
+  Account,
+  AccountScope,
   ActivityRecord,
   AppSettings,
   ItemHistoryLog,
+  ParsedQuickInput,
+  PaymentMethod,
   PersonalItem,
   ReminderItem,
   Transaction,
@@ -34,6 +42,19 @@ import {
   cancelReminderNotification,
   scheduleReminderNotification,
 } from '../utils/notifications';
+import { parseQuickInput } from '../utils/nlpParser';
+import { getNowInNPT } from '../utils/nepaliDate';
+import {
+  AccountSummaryGrouping,
+  AccountWithBalance,
+  calculateAccountBalances,
+} from '../utils/accountBalances';
+
+export {
+  AccountSummaryGrouping,
+  AccountWithBalance,
+  calculateAccountBalances,
+};
 
 interface VaultState {
   isHydrated: boolean;
@@ -41,6 +62,7 @@ interface VaultState {
   error: string | null;
 
   settings: AppSettings;
+  accounts: Account[];
   transactions: Transaction[];
   items: PersonalItem[];
   itemHistory: ItemHistoryLog[];
@@ -50,6 +72,16 @@ interface VaultState {
   // Actions
   hydrateFromDB: () => Promise<void>;
   updateSettings: (partial: Partial<AppSettings>) => Promise<void>;
+
+  // Accounts
+  addAccount: (
+    data: Omit<Account, 'id' | 'createdAt' | 'updatedAt'>
+  ) => Promise<void>;
+  editAccount: (
+    id: string,
+    data: Omit<Account, 'id' | 'createdAt' | 'updatedAt'>
+  ) => Promise<void>;
+  removeAccount: (id: string) => Promise<void>;
 
   // Transactions
   addTransaction: (
@@ -95,6 +127,14 @@ interface VaultState {
   toggleReminderCompleted: (id: string) => Promise<void>;
   removeReminder: (id: string) => Promise<void>;
 
+  // Intelligent Quick Message Box Command Processor
+  processQuickCommand: (rawText: string) => Promise<{
+    success: boolean;
+    message: string;
+    parsed: ParsedQuickInput;
+    undoAction?: () => Promise<void>;
+  }>;
+
   // Backup & Restore
   getFullBackupPayload: () => VaultBackupPayload;
   restoreFromBackup: (payload: VaultBackupPayload) => Promise<void>;
@@ -117,6 +157,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
   error: null,
 
   settings: DEFAULT_SETTINGS,
+  accounts: [],
   transactions: [],
   items: [],
   itemHistory: [],
@@ -125,19 +166,28 @@ export const useVaultStore = create<VaultState>((set, get) => ({
 
   hydrateFromDB: async () => {
     try {
-      const [settings, transactions, items, itemHistory, activities, reminders] =
-        await Promise.all([
-          dbGetSettings(),
-          dbGetAllTransactions(),
-          dbGetAllItems(),
-          dbGetItemHistory(),
-          dbGetAllActivities(),
-          dbGetAllReminders(),
-        ]);
+      const [
+        settings,
+        accounts,
+        transactions,
+        items,
+        itemHistory,
+        activities,
+        reminders,
+      ] = await Promise.all([
+        dbGetSettings(),
+        dbGetAllAccounts(),
+        dbGetAllTransactions(),
+        dbGetAllItems(),
+        dbGetItemHistory(),
+        dbGetAllActivities(),
+        dbGetAllReminders(),
+      ]);
 
       set({
         isHydrated: true,
         settings,
+        accounts,
         transactions,
         items,
         itemHistory,
@@ -190,6 +240,69 @@ export const useVaultStore = create<VaultState>((set, get) => ({
         }
       }
       set({ reminders: updatedReminders });
+    }
+  },
+
+  // Accounts
+  addAccount: async (data) => {
+    if (get().isSubmitting) return;
+    set({ isSubmitting: true, error: null });
+    try {
+      const now = new Date().toISOString();
+      const newAcc: Account = {
+        ...data,
+        id: `acc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        createdAt: now,
+        updatedAt: now,
+      };
+      await dbInsertAccount(newAcc);
+      const accounts = await dbGetAllAccounts();
+      set({ accounts, isSubmitting: false });
+    } catch (err) {
+      set({
+        isSubmitting: false,
+        error: err instanceof Error ? err.message : 'Failed to add account',
+      });
+      throw err;
+    }
+  },
+
+  editAccount: async (id, data) => {
+    if (get().isSubmitting) return;
+    set({ isSubmitting: true, error: null });
+    try {
+      const existing = get().accounts.find((a) => a.id === id);
+      if (!existing) throw new Error('Account not found');
+      const updated: Account = {
+        ...existing,
+        ...data,
+        updatedAt: new Date().toISOString(),
+      };
+      await dbUpdateAccount(updated);
+      const accounts = await dbGetAllAccounts();
+      set({ accounts, isSubmitting: false });
+    } catch (err) {
+      set({
+        isSubmitting: false,
+        error: err instanceof Error ? err.message : 'Failed to update account',
+      });
+      throw err;
+    }
+  },
+
+  removeAccount: async (id) => {
+    if (get().isSubmitting) return;
+    set({ isSubmitting: true, error: null });
+    try {
+      await dbDeleteAccount(id);
+      const accounts = await dbGetAllAccounts();
+      set({ accounts, isSubmitting: false });
+    } catch (err) {
+      set({
+        isSubmitting: false,
+        error: err instanceof Error ? err.message : 'Failed to remove account',
+      });
+      throw err;
     }
   },
 
@@ -496,12 +609,149 @@ export const useVaultStore = create<VaultState>((set, get) => ({
     }));
   },
 
+  processQuickCommand: async (rawText: string) => {
+    const parsed = parseQuickInput(rawText);
+    const npt = getNowInNPT();
+    const createdIds: {
+      transactionId?: string;
+      itemId?: string;
+      activityId?: string;
+      reminderId?: string;
+    } = {};
+
+    try {
+      if (parsed.intent === 'reminder') {
+        const title = parsed.title;
+        const dateISO = parsed.dateISO || npt.isoDate;
+        const timeString = parsed.timeString || '09:00';
+        await get().addReminder({
+          title,
+          description: `Created via Quick Input: "${rawText}"`,
+          dateISO,
+          timeString,
+          priority: 'Medium',
+          category: parsed.category || 'Bills & Finance',
+          recurrence: 'none',
+        });
+        const created = get().reminders[0];
+        if (created) createdIds.reminderId = created.id;
+
+        return {
+          success: true,
+          message: parsed.humanSummary,
+          parsed,
+          undoAction: async () => {
+            if (createdIds.reminderId) {
+              await get().removeReminder(createdIds.reminderId);
+            }
+          },
+        };
+      }
+
+      if (parsed.intent === 'activity') {
+        await get().addActivity({
+          title: parsed.title,
+          description: `Logged via Quick Input: "${rawText}"`,
+          category: parsed.category || 'Fitness & Health',
+          dateISO: npt.isoDate,
+          timeString: parsed.timeString || npt.time24,
+          numericValue: parsed.numericValue || 1,
+          unit: parsed.unit || 'mins',
+          status: 'completed',
+        });
+        const created = get().activities[0];
+        if (created) createdIds.activityId = created.id;
+
+        return {
+          success: true,
+          message: parsed.humanSummary,
+          parsed,
+          undoAction: async () => {
+            if (createdIds.activityId) {
+              await get().removeActivity(createdIds.activityId);
+            }
+          },
+        };
+      }
+
+      // Financial transaction (Income or Expense)
+      const accounts = get().accounts;
+      let matchedAccount = accounts.find((a) => {
+        if (parsed.accountScope && a.scope !== parsed.accountScope) return false;
+        if (parsed.paymentMethod === 'Bank Transfer' && a.paymentMethod === 'Bank Transfer') return true;
+        if (parsed.paymentMethod === 'Cash' && a.paymentMethod === 'Cash') return true;
+        return a.paymentMethod === parsed.paymentMethod;
+      });
+
+      if (!matchedAccount && accounts.length > 0) {
+        matchedAccount = accounts.find((a) => a.scope === (parsed.accountScope || 'Personal')) || accounts[0];
+      }
+
+      const txnAmount = parsed.amount || (parsed.intent === 'income' ? 200 : 0);
+
+      await get().addTransaction({
+        type: parsed.intent === 'income' ? 'income' : 'expense',
+        title: parsed.title,
+        amount: txnAmount,
+        category: parsed.category || (parsed.intent === 'income' ? 'Other Income' : 'Shopping'),
+        dateISO: npt.isoDate,
+        paymentMethod: parsed.paymentMethod || matchedAccount?.paymentMethod || 'Cash',
+        accountId: matchedAccount?.id,
+        accountScope: parsed.accountScope || matchedAccount?.scope || 'Personal',
+        description: `Added via Quick Input: "${rawText}"`,
+      });
+      const createdTxn = get().transactions[0];
+      if (createdTxn) createdIds.transactionId = createdTxn.id;
+
+      // If user bought an item (e.g. "bought notebook, 5000"), also catalog into items inventory!
+      if (parsed.isItemAndExpense) {
+        await get().addItem(
+          {
+            name: parsed.itemName || parsed.title,
+            description: `Auto-cataloged via Quick Input: "${rawText}"`,
+            category: parsed.itemCategory || 'Books',
+            purchasePrice: txnAmount,
+            purchaseDateISO: npt.isoDate,
+            quantity: 1,
+            imageUri: '',
+            location: parsed.itemLocation || 'Home / Study',
+            status: 'Owned',
+          },
+          'Auto-cataloged from Quick Input message'
+        );
+        const createdItem = get().items[0];
+        if (createdItem) createdIds.itemId = createdItem.id;
+      }
+
+      return {
+        success: true,
+        message: parsed.humanSummary,
+        parsed,
+        undoAction: async () => {
+          if (createdIds.transactionId) {
+            await get().removeTransaction(createdIds.transactionId);
+          }
+          if (createdIds.itemId) {
+            await get().removeItem(createdIds.itemId);
+          }
+        },
+      };
+    } catch (err) {
+      return {
+        success: false,
+        message: err instanceof Error ? err.message : 'Failed to process command',
+        parsed,
+      };
+    }
+  },
+
   getFullBackupPayload: () => {
     const state = get();
     return {
       version: 1,
       exportedAt: new Date().toISOString(),
       settings: state.settings,
+      accounts: state.accounts,
       transactions: state.transactions,
       items: state.items,
       itemHistory: state.itemHistory,

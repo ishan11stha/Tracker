@@ -232,6 +232,7 @@ export function getNowInNPT(now: Date = new Date()): {
   seconds: number;
   weekday: number;
   isoDate: string;
+  time24: string;
 } {
   // Nepal Standard Time is strictly UTC + 5 hours 45 minutes (+345 minutes)
   const nptMillis = now.getTime() + 345 * 60 * 1000;
@@ -245,8 +246,9 @@ export function getNowInNPT(now: Date = new Date()): {
   const seconds = nptDate.getUTCSeconds();
   const weekday = nptDate.getUTCDay();
   const isoDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  const time24 = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 
-  return { year, month, day, hours, minutes, seconds, weekday, isoDate };
+  return { year, month, day, hours, minutes, seconds, weekday, isoDate, time24 };
 }
 
 /**

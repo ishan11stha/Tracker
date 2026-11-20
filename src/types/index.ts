@@ -2,6 +2,19 @@ import { z } from 'zod';
 
 export type TransactionType = 'income' | 'expense';
 
+export type AccountScope = 'Personal' | 'Family';
+
+export interface Account {
+  id: string;
+  name: string; // e.g. 'Bank', 'Cash', 'eSewa'
+  scope: AccountScope; // 'Personal' | 'Family'
+  initialBalance: number;
+  paymentMethod: PaymentMethod;
+  color?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type PaymentMethod =
   | 'Cash'
   | 'eSewa'
@@ -19,10 +32,28 @@ export interface Transaction {
   category: string;
   dateISO: string; // YYYY-MM-DD in Gregorian (AD)
   paymentMethod: PaymentMethod;
+  accountId?: string;
+  accountScope?: AccountScope;
   description: string;
   createdAt: string;
   updatedAt: string;
 }
+
+export const accountSchema = z.object({
+  name: z.string().trim().min(1, 'Account name is required').max(50),
+  scope: z.enum(['Personal', 'Family']),
+  initialBalance: z.number().min(0, 'Balance cannot be negative'),
+  paymentMethod: z.enum([
+    'Cash',
+    'eSewa',
+    'Khalti',
+    'Bank Transfer',
+    'Card',
+    'ConnectIPS',
+    'Other',
+  ]),
+  color: z.string().optional(),
+});
 
 export const transactionSchema = z.object({
   type: z.enum(['income', 'expense']),
@@ -46,6 +77,8 @@ export const transactionSchema = z.object({
     'ConnectIPS',
     'Other',
   ]),
+  accountId: z.string().optional(),
+  accountScope: z.enum(['Personal', 'Family']).optional(),
   description: z.string().max(500, 'Notes cannot exceed 500 characters'),
 });
 
@@ -226,7 +259,49 @@ export const vaultBackupSchema = z.object({
       updatedAt: z.string(),
     })
   ),
+  accounts: z
+    .array(
+      accountSchema.extend({
+        id: z.string().min(1),
+        createdAt: z.string(),
+        updatedAt: z.string(),
+      })
+    )
+    .optional(),
 });
+
+export type QuickIntent =
+  | 'income'
+  | 'expense'
+  | 'item'
+  | 'activity'
+  | 'reminder';
+
+export interface ParsedQuickInput {
+  rawText: string;
+  intent: QuickIntent;
+  title: string;
+  amount?: number;
+  category?: string;
+  paymentMethod?: PaymentMethod;
+  accountScope?: AccountScope;
+  accountId?: string;
+  // For dual item + expense ("bought notebook, 5000")
+  isItemAndExpense?: boolean;
+  itemName?: string;
+  itemCategory?: string;
+  itemPrice?: number;
+  itemLocation?: string;
+  // For habit/activity ("5km run 30 mins")
+  numericValue?: number;
+  unit?: string;
+  timeString?: string;
+  // For reminder ("remind me tomorrow 5pm to pay wifi")
+  dateISO?: string;
+  // Metadata & Feedback
+  confidence: number;
+  humanSummary: string;
+}
 
 export const INCOME_CATEGORIES = [
   'Salary',

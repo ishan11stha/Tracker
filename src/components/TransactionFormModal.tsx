@@ -21,6 +21,7 @@ import {
   X,
 } from 'lucide-react-native';
 import {
+  AccountScope,
   EXPENSE_CATEGORIES,
   INCOME_CATEGORIES,
   PAYMENT_METHODS,
@@ -54,6 +55,7 @@ interface TransactionFormValues {
   category: string;
   dateISO: string;
   paymentMethod: PaymentMethod;
+  accountScope?: AccountScope;
   description: string;
 }
 
@@ -93,6 +95,7 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
           : EXPENSE_CATEGORIES[0],
       dateISO: todayISO,
       paymentMethod: 'Cash',
+      accountScope: 'Personal',
       description: '',
     },
   });
@@ -101,6 +104,7 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
   const currentDateISO = watch('dateISO');
   const currentCategory = watch('category');
   const currentPayment = watch('paymentMethod');
+  const currentScope = watch('accountScope') || 'Personal';
 
   useEffect(() => {
     if (visible) {
@@ -112,6 +116,7 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
           category: editingTransaction.category,
           dateISO: editingTransaction.dateISO,
           paymentMethod: editingTransaction.paymentMethod,
+          accountScope: editingTransaction.accountScope || 'Personal',
           description: editingTransaction.description || '',
         });
         setAmountInput(String(editingTransaction.amount));
@@ -127,6 +132,7 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
           category: defaultCat,
           dateISO: getNowInNPT().isoDate,
           paymentMethod: 'Cash',
+          accountScope: 'Personal',
           description: '',
         });
         setAmountInput('');
@@ -409,6 +415,47 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
                         ]}
                       >
                         {cat}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Wallet / Ownership Scope */}
+            <View style={styles.fieldGroup}>
+              <Text style={[styles.label, { color: theme.textSecondary }]}>
+                Wallet / Ownership Scope *
+              </Text>
+              <View style={styles.chipsWrap}>
+                {(['Personal', 'Family'] as const).map((sc) => {
+                  const selected = currentScope === sc;
+                  const activeCol = sc === 'Personal' ? '#2563EB' : '#7C3AED';
+                  return (
+                    <TouchableOpacity
+                      key={sc}
+                      onPress={() =>
+                        setValue('accountScope', sc, { shouldValidate: true })
+                      }
+                      style={[
+                        styles.chip,
+                        {
+                          backgroundColor: selected
+                            ? activeCol
+                            : theme.inputBg,
+                          borderColor: selected ? activeCol : theme.border,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.chipText,
+                          {
+                            color: selected ? '#FFFFFF' : theme.textPrimary,
+                          },
+                        ]}
+                      >
+                        {sc === 'Personal' ? 'Personal (Own)' : 'Family'}
                       </Text>
                     </TouchableOpacity>
                   );

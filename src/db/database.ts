@@ -1,5 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 import {
+  Account,
   ActivityRecord,
   AppSettings,
   ItemHistoryLog,
@@ -124,7 +125,38 @@ async function initializeSchema(db: SQLite.SQLiteDatabase): Promise<void> {
     );
 
     CREATE INDEX IF NOT EXISTS idx_reminders_date ON reminders(dateISO ASC);
+
+    CREATE TABLE IF NOT EXISTS accounts (
+      id TEXT PRIMARY KEY NOT NULL,
+      name TEXT NOT NULL,
+      scope TEXT NOT NULL CHECK(scope IN ('Personal', 'Family')),
+      initialBalance REAL NOT NULL DEFAULT 0,
+      paymentMethod TEXT NOT NULL,
+      color TEXT DEFAULT '#1E40AF',
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
+    );
   `);
+
+  // Run non-destructive column migrations for existing databases
+  try {
+    await db.execAsync(`ALTER TABLE transactions ADD COLUMN accountId TEXT;`);
+  } catch {
+    // Column already exists
+  }
+  try {
+    await db.execAsync(`ALTER TABLE transactions ADD COLUMN accountScope TEXT DEFAULT 'Personal';`);
+  } catch {
+    // Column already exists
+  }
+
+  // Ensure starter accounts exist (Personal: Bank 5000, Cash 50; Family: Bank 500, Cash 100)
+  const existingAccounts = await db.getFirstAsync<{ count: number }>(
+    `SELECT COUNT(*) as count FROM accounts`
+  );
+  if (!existingAccounts || existingAccounts.count === 0) {
+    await seedDefaultAccounts(db);
+  }
 
   // Check if initial seed / first-run setup has occurred
   const seeded = await db.getFirstAsync<{ value: string }>(
@@ -133,6 +165,69 @@ async function initializeSchema(db: SQLite.SQLiteDatabase): Promise<void> {
 
   if (!seeded) {
     await seedInitialData(db);
+  }
+}
+
+export async function seedDefaultAccounts(db: SQLite.SQLiteDatabase): Promise<void> {
+  const nowStamp = new Date().toISOString();
+  const defaultAccounts: Account[] = [
+    {
+      id: 'acc_personal_bank',
+      name: 'Bank',
+      scope: 'Personal',
+      initialBalance: 5000,
+      paymentMethod: 'Bank Transfer',
+      color: '#1E40AF',
+      createdAt: nowStamp,
+      updatedAt: nowStamp,
+    },
+    {
+      id: 'acc_personal_cash',
+      name: 'Cash',
+      scope: 'Personal',
+      initialBalance: 50,
+      paymentMethod: 'Cash',
+      color: '#059669',
+      createdAt: nowStamp,
+      updatedAt: nowStamp,
+    },
+    {
+      id: 'acc_family_bank',
+      name: 'Bank',
+      scope: 'Family',
+      initialBalance: 500,
+      paymentMethod: 'Bank Transfer',
+      color: '#7C3AED',
+      createdAt: nowStamp,
+      updatedAt: nowStamp,
+    },
+    {
+      id: 'acc_family_cash',
+      name: 'Cash',
+      scope: 'Family',
+      initialBalance: 100,
+      paymentMethod: 'Cash',
+      color: '#D97706',
+      createdAt: nowStamp,
+      updatedAt: nowStamp,
+    },
+  ];
+
+  for (const acc of defaultAccounts) {
+    await db.runAsync(
+      `INSERT OR REPLACE INTO accounts (id, name, scope, initialBalance, paymentMethod, color, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        acc.id,
+        acc.name,
+        acc.scope,
+        acc.initialBalance,
+        acc.paymentMethod,
+        acc.color || '#1E40AF',
+        acc.createdAt,
+        acc.updatedAt,
+      ]
+    );
   }
 }
 
@@ -516,8 +611,8 @@ export async function dbInsertTransaction(txn: Transaction): Promise<void> {
   const db = await getDatabase();
   await db.withTransactionAsync(async () => {
     await db.runAsync(
-      `INSERT INTO transactions (id, type, title, amount, category, dateISO, paymentMethod, description, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO transactions (id, type, title, amount, category, dateISO, paymentMethod, accountId, accountScope, description, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         txn.id,
         txn.type,
@@ -526,6 +621,8 @@ export async function dbInsertTransaction(txn: Transaction): Promise<void> {
         txn.category,
         txn.dateISO,
         txn.paymentMethod,
+        txn.accountId || null,
+        txn.accountScope || 'Personal',
         txn.description,
         txn.createdAt,
         txn.updatedAt,
@@ -539,7 +636,7 @@ export async function dbUpdateTransaction(txn: Transaction): Promise<void> {
   await db.withTransactionAsync(async () => {
     await db.runAsync(
       `UPDATE transactions
-       SET type = ?, title = ?, amount = ?, category = ?, dateISO = ?, paymentMethod = ?, description = ?, updatedAt = ?
+       SET type = ?, title = ?, amount = ?, category = ?, dateISO = ?, paymentMethod = ?, accountId = ?, accountScope = ?, description = ?, updatedAt = ?
        WHERE id = ?`,
       [
         txn.type,
@@ -548,6 +645,8 @@ export async function dbUpdateTransaction(txn: Transaction): Promise<void> {
         txn.category,
         txn.dateISO,
         txn.paymentMethod,
+        txn.accountId || null,
+        txn.accountScope || 'Personal',
         txn.description,
         txn.updatedAt,
         txn.id,
@@ -560,6 +659,61 @@ export async function dbDeleteTransaction(id: string): Promise<void> {
   const db = await getDatabase();
   await db.withTransactionAsync(async () => {
     await db.runAsync(`DELETE FROM transactions WHERE id = ?`, [id]);
+  });
+}
+
+// Accounts CRUD (Multi-wallet & Scope tracking)
+export async function dbGetAllAccounts(): Promise<Account[]> {
+  const db = await getDatabase();
+  return await db.getAllAsync<Account>(
+    `SELECT * FROM accounts ORDER BY scope ASC, createdAt ASC`
+  );
+}
+
+export async function dbInsertAccount(account: Account): Promise<void> {
+  const db = await getDatabase();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      `INSERT INTO accounts (id, name, scope, initialBalance, paymentMethod, color, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        account.id,
+        account.name,
+        account.scope,
+        account.initialBalance,
+        account.paymentMethod,
+        account.color || '#1E40AF',
+        account.createdAt,
+        account.updatedAt,
+      ]
+    );
+  });
+}
+
+export async function dbUpdateAccount(account: Account): Promise<void> {
+  const db = await getDatabase();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      `UPDATE accounts
+       SET name = ?, scope = ?, initialBalance = ?, paymentMethod = ?, color = ?, updatedAt = ?
+       WHERE id = ?`,
+      [
+        account.name,
+        account.scope,
+        account.initialBalance,
+        account.paymentMethod,
+        account.color || '#1E40AF',
+        account.updatedAt,
+        account.id,
+      ]
+    );
+  });
+}
+
+export async function dbDeleteAccount(id: string): Promise<void> {
+  const db = await getDatabase();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(`DELETE FROM accounts WHERE id = ?`, [id]);
   });
 }
 
@@ -821,6 +975,7 @@ export interface VaultBackupPayload {
   itemHistory: ItemHistoryLog[];
   activities: ActivityRecord[];
   reminders: ReminderItem[];
+  accounts?: Account[];
 }
 
 export async function dbRestoreBackup(payload: VaultBackupPayload): Promise<void> {
@@ -838,11 +993,30 @@ export async function dbRestoreBackup(payload: VaultBackupPayload): Promise<void
     await db.runAsync(`DELETE FROM transactions`);
     await db.runAsync(`DELETE FROM activities`);
     await db.runAsync(`DELETE FROM reminders`);
+    if (payload.accounts && payload.accounts.length > 0) {
+      await db.runAsync(`DELETE FROM accounts`);
+      for (const a of payload.accounts) {
+        await db.runAsync(
+          `INSERT INTO accounts (id, name, scope, initialBalance, paymentMethod, color, createdAt, updatedAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            a.id,
+            a.name,
+            a.scope,
+            a.initialBalance,
+            a.paymentMethod,
+            a.color || '#1E40AF',
+            a.createdAt,
+            a.updatedAt,
+          ]
+        );
+      }
+    }
 
     for (const t of payload.transactions || []) {
       await db.runAsync(
-        `INSERT INTO transactions (id, type, title, amount, category, dateISO, paymentMethod, description, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO transactions (id, type, title, amount, category, dateISO, paymentMethod, accountId, accountScope, description, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           t.id,
           t.type,
@@ -851,6 +1025,8 @@ export async function dbRestoreBackup(payload: VaultBackupPayload): Promise<void
           t.category,
           t.dateISO,
           t.paymentMethod,
+          t.accountId || null,
+          t.accountScope || 'Personal',
           t.description || '',
           t.createdAt,
           t.updatedAt,
