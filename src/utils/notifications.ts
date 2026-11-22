@@ -3,15 +3,19 @@ import { Platform } from 'react-native';
 import { ReminderItem, ReminderRecurrence } from '../types';
 import { adToBs, formatBSDateNepali } from './nepaliDate';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+try {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+} catch {
+  // Safe fallback for environments like Expo Go or Web
+}
 
 export async function requestNotificationPermissions(): Promise<boolean> {
   try {
