@@ -76,19 +76,23 @@ export function extractAmount(text: string): number | null {
     if (!isNaN(val) && val > 0) return val;
   }
 
-  // Any standalone number in the string (prefer numbers that aren't part of times like "5pm" or "17:00")
-  // Exclude numbers followed by km, min, mins, am, pm, hr, hrs, etc.
-  const standaloneRegex = /\b([0-9]+(?:,[0-9]+)*(?:\.[0-9]+)?)\b(?!\s*(?:am|pm|mins?|minutes?|hrs?|hours?|km|steps?|pages?|glasses?))/gi;
+  // Any standalone number in the string (prefer numbers that aren't part of
+  // times like "5pm" or "17:00"). Quantity words such as "2 notebooks" are a
+  // common source of false positives, so use the largest remaining candidate.
+  // In natural purchase phrasing the monetary amount is normally the largest
+  // number ("bought 2 notebooks for 5000").
+  const standaloneRegex = /\b([0-9]+(?:,[0-9]+)*(?:\.[0-9]+)?)\b(?!\s*(?:am|pm|mins?|minutes?|hrs?|hours?|km|steps?|pages?|glasses?|st|nd|rd|th))/gi;
   const matches = [...norm.matchAll(standaloneRegex)];
+  let largest: number | null = null;
   for (const m of matches) {
     const cleanNum = m[1].replace(/,/g, '');
     const val = parseFloat(cleanNum);
-    if (!isNaN(val) && val > 0) {
-      return val;
+    if (!isNaN(val) && val > 0 && (largest === null || val > largest)) {
+      largest = val;
     }
   }
 
-  return null;
+  return largest;
 }
 
 /**
@@ -123,7 +127,7 @@ export function detectPaymentAndScope(text: string): {
     paymentMethod = 'eSewa';
   } else if (lower.includes('khalti')) {
     paymentMethod = 'Khalti';
-  } else if (lower.includes('connectips') || lower.includes('ips')) {
+  } else if (lower.includes('connectips') || /\bips\b/.test(lower)) {
     paymentMethod = 'ConnectIPS';
   } else if (lower.includes('card') || lower.includes('atm')) {
     paymentMethod = 'Card';
@@ -340,11 +344,20 @@ export function parseQuickInput(rawText: string): ParsedQuickInput {
 
     // Check time: 5pm, 17:00, 9am, 10:30 am
     let timeString = '09:00';
-    const timeMatch = clean.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i);
+    const meridiemMatch = clean.match(
+      /\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i
+    );
+    const colonMatch = clean.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/);
+    const atMatch = clean.match(
+      /\bat\s+([01]?\d|2[0-3])(?::([0-5]\d))?\b/i
+    );
+    const timeMatch = meridiemMatch || colonMatch || atMatch;
     if (timeMatch) {
       let h = parseInt(timeMatch[1], 10);
       const m = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
-      const meridiem = timeMatch[3]?.toLowerCase();
+      const meridiem = meridiemMatch
+        ? meridiemMatch[3]?.toLowerCase()
+        : undefined;
       if (meridiem === 'pm' && h < 12) h += 12;
       if (meridiem === 'am' && h === 12) h = 0;
       timeString = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
@@ -352,7 +365,10 @@ export function parseQuickInput(rawText: string): ParsedQuickInput {
     }
 
     // Remove leading words like "to ", "about "
-    clean = clean.replace(/^(?:to|about|for)\s+/i, '').replace(/[,\.]/g, '').trim();
+    clean = clean
+      .replace(/^(?:to|about|for|at)\s+/i, '')
+      .replace(/[,\.]/g, '')
+      .trim();
     const title = clean.length > 0 ? clean.charAt(0).toUpperCase() + clean.slice(1) : 'Scheduled Reminder';
 
     return {
@@ -429,7 +445,8 @@ export function parseQuickInput(rawText: string): ParsedQuickInput {
   const { paymentMethod, accountScope } = detectPaymentAndScope(norm);
 
   if (isIncome) {
-    const finalAmount = amount || 200; // default if not parsed
+    // Never invent an amount. The command processor asks the user instead.
+    const finalAmount = amount || 0;
     let title = 'Income Received';
 
     if (lower.includes('mom') || lower.includes('aama')) {
@@ -487,6 +504,8 @@ export function parseQuickInput(rawText: string): ParsedQuickInput {
     .replace(/\b(bank|cash|esewa|khalti|card)\b/gi, '')
     .replace(/[,\.\:\-]/g, ' ')
     .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b(?:for|at|on|from)\s*$/i, '')
     .trim();
 
   if (!candidateTitle) {

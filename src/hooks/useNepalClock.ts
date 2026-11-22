@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { AppState } from 'react-native';
 import {
   BSDate,
   adToBs,
@@ -32,11 +33,31 @@ export function useNepalClock(
   const [now, setNow] = useState<Date>(() => new Date());
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setNow(new Date());
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
+    let interval: ReturnType<typeof setInterval> | null = null;
+    const tickMs = includeSeconds ? 1_000 : 30_000;
+
+    const start = () => {
+      if (interval !== null) clearInterval(interval);
+      interval = setInterval(() => setNow(new Date()), tickMs);
+    };
+
+    start();
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        // Catch up immediately after returning from the background.
+        setNow(new Date());
+        start();
+      } else if (interval !== null) {
+        clearInterval(interval);
+        interval = null;
+      }
+    });
+
+    return () => {
+      if (interval !== null) clearInterval(interval);
+      subscription.remove();
+    };
+  }, [includeSeconds]);
 
   const npt = useMemo(() => getNowInNPT(now), [now]);
   const bsDate = useMemo(() => adToBs(npt.isoDate), [npt.isoDate]);

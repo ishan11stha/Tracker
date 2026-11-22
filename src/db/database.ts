@@ -7,7 +7,9 @@ import {
   PersonalItem,
   ReminderItem,
   Transaction,
+  appSettingsSchema,
 } from '../types';
+import { DEFAULT_SETTINGS } from '../constants/appSettings';
 
 let dbInstance: SQLite.SQLiteDatabase | null = null;
 let dbInitPromise: Promise<SQLite.SQLiteDatabase> | null = null;
@@ -149,7 +151,7 @@ async function initializeSchema(db: SQLite.SQLiteDatabase): Promise<void> {
     // Column already exists
   }
 
-  // Ensure starter accounts exist (Personal: Bank 5000, Cash 50; Family: Bank 500, Cash 100)
+  // Ensure the four foundational wallets exist at zero balance.
   const existingAccounts = await db.getFirstAsync<{ count: number }>(
     `SELECT COUNT(*) as count FROM accounts`
   );
@@ -280,20 +282,9 @@ async function seedInitialData(db: SQLite.SQLiteDatabase): Promise<void> {
         // ignore JSON parse error
       }
     } else {
-      const defaultSettings: AppSettings = {
-        userName: '',
-        userTitle: 'Kathmandu, Nepal',
-        currency: 'NPR',
-        language: 'en',
-        preferredCalendar: 'BS',
-        timeFormat: '12h',
-        notificationsEnabled: true,
-        theme: 'dark',
-      };
-
       await db.runAsync(
         `INSERT OR REPLACE INTO settings (key, value) VALUES ('app_settings', ?), ('is_seeded', 'true')`,
-        [JSON.stringify(defaultSettings)]
+        [JSON.stringify(DEFAULT_SETTINGS)]
       );
     }
 
@@ -304,7 +295,7 @@ async function seedInitialData(db: SQLite.SQLiteDatabase): Promise<void> {
 /**
  * Resets all user-entered data across all sections (transactions, items, history,
  * activities, reminders) so the user has a fresh start with their own details.
- * Re-seeds the 4 foundational accounts (Personal: Bank 5000, Cash 50; Family: Bank 500, Cash 100).
+ * Re-seeds the four foundational accounts (Personal/Family Bank and Cash) at zero.
  */
 export async function dbResetAllUserData(): Promise<void> {
   const db = await getDatabase();
@@ -331,21 +322,19 @@ export async function dbGetSettings(): Promise<AppSettings> {
   );
   if (row?.value) {
     try {
-      return JSON.parse(row.value) as AppSettings;
+      const parsed = JSON.parse(row.value) as Partial<AppSettings>;
+      const validated = appSettingsSchema.safeParse({
+        ...DEFAULT_SETTINGS,
+        ...parsed,
+      });
+      if (validated.success) {
+        return validated.data;
+      }
     } catch {
-      // fallback below
+      // Corrupt or partial JSON falls back to safe defaults below.
     }
   }
-  return {
-    userName: '',
-    userTitle: 'Kathmandu, Nepal',
-    currency: 'NPR',
-    language: 'en',
-    preferredCalendar: 'BS',
-    timeFormat: '12h',
-    notificationsEnabled: true,
-    theme: 'dark',
-  };
+  return { ...DEFAULT_SETTINGS };
 }
 
 export async function dbSaveSettings(settings: AppSettings): Promise<void> {
@@ -750,8 +739,12 @@ export async function dbRestoreBackup(payload: VaultBackupPayload): Promise<void
     await db.runAsync(`DELETE FROM transactions`);
     await db.runAsync(`DELETE FROM activities`);
     await db.runAsync(`DELETE FROM reminders`);
+
+    // Accounts must always mirror the restored dataset. Older backups did not
+    // include accounts, so reseed the four foundational wallets in that case
+    // rather than leaving stale accounts that do not match the transactions.
+    await db.runAsync(`DELETE FROM accounts`);
     if (payload.accounts && payload.accounts.length > 0) {
-      await db.runAsync(`DELETE FROM accounts`);
       for (const a of payload.accounts) {
         await db.runAsync(
           `INSERT INTO accounts (id, name, scope, initialBalance, paymentMethod, color, createdAt, updatedAt)
@@ -768,6 +761,8 @@ export async function dbRestoreBackup(payload: VaultBackupPayload): Promise<void
           ]
         );
       }
+    } else {
+      await seedDefaultAccounts(db);
     }
 
     for (const t of payload.transactions || []) {

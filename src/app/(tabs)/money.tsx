@@ -24,12 +24,10 @@ import {
   useVaultStore,
 } from '../../store/useVaultStore';
 import { getSectionPalette, getThemeColors } from '../../theme/colors';
+import { LAYOUT } from '../../theme/layout';
 import { formatCurrency } from '../../utils/currency';
-import {
-  adToBs,
-  formatBSDateNepali,
-  getNowInNPT,
-} from '../../utils/nepaliDate';
+import { adToBs, formatBSDateNepali } from '../../utils/nepaliDate';
+import { useCurrentNPT } from '../../hooks/useCurrentNPT';
 import { AccountScope, Transaction, TransactionType } from '../../types';
 import { TransactionFormModal } from '../../components/TransactionFormModal';
 import {
@@ -69,10 +67,10 @@ export default function MoneyManagerScreen() {
     useState<TransactionType>('expense');
   const [editingTxn, setEditingTxn] = useState<Transaction | null>(null);
 
-  const nptToday = useMemo(() => getNowInNPT(), []);
+  const nptToday = useCurrentNPT();
   const todayBS = useMemo(() => adToBs(nptToday.isoDate), [nptToday.isoDate]);
 
-  // Multi-wallet & Scope Balances (Personal: Bank 5000, Cash 50; Family: Bank 500, Cash 100)
+  // Multi-wallet and ownership-scope balances.
   const accountSummary = useMemo(
     () => calculateAccountBalances(accounts, transactions),
     [accounts, transactions]
@@ -120,7 +118,9 @@ export default function MoneyManagerScreen() {
   }, [
     transactions,
     timeRange,
-    nptToday,
+    nptToday.isoDate,
+    nptToday.year,
+    nptToday.month,
     todayBS,
     settings.preferredCalendar,
   ]);
@@ -407,6 +407,9 @@ export default function MoneyManagerScreen() {
               <TouchableOpacity
                 key={tab.key}
                 onPress={() => setTimeRange(tab.key)}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={`Show ${tab.label} transactions`}
                 style={[
                   styles.periodTabBtn,
                   active && { backgroundColor: palette.accentSoft },
@@ -593,9 +596,16 @@ export default function MoneyManagerScreen() {
             placeholder="Search title, category, eSewa/Khalti, notes..."
             placeholderTextColor={theme.textMuted}
             style={[styles.searchInput, { color: theme.textPrimary }]}
+            accessibilityLabel="Search transactions"
+            returnKeyType="search"
           />
           {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <TouchableOpacity
+              onPress={() => setSearchQuery('')}
+              accessibilityRole="button"
+              accessibilityLabel="Clear transaction search"
+              hitSlop={8}
+            >
               <X size={16} color={theme.textMuted} />
             </TouchableOpacity>
           )}
@@ -615,6 +625,8 @@ export default function MoneyManagerScreen() {
               <TouchableOpacity
                 key={sf.key}
                 onPress={() => setScopeFilter(sf.key)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
                 style={[
                   styles.scopeFilterBtn,
                   active && {
@@ -720,6 +732,8 @@ export default function MoneyManagerScreen() {
                   setTypeFilter(tf.key);
                   setSelectedCategory('All');
                 }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
                 style={[
                   styles.filterChip,
                   {
@@ -746,6 +760,8 @@ export default function MoneyManagerScreen() {
               <TouchableOpacity
                 key={cat}
                 onPress={() => setSelectedCategory(cat)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
                 style={[
                   styles.filterChip,
                   {
@@ -955,12 +971,18 @@ export default function MoneyManagerScreen() {
                         <TouchableOpacity
                           onPress={() => handleOpenEdit(t)}
                           style={styles.iconActionBtn}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Edit transaction ${t.title}`}
+                          hitSlop={8}
                         >
                           <Edit3 size={14} color={theme.textMuted} />
                         </TouchableOpacity>
                         <TouchableOpacity
                           onPress={() => handleDelete(t)}
                           style={styles.iconActionBtn}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Delete transaction ${t.title}`}
+                          hitSlop={8}
                         >
                           <Trash2 size={14} color="#EF4444" />
                         </TouchableOpacity>
@@ -992,7 +1014,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 16,
+    width: '100%',
+    maxWidth: LAYOUT.maxContentWidth,
+    alignSelf: 'center',
+    paddingHorizontal: LAYOUT.horizontalPadding,
     paddingTop: 10,
     paddingBottom: 32,
   },
@@ -1090,7 +1115,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 16,
     paddingHorizontal: 12,
-    height: 44,
+    paddingVertical: 8,
+    minHeight: 44,
     gap: 8,
     marginBottom: 10,
   },

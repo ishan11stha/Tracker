@@ -1,80 +1,90 @@
 import React, { useEffect } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useVaultStore } from '../store/useVaultStore';
 import { getThemeColors } from '../theme/colors';
-import { requestNotificationPermissions } from '../utils/notifications';
+import { AppErrorBoundary } from '../components/AppErrorBoundary';
 
 export default function RootLayout() {
-  const { isHydrated, hydrateFromDB, settings } = useVaultStore();
+  const { isHydrated, hydrateFromDB, settings, error, clearError } =
+    useVaultStore();
   const isDark = settings.theme === 'dark';
   const theme = getThemeColors(isDark);
 
   useEffect(() => {
     hydrateFromDB();
-    requestNotificationPermissions();
   }, [hydrateFromDB]);
 
-  if (!isHydrated) {
-    return (
-      <View
-        style={[
-          styles.loadingContainer,
-          { backgroundColor: isDark ? '#0F172A' : '#F5F6F8' },
-        ]}
-      >
-        <StatusBar style={isDark ? 'light' : 'dark'} />
-        <View
-          style={[
-            styles.logoBadge,
-            {
-              backgroundColor: isDark ? '#1E293B' : '#0F172A',
-              borderColor: isDark ? '#334155' : 'transparent',
-              borderWidth: isDark ? 1 : 0,
-            },
-          ]}
-        >
-          <Text style={styles.logoBadgeText}>V</Text>
-        </View>
-        <Text style={[styles.brandTitle, { color: theme.textPrimary }]}>
-          VAULT
-        </Text>
-        <Text style={[styles.brandTagline, { color: theme.textSecondary }]}>
-          Your life. Your records. Your control.
-        </Text>
-        <ActivityIndicator
-          size="large"
-          color={isDark ? '#60A5FA' : '#0F172A'}
-          style={{ marginTop: 24 }}
-        />
-      </View>
-    );
-  }
+  useEffect(() => {
+    if (!error) return;
+    Alert.alert('VAULT could not complete that action', error, [
+      { text: 'Dismiss', onPress: clearError },
+    ]);
+  }, [error, clearError]);
+
+  const statusBarBackground = isDark ? '#0F172A' : '#F5F6F8';
 
   return (
     <SafeAreaProvider>
-      <StatusBar style={isDark ? 'light' : 'dark'} />
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          animation: 'slide_from_right',
-          contentStyle: {
-            backgroundColor: isDark ? '#0F172A' : '#F5F6F8',
-          },
-        }}
-      >
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="settings"
-          options={{
-            headerShown: false,
-            presentation: 'card',
-            animation: 'slide_from_right',
-          }}
+      <AppErrorBoundary>
+        <StatusBar
+          style={isDark ? 'light' : 'dark'}
         />
-      </Stack>
+        {!isHydrated ? (
+          <View
+            style={[
+              styles.loadingContainer,
+              { backgroundColor: statusBarBackground },
+            ]}
+          >
+            <View
+              style={[
+                styles.logoBadge,
+                {
+                  backgroundColor: isDark ? '#1E293B' : '#0F172A',
+                  borderColor: isDark ? '#334155' : 'transparent',
+                  borderWidth: isDark ? 1 : 0,
+                },
+              ]}
+            >
+              <Text style={styles.logoBadgeText}>V</Text>
+            </View>
+            <Text style={[styles.brandTitle, { color: theme.textPrimary }]}>
+              VAULT
+            </Text>
+            <Text
+              style={[styles.brandTagline, { color: theme.textSecondary }]}
+            >
+              Your life. Your records. Your control.
+            </Text>
+            <ActivityIndicator
+              size="large"
+              color={isDark ? '#60A5FA' : '#0F172A'}
+              style={{ marginTop: 24 }}
+            />
+          </View>
+        ) : (
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              animation: 'slide_from_right',
+              contentStyle: { backgroundColor: statusBarBackground },
+            }}
+          >
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="settings"
+              options={{
+                headerShown: false,
+                presentation: 'card',
+                animation: 'slide_from_right',
+              }}
+            />
+          </Stack>
+        )}
+      </AppErrorBoundary>
     </SafeAreaProvider>
   );
 }

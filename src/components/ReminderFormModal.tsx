@@ -25,6 +25,7 @@ import {
 } from '../types';
 import { useVaultStore } from '../store/useVaultStore';
 import { getSectionPalette, getThemeColors } from '../theme/colors';
+import { LAYOUT } from '../theme/layout';
 import {
   adToBs,
   formatBSDateNepali,
@@ -159,7 +160,13 @@ export const ReminderFormModal: React.FC<ReminderFormModalProps> = ({
                 {editingReminder ? 'Edit Reminder' : 'Create Reminder'}
               </Text>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+            <TouchableOpacity
+              onPress={onClose}
+              style={styles.closeBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Close reminder form"
+              hitSlop={8}
+            >
               <X size={20} color={theme.textSecondary} />
             </TouchableOpacity>
           </View>
@@ -456,6 +463,9 @@ const styles = StyleSheet.create({
     left: 0,
   },
   sheet: {
+    width: '100%',
+    maxWidth: LAYOUT.maxModalWidth,
+    alignSelf: 'center',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingHorizontal: 20,
@@ -509,7 +519,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 14,
     paddingHorizontal: 14,
-    height: 48,
+    paddingVertical: 10,
+    minHeight: 48,
     fontSize: 14,
   },
   textArea: {

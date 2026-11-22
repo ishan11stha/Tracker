@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -50,6 +50,14 @@ export function QuickActionMessageBox({
     message: string;
     undo?: () => Promise<void>;
   } | null>(null);
+  const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (feedbackTimer.current) clearTimeout(feedbackTimer.current);
+    },
+    []
+  );
 
   const handleSubmit = useCallback(
     async (textToProcess?: string) => {
@@ -69,8 +77,9 @@ export function QuickActionMessageBox({
             undo: result.undoAction,
           });
 
-          // Auto-hide feedback after 6 seconds
-          setTimeout(() => {
+          // Auto-hide feedback after 6 seconds, replacing any previous timer.
+          if (feedbackTimer.current) clearTimeout(feedbackTimer.current);
+          feedbackTimer.current = setTimeout(() => {
             setFeedback((current) =>
               current?.message === result.message ? null : current
             );
@@ -94,6 +103,7 @@ export function QuickActionMessageBox({
     if (!feedback?.undo) return;
     try {
       await feedback.undo();
+      if (feedbackTimer.current) clearTimeout(feedbackTimer.current);
       setFeedback(null);
       Alert.alert('Reverted', 'Action has been undone.');
     } catch {
@@ -248,6 +258,7 @@ export function QuickActionMessageBox({
           onChangeText={setInputVal}
           placeholder="e.g. get by mom 200, add to bank"
           placeholderTextColor={theme.textMuted}
+          accessibilityLabel="Quick add command"
           returnKeyType="send"
           onSubmitEditing={() => handleSubmit()}
           autoCapitalize="none"
@@ -269,6 +280,9 @@ export function QuickActionMessageBox({
           activeOpacity={0.8}
           onPress={() => handleSubmit()}
           disabled={!inputVal.trim() || isProcessing}
+          accessibilityRole="button"
+          accessibilityLabel="Process quick add command"
+          accessibilityState={{ disabled: !inputVal.trim() || isProcessing }}
           style={[
             styles.sendButton,
             {

@@ -34,6 +34,7 @@ import {
 } from 'lucide-react-native';
 import { useVaultStore } from '../store/useVaultStore';
 import { getThemeColors } from '../theme/colors';
+import { LAYOUT } from '../theme/layout';
 import {
   exportVaultBackupJSON,
   exportVaultDataToCSV,
@@ -60,13 +61,19 @@ export default function SettingsScreen() {
   const [nameInput, setNameInput] = useState(settings.userName);
   const [titleInput, setTitleInput] = useState(settings.userTitle);
   const [profileSaved, setProfileSaved] = useState(false);
+  const [profileError, setProfileError] = useState('');
 
   const handleSaveProfile = async () => {
-    if (!nameInput.trim()) return;
-    await updateSettings({
+    if (!nameInput.trim()) {
+      setProfileError('Enter your name before saving the profile.');
+      return;
+    }
+    setProfileError('');
+    const saved = await updateSettings({
       userName: nameInput.trim(),
       userTitle: titleInput.trim() || 'Kathmandu, Nepal',
     });
+    if (!saved) return;
     setProfileSaved(true);
     setTimeout(() => setProfileSaved(false), 2000);
   };
@@ -112,6 +119,9 @@ export default function SettingsScreen() {
       if (res.canceled || !res.assets?.[0]?.uri) return;
 
       const pickedFile = new File(res.assets[0].uri);
+      if (pickedFile.size > 25 * 1024 * 1024) {
+        throw new Error('Backup files larger than 25 MB are not supported.');
+      }
       const content = await pickedFile.text();
       const validatedPayload = parseAndValidateBackupJSON(content);
 
@@ -128,10 +138,22 @@ export default function SettingsScreen() {
             text: 'Restore Now',
             style: 'default',
             onPress: async () => {
-              await restoreFromBackup(validatedPayload);
-              setNameInput(validatedPayload.settings.userName);
-              setTitleInput(validatedPayload.settings.userTitle);
-              Alert.alert('Restore Complete', 'All records restored to SQLite.');
+              try {
+                await restoreFromBackup(validatedPayload);
+                setNameInput(validatedPayload.settings.userName);
+                setTitleInput(validatedPayload.settings.userTitle);
+                Alert.alert(
+                  'Restore Complete',
+                  'All records restored to SQLite.'
+                );
+              } catch (err) {
+                Alert.alert(
+                  'Restore Failed',
+                  err instanceof Error
+                    ? err.message
+                    : 'Could not restore the backup.'
+                );
+              }
             },
           },
         ]
@@ -189,6 +211,8 @@ export default function SettingsScreen() {
               styles.backBtn,
               { backgroundColor: theme.card, borderColor: theme.border },
             ]}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
           >
             <ArrowLeft size={20} color={theme.textPrimary} />
           </TouchableOpacity>
@@ -223,18 +247,25 @@ export default function SettingsScreen() {
           </Text>
           <TextInput
             value={nameInput}
-            onChangeText={setNameInput}
+            onChangeText={(value) => {
+              setNameInput(value);
+              if (profileError) setProfileError('');
+            }}
             placeholder="Your Name"
             placeholderTextColor={theme.textMuted}
+            accessibilityLabel="Full name"
             style={[
               styles.input,
               {
                 backgroundColor: theme.inputBg,
                 color: theme.textPrimary,
-                borderColor: theme.border,
+                borderColor: profileError ? '#DC2626' : theme.border,
               },
             ]}
           />
+          {profileError ? (
+            <Text style={styles.profileError}>{profileError}</Text>
+          ) : null}
 
           <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
             Location / Subtitle
@@ -244,6 +275,7 @@ export default function SettingsScreen() {
             onChangeText={setTitleInput}
             placeholder="Kathmandu, Nepal"
             placeholderTextColor={theme.textMuted}
+            accessibilityLabel="Location or profile subtitle"
             style={[
               styles.input,
               {
@@ -256,6 +288,8 @@ export default function SettingsScreen() {
 
           <TouchableOpacity
             onPress={handleSaveProfile}
+            accessibilityRole="button"
+            accessibilityLabel="Save profile"
             style={[
               styles.saveProfileBtn,
               {
@@ -547,15 +581,15 @@ export default function SettingsScreen() {
                 <Text
                   style={[styles.settingHint, { color: theme.textSecondary }]}
                 >
-                  Light theme is default for VAULT
+                  Switch between light and dark themes
                 </Text>
               </View>
             </View>
             <Switch
               value={isDark}
-              onValueChange={(val) =>
-                updateSettings({ theme: val ? 'dark' : 'light' })
-              }
+              onValueChange={(val) => {
+                void updateSettings({ theme: val ? 'dark' : 'light' });
+              }}
               trackColor={{ false: '#CBD5E1', true: '#16A34A' }}
             />
           </View>
@@ -584,9 +618,9 @@ export default function SettingsScreen() {
             </View>
             <Switch
               value={Boolean(settings.privateMode)}
-              onValueChange={(val) =>
-                updateSettings({ privateMode: val })
-              }
+              onValueChange={(val) => {
+                void updateSettings({ privateMode: val });
+              }}
               trackColor={{ false: '#CBD5E1', true: '#0F3375' }}
             />
           </View>
@@ -615,9 +649,9 @@ export default function SettingsScreen() {
             </View>
             <Switch
               value={settings.notificationsEnabled}
-              onValueChange={(val) =>
-                updateSettings({ notificationsEnabled: val })
-              }
+              onValueChange={(val) => {
+                void updateSettings({ notificationsEnabled: val });
+              }}
               trackColor={{ false: '#CBD5E1', true: '#EA580C' }}
             />
           </View>
@@ -753,6 +787,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
+    width: '100%',
+    maxWidth: LAYOUT.maxContentWidth,
+    alignSelf: 'center',
     paddingHorizontal: 18,
     paddingTop: 12,
     paddingBottom: 36,
@@ -805,9 +842,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 14,
     paddingHorizontal: 14,
-    height: 46,
+    paddingVertical: 10,
+    minHeight: 46,
     fontSize: 14,
     marginBottom: 12,
+  },
+  profileError: {
+    color: '#DC2626',
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: -6,
+    marginBottom: 10,
   },
   saveProfileBtn: {
     flexDirection: 'row',

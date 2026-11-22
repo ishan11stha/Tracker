@@ -87,7 +87,12 @@ export const TimePickerModal: React.FC<TimePickerModalProps> = ({
                 Select Nepal Time (NPT)
               </Text>
             </View>
-            <TouchableOpacity onPress={onClose}>
+            <TouchableOpacity
+              onPress={onClose}
+              accessibilityRole="button"
+              accessibilityLabel="Close time picker"
+              hitSlop={8}
+            >
               <X size={20} color={theme.textSecondary} />
             </TouchableOpacity>
           </View>

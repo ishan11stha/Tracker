@@ -23,6 +23,7 @@ import {
 } from '../types';
 import { useVaultStore } from '../store/useVaultStore';
 import { getSectionPalette, getThemeColors } from '../theme/colors';
+import { LAYOUT } from '../theme/layout';
 import {
   adToBs,
   formatBSDateNepali,
@@ -36,6 +37,7 @@ import { TimePickerModal } from './TimePickerModal';
 interface ActivityFormModalProps {
   visible: boolean;
   editingActivity?: ActivityRecord | null;
+  initialDateISO?: string;
   onClose: () => void;
 }
 
@@ -53,6 +55,7 @@ interface ActivityFormValues {
 export const ActivityFormModal: React.FC<ActivityFormModalProps> = ({
   visible,
   editingActivity = null,
+  initialDateISO,
   onClose,
 }) => {
   const { settings, addActivity, editActivity, isSubmitting } = useVaultStore();
@@ -119,7 +122,7 @@ export const ActivityFormModal: React.FC<ActivityFormModalProps> = ({
           title: '',
           description: '',
           category: ACTIVITY_CATEGORIES[0],
-          dateISO: now.isoDate,
+          dateISO: initialDateISO || now.isoDate,
           timeString: nowTime,
           numericValue: 30,
           unit: 'mins',
@@ -128,7 +131,7 @@ export const ActivityFormModal: React.FC<ActivityFormModalProps> = ({
         setNumInput('30');
       }
     }
-  }, [visible, editingActivity, reset]);
+  }, [visible, editingActivity, initialDateISO, reset]);
 
   const onSubmit = async (values: ActivityFormValues) => {
     try {
@@ -167,7 +170,13 @@ export const ActivityFormModal: React.FC<ActivityFormModalProps> = ({
             <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>
               {editingActivity ? 'Edit Activity Entry' : 'Log Daily Activity'}
             </Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+            <TouchableOpacity
+              onPress={onClose}
+              style={styles.closeBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Close activity form"
+              hitSlop={8}
+            >
               <X size={20} color={theme.textSecondary} />
             </TouchableOpacity>
           </View>
@@ -537,6 +546,9 @@ const styles = StyleSheet.create({
     left: 0,
   },
   sheet: {
+    width: '100%',
+    maxWidth: LAYOUT.maxModalWidth,
+    alignSelf: 'center',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingHorizontal: 20,
@@ -597,7 +609,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 14,
     paddingHorizontal: 14,
-    height: 48,
+    paddingVertical: 10,
+    minHeight: 48,
     fontSize: 14,
   },
   textArea: {

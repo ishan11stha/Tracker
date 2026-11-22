@@ -34,7 +34,11 @@ import {
   activitySchema,
   reminderSchema,
   vaultBackupSchema,
+  isValidISODate,
+  isValidTime24,
 } from '../src/types/index.ts';
+import { escapeCSV } from '../src/utils/csv.ts';
+import { computeNextOccurrenceDate, getNPTTargetDate } from '../src/utils/dateRecurrence.ts';
 
 function assert(condition: boolean, message: string) {
   if (!condition) {
@@ -264,6 +268,17 @@ assert(parsedF.intent === 'income', `Expected intent 'income', got ${parsedF.int
 assert(parsedF.amount === 500, `Expected amount 500, got ${parsedF.amount}`);
 assert(parsedF.accountScope === 'Family', `Expected accountScope 'Family', got ${parsedF.accountScope}`);
 
+// Test G: quantity must not be mistaken for the purchase amount
+const parsedG = parseQuickInput('bought 2 notebooks for 5000');
+assert(parsedG.amount === 5000, `Expected amount 5000, got ${parsedG.amount}`);
+assert(parsedG.isItemAndExpense === true, 'Expected linked item for purchase');
+
+// Test H: an explicit "at 5" time must not consume a monetary amount
+const parsedH = parseQuickInput('remind me tomorrow at 5 to pay wifi');
+assert(parsedH.intent === 'reminder', `Expected reminder intent, got ${parsedH.intent}`);
+assert(parsedH.timeString === '05:00', `Expected 05:00, got ${parsedH.timeString}`);
+assert(parsedH.title.toLowerCase() === 'pay wifi', `Unexpected title: ${parsedH.title}`);
+
 console.log('9. Intelligent NLP Intent & Entity Parser Engine: PASSED');
 
 // 10. Multi-Account / Multi-Wallet Ownership & Scope Calculation Engine
@@ -411,12 +426,161 @@ const invalidItem = itemSchema.safeParse({
   status: 'Owned',
 });
 assert(!invalidItem.success, 'Expected negative price / zero quantity item to fail validation');
+
+assert(isValidISODate('2024-02-29'), 'Leap day should be a valid date');
+assert(!isValidISODate('2026-02-31'), 'Impossible calendar date should be rejected');
+assert(!isValidISODate('2026-13-01'), 'Invalid month should be rejected');
+assert(isValidTime24('23:59'), '23:59 should be valid');
+assert(!isValidTime24('24:00'), '24:00 should be invalid');
+
+const impossibleDateTxn = transactionSchema.safeParse({
+  type: 'expense',
+  title: 'Invalid date',
+  amount: 100,
+  category: 'Shopping',
+  dateISO: '2026-02-31',
+  paymentMethod: 'Cash',
+  description: '',
+});
+assert(!impossibleDateTxn.success, 'Impossible date must fail schema validation');
+
+const invalidTimeReminder = reminderSchema.safeParse({
+  title: 'Bad time',
+  description: '',
+  dateISO: '2026-11-20',
+  timeString: '25:90',
+  priority: 'Medium',
+  category: 'Other',
+  recurrence: 'none',
+});
+assert(!invalidTimeReminder.success, 'Invalid time must fail schema validation');
+
+const emptyNameBackup = vaultBackupSchema.safeParse({
+  version: 1,
+  exportedAt: '2026-11-20T05:45:00.000Z',
+  settings: {
+    userName: '',
+    userTitle: 'Kathmandu, Nepal',
+    currency: 'NPR',
+    language: 'en',
+    preferredCalendar: 'BS',
+    timeFormat: '12h',
+    notificationsEnabled: true,
+    theme: 'dark',
+  },
+  transactions: [],
+  items: [],
+  itemHistory: [],
+  activities: [],
+  reminders: [],
+});
+assert(
+  emptyNameBackup.success,
+  'Backups created before profile setup must remain restorable'
+);
+
+const futureBackup = vaultBackupSchema.safeParse({
+  ...(emptyNameBackup.success ? emptyNameBackup.data : {}),
+  version: 99,
+});
+assert(!futureBackup.success, 'Unknown future backup versions must be rejected');
+
+assert(
+  escapeCSV('=HYPERLINK("https://example.com")') ===
+    '"\'=HYPERLINK(""https://example.com"")"',
+  'CSV formula injection must be neutralized'
+);
+assert(escapeCSV('Normal note') === '"Normal note"', 'Normal CSV values must remain intact');
+
 console.log('12. Security & Form Validation Boundaries: PASSED');
 
 // 13. Currency Formatting & Lakh/Crore System Stress Testing
 assert(formatCurrency(-5400, 'NPR') === '- NPR 5,400', `Unexpected negative format: ${formatCurrency(-5400, 'NPR')}`);
 assert(formatCurrency(10000000, 'NPR') === 'NPR 1,00,00,000', `Expected 1 Crore format, got ${formatCurrency(10000000, 'NPR')}`);
 assert(formatCurrency(0, 'NPR') === 'NPR 0', `Expected zero format, got ${formatCurrency(0, 'NPR')}`);
-console.log('13. Currency Formatting & Lakh/Crore Stress Tests: PASSED\n');
+console.log('13. Currency Formatting & Lakh/Crore Stress Tests: PASSED');
+
+// 14. Quick Action NLP Example Prompts Verification
+const p1 = parseQuickInput('get by mom 200, add to bank');
+assert(p1.intent === 'income' && p1.amount === 200 && p1.paymentMethod === 'Bank Transfer', 'Failed parsing "get by mom 200, add to bank"');
+
+const p2 = parseQuickInput('bought notebook, 5000');
+assert(p2.intent === 'expense' && p2.amount === 5000 && p2.isItemAndExpense === true, 'Failed parsing "bought notebook, 5000"');
+
+const p3 = parseQuickInput('drank coffee 150 cash');
+assert(p3.intent === 'expense' && p3.amount === 150 && p3.paymentMethod === 'Cash', 'Failed parsing "drank coffee 150 cash"');
+
+const p4 = parseQuickInput('5km run 30 mins');
+assert(p4.intent === 'activity' && p4.numericValue === 5 && p4.unit === 'km', 'Failed parsing "5km run 30 mins"');
+
+const p5 = parseQuickInput('remind me tomorrow 5pm to pay wifi');
+assert(p5.intent === 'reminder' && p5.timeString === '17:00' && p5.title.toLowerCase().includes('wifi'), 'Failed parsing "remind me tomorrow 5pm to pay wifi"');
+
+const p6 = parseQuickInput('family bank deposit 500');
+assert(p6.intent === 'income' && p6.amount === 500 && p6.accountScope === 'Family', 'Failed parsing "family bank deposit 500"');
+console.log('14. NLP Quick Action All Example Prompts: PASSED');
+
+// 15. Reminder Recurrence & Notification Scheduling Math
+const futureBase = computeNextOccurrenceDate('2027-01-01', '09:00', 'none', new Date('2026-11-20T00:00:00Z'));
+assert(futureBase !== null, 'Future reminder should have valid trigger date');
+
+const pastDaily = computeNextOccurrenceDate('2026-11-19', '09:00', 'daily', new Date('2026-11-20T10:00:00Z'));
+assert(pastDaily !== null && pastDaily.getTime() > new Date('2026-11-20T10:00:00Z').getTime(), 'Past daily reminder should advance to next future trigger');
+
+const pastWeekly = computeNextOccurrenceDate('2026-11-01', '09:00', 'weekly', new Date('2026-11-20T10:00:00Z'));
+assert(pastWeekly !== null && pastWeekly.getTime() > new Date('2026-11-20T10:00:00Z').getTime(), 'Past weekly reminder should advance to next week');
+console.log('15. Notification Recurrence & Scheduling Engine: PASSED');
+
+// 16. Full Backup Payload & Restoration Roundtrip Schema Check
+const fullPayload = {
+  version: 1,
+  exportedAt: new Date().toISOString(),
+  settings: {
+    userName: 'Ishan Shrestha',
+    userTitle: 'Kathmandu, Nepal',
+    currency: 'NPR',
+    language: 'en',
+    preferredCalendar: 'BS',
+    timeFormat: '12h',
+    notificationsEnabled: true,
+    theme: 'dark',
+    privateMode: false,
+  },
+  accounts: [
+    {
+      id: 'acc-1',
+      name: 'Personal Bank',
+      scope: 'Personal',
+      initialBalance: 0,
+      paymentMethod: 'Bank Transfer',
+      color: '#1E40AF',
+      createdAt: '2026-11-20T00:00:00.000Z',
+      updatedAt: '2026-11-20T00:00:00.000Z',
+    },
+  ],
+  transactions: [
+    {
+      id: 'txn-1',
+      type: 'income',
+      title: 'Salary Deposit',
+      amount: 100000,
+      category: 'Salary',
+      dateISO: '2026-11-20',
+      paymentMethod: 'Bank Transfer',
+      accountId: 'acc-1',
+      accountScope: 'Personal',
+      description: 'Monthly pay',
+      createdAt: '2026-11-20T00:00:00.000Z',
+      updatedAt: '2026-11-20T00:00:00.000Z',
+    },
+  ],
+  items: [],
+  itemHistory: [],
+  activities: [],
+  reminders: [],
+};
+const parsedBackup = vaultBackupSchema.safeParse(fullPayload);
+assert(parsedBackup.success, 'Full backup payload must pass schema validation');
+console.log('16. Backup Payload Schema & Restoration Integrity: PASSED\n');
 
 console.log('✅ ALL VAULT CORE & ARCHITECTURAL CHECKS PASSED!');

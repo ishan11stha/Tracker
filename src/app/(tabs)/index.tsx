@@ -31,13 +31,14 @@ import {
   useVaultStore,
 } from '../../store/useVaultStore';
 import { getSectionPalette, getThemeColors } from '../../theme/colors';
+import { LAYOUT } from '../../theme/layout';
 import {
   formatDisplayDate,
   formatTimeString,
-  getNowInNPT,
 } from '../../utils/nepaliDate';
 import { formatCurrency } from '../../utils/currency';
 import { NepaliDateClockBanner } from '../../components/NepaliDateClockBanner';
+import { useCurrentNPT } from '../../hooks/useCurrentNPT';
 import { QuickActionMessageBox } from '../../components/QuickActionMessageBox';
 import { TransactionFormModal } from '../../components/TransactionFormModal';
 import { ItemFormModal } from '../../components/ItemFormModal';
@@ -82,7 +83,8 @@ export default function DashboardScreen() {
   const [selectedPeriod, setSelectedPeriod] =
     useState<MonekinPeriodKey>('1M');
 
-  const initialNpt = useMemo(() => getNowInNPT(), []);
+  // Refresh on focus and each minute so period filters survive midnight.
+  const initialNpt = useCurrentNPT();
 
   // Monekin time-of-day welcome greeting (`_pickWelcomeGreeting`)
   const welcomeGreeting = useMemo(() => {
@@ -365,6 +367,8 @@ export default function DashboardScreen() {
               activeOpacity={0.8}
               onPress={() => router.push('/settings')}
               style={styles.welcomeTouch}
+              accessibilityRole="button"
+              accessibilityLabel="Open personal profile and settings"
             >
               <View
                 style={[
@@ -400,6 +404,9 @@ export default function DashboardScreen() {
                   styles.circleIconBtn,
                   { backgroundColor: theme.surfaceContainerHigh },
                 ]}
+                accessibilityRole="switch"
+                accessibilityLabel="Hide balances in private mode"
+                accessibilityState={{ checked: privateMode }}
               >
                 {privateMode ? (
                   <EyeOff size={19} color={theme.textPrimary} />
@@ -414,6 +421,8 @@ export default function DashboardScreen() {
                   styles.circleIconBtn,
                   { backgroundColor: theme.surfaceContainerHigh },
                 ]}
+                accessibilityRole="button"
+                accessibilityLabel="Open settings"
               >
                 <Settings size={19} color={theme.textPrimary} />
               </TouchableOpacity>
@@ -463,6 +472,9 @@ export default function DashboardScreen() {
                     <TouchableOpacity
                       key={sc}
                       onPress={() => setOverviewScope(sc)}
+                      accessibilityRole="tab"
+                      accessibilityState={{ selected: isSel }}
+                      accessibilityLabel={`Show ${sc} accounts`}
                       style={[
                         styles.scopeMiniTab,
                         isSel && {
@@ -1168,6 +1180,9 @@ export default function DashboardScreen() {
                   <TouchableOpacity
                     key={rem.id}
                     onPress={() => toggleReminderCompleted(rem.id)}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: rem.isCompleted }}
+                    accessibilityLabel={`Mark ${rem.title} as completed`}
                     style={[
                       styles.listItemRow,
                       idx < upcomingReminders.length - 1 && {
@@ -1243,6 +1258,11 @@ export default function DashboardScreen() {
                   <TouchableOpacity
                     key={act.id}
                     onPress={() => toggleActivityStatus(act.id)}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: isDone }}
+                    accessibilityLabel={`Mark ${act.title} as ${
+                      isDone ? 'pending' : 'completed'
+                    }`}
                     style={[
                       styles.listItemRow,
                       idx < recentActivities.length - 1 && {
@@ -1434,6 +1454,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
+    width: '100%',
+    maxWidth: LAYOUT.maxContentWidth,
+    alignSelf: 'center',
     paddingTop: 8,
     paddingBottom: 90,
   },

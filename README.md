@@ -21,31 +21,39 @@ c:\Users\user\Documents\Tracker
 │   │       ├── items.tsx             # Item Tracker (Soft Blue #E8F1FC)
 │   │       ├── tracker.tsx           # Activity Tracker (Soft Lavender #F0EBFA)
 │   │       └── reminders.tsx         # Reminder Manager (Soft Peach #FFF0E6)
-│   ├── components/                   # Reusable UI & Modal Components
-│   │   ├── NepaliDateClockBanner.tsx # Isolated 1s live NPT clock & BS/AD hero card
+│   ├── components/                   # Reusable UI & modal components
+│   │   ├── AppErrorBoundary.tsx      # Crash recovery with a safe reload screen
+│   │   ├── NepaliDateClockBanner.tsx # Isolated live NPT clock & BS/AD hero card
 │   │   ├── NepaliCalendarModal.tsx   # Dual BS / AD interactive calendar modal
 │   │   ├── TimePickerModal.tsx       # 12h / 24h Nepal Standard Time picker modal
-│   │   ├── TransactionFormModal.tsx  # Income/Expense form modal (React Hook Form + Zod)
-│   │   ├── ItemFormModal.tsx         # Personal Item & Photo form modal
-│   │   ├── ActivityFormModal.tsx     # Daily Activity logger modal
-│   │   └── ReminderFormModal.tsx     # Reminder & Notification scheduler modal
+│   │   ├── QuickActionMessageBox.tsx # Natural-language quick entry with undo
+│   │   ├── monekin/                  # Charts and shared financial visualization primitives
+│   │   ├── TransactionFormModal.tsx  # Income/expense form (React Hook Form + Zod)
+│   │   ├── ItemFormModal.tsx         # Personal item & persistent photo form
+│   │   ├── ActivityFormModal.tsx     # Daily activity logger
+│   │   └── ReminderFormModal.tsx     # Reminder & notification scheduler
 │   ├── constants/
+│   │   ├── appSettings.ts            # Canonical first-run settings
 │   │   └── categories.ts             # Domain categories, units, statuses & priorities
 │   ├── db/
-│   │   └── database.ts               # Expo SQLite WAL database & transactional CRUD
+│   │   └── database.ts               # Expo SQLite WAL database, migrations & transactional CRUD
 │   ├── hooks/
-│   │   └── useNepalClock.ts          # Live Nepal Standard Time (UTC+05:45) hook
+│   │   ├── useNepalClock.ts          # Live NPT clock with background pause/resume
+│   │   └── useCurrentNPT.ts          # Focus-aware current Nepal date refresh
 │   ├── store/
 │   │   └── useVaultStore.ts          # Zustand store with submission locking & selectors
 │   ├── theme/
-│   │   └── colors.ts                 # Light/Dark palettes & section-specific colors
+│   │   ├── colors.ts                 # Light/Dark palettes & section-specific colors
+│   │   └── layout.ts                 # Shared phone/tablet content width constraints
 │   ├── types/
-│   │   └── index.ts                  # TypeScript interfaces & Zod validation schemas
+│   │   └── index.ts                  # Interfaces, real date/time checks & Zod schemas
 │   └── utils/
 │       ├── nepaliDate.ts             # Verified 2000–2099 BS <-> AD conversion engine
 │       ├── currency.ts               # NPR South Asian Lakh/Crore currency formatter
 │       ├── notifications.ts          # Android notification channel & recurrence calculation
-│       └── exportBackup.ts           # Expo SDK 58 File/Paths CSV export & JSON backup validation
+│       ├── csv.ts                    # CSV escaping with formula-injection protection
+│       ├── itemImages.ts             # Persistent item photo storage and cleanup
+│       └── exportBackup.ts           # CSV export & validated JSON backup/restore
 ├── scripts/
 │   └── verify-vault.ts               # Automated verification test suite
 ├── app.json                          # Android-exclusive Expo configuration
@@ -78,9 +86,21 @@ npm run tunnel
 
 ### Run Typecheck & Automated Verification Suite
 ```bash
-npx tsc --noEmit
-node scripts/verify-vault.ts
+npm run typecheck
+npm run verify
 ```
+
+Quality checks cover Nepali date conversion, NPT clock formatting, Zod form and
+backup validation, CSV formula-injection escaping, multi-wallet balances, and
+the natural-language quick-entry parser.
+
+### Data protection notes
+- Backups are schema-validated before any SQLite data is replaced.
+- CSV cells beginning with `=`, `+`, `-`, or `@` are neutralized to prevent
+  spreadsheet formula injection.
+- The app only requests notification permission when notifications are used.
+- Camera and notification permissions are declared; unused microphone and
+  legacy broad-storage permissions are intentionally absent.
 
 ### Build & Export Installable Android `.apk`
 - **Cloud APK Build via EAS (No local Android Studio required):**

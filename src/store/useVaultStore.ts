@@ -38,9 +38,15 @@ import {
   PersonalItem,
   ReminderItem,
   Transaction,
+  accountSchema,
+  activitySchema,
+  itemSchema,
+  reminderSchema,
+  transactionSchema,
 } from '../types';
 import {
   cancelReminderNotification,
+  requestNotificationPermissions,
   scheduleReminderNotification,
 } from '../utils/notifications';
 import { parseQuickInput } from '../utils/nlpParser';
@@ -50,6 +56,8 @@ import {
   AccountWithBalance,
   calculateAccountBalances,
 } from '../utils/accountBalances';
+import { DEFAULT_SETTINGS } from '../constants/appSettings';
+import { deletePersistedItemImage } from '../utils/itemImages';
 
 export {
   AccountSummaryGrouping,
@@ -72,7 +80,8 @@ interface VaultState {
 
   // Actions
   hydrateFromDB: () => Promise<void>;
-  updateSettings: (partial: Partial<AppSettings>) => Promise<void>;
+  clearError: () => void;
+  updateSettings: (partial: Partial<AppSettings>) => Promise<boolean>;
 
   // Accounts
   addAccount: (
@@ -87,7 +96,7 @@ interface VaultState {
   // Transactions
   addTransaction: (
     data: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>
-  ) => Promise<void>;
+  ) => Promise<Transaction | null>;
   editTransaction: (
     id: string,
     data: Omit<Transaction, 'id' | 'createdAt' | 'updatedAt'>
@@ -98,7 +107,7 @@ interface VaultState {
   addItem: (
     data: Omit<PersonalItem, 'id' | 'createdAt' | 'updatedAt'>,
     note?: string
-  ) => Promise<void>;
+  ) => Promise<PersonalItem | null>;
   editItem: (
     id: string,
     data: Omit<PersonalItem, 'id' | 'createdAt' | 'updatedAt'>,
@@ -109,7 +118,7 @@ interface VaultState {
   // Activities
   addActivity: (
     data: Omit<ActivityRecord, 'id' | 'createdAt' | 'updatedAt'>
-  ) => Promise<void>;
+  ) => Promise<ActivityRecord | null>;
   editActivity: (
     id: string,
     data: Omit<ActivityRecord, 'id' | 'createdAt' | 'updatedAt'>
@@ -120,7 +129,7 @@ interface VaultState {
   // Reminders
   addReminder: (
     data: Omit<ReminderItem, 'id' | 'isCompleted' | 'notificationId' | 'createdAt' | 'updatedAt'>
-  ) => Promise<void>;
+  ) => Promise<ReminderItem | null>;
   editReminder: (
     id: string,
     data: Omit<ReminderItem, 'id' | 'isCompleted' | 'notificationId' | 'createdAt' | 'updatedAt'>
@@ -141,17 +150,6 @@ interface VaultState {
   restoreFromBackup: (payload: VaultBackupPayload) => Promise<void>;
   resetAllData: () => Promise<void>;
 }
-
-const DEFAULT_SETTINGS: AppSettings = {
-  userName: '',
-  userTitle: 'Kathmandu, Nepal',
-  currency: 'NPR',
-  language: 'en',
-  preferredCalendar: 'BS',
-  timeFormat: '12h',
-  notificationsEnabled: true,
-  theme: 'dark',
-};
 
 export const useVaultStore = create<VaultState>((set, get) => ({
   isHydrated: false,
@@ -205,44 +203,71 @@ export const useVaultStore = create<VaultState>((set, get) => ({
     }
   },
 
+  clearError: () => set({ error: null }),
+
   updateSettings: async (partial) => {
     const prevSettings = get().settings;
     const nextSettings: AppSettings = {
       ...prevSettings,
       ...partial,
     };
-    set({ settings: nextSettings });
-    await dbSaveSettings(nextSettings);
+    set({ settings: nextSettings, error: null });
 
-    // If notificationsEnabled changed, sync all pending reminder notifications
+    try {
+      await dbSaveSettings(nextSettings);
+    } catch (err) {
+      set({
+        settings: prevSettings,
+        error:
+          err instanceof Error ? err.message : 'Failed to save settings',
+      });
+      return false;
+    }
+
+    // If notificationsEnabled changed, sync all pending reminder notifications.
+    // A notification scheduling failure must not roll back the saved setting.
     if (
       partial.notificationsEnabled !== undefined &&
       partial.notificationsEnabled !== prevSettings.notificationsEnabled
     ) {
-      const currentReminders = get().reminders;
-      const updatedReminders: ReminderItem[] = [];
+      try {
+        if (nextSettings.notificationsEnabled) {
+          await requestNotificationPermissions();
+        }
+        const currentReminders = get().reminders;
+        const updatedReminders: ReminderItem[] = [];
 
-      for (const rem of currentReminders) {
-        if (rem.isCompleted) {
-          updatedReminders.push(rem);
-          continue;
-        }
-        if (!nextSettings.notificationsEnabled) {
-          if (rem.notificationId) {
-            await cancelReminderNotification(rem.notificationId);
+        for (const rem of currentReminders) {
+          if (rem.isCompleted) {
+            updatedReminders.push(rem);
+            continue;
           }
-          const cleared = { ...rem, notificationId: '' };
-          await dbUpdateReminder(cleared);
-          updatedReminders.push(cleared);
-        } else {
-          const newNotifId = await scheduleReminderNotification(rem, true);
-          const scheduled = { ...rem, notificationId: newNotifId };
-          await dbUpdateReminder(scheduled);
-          updatedReminders.push(scheduled);
+          if (!nextSettings.notificationsEnabled) {
+            if (rem.notificationId) {
+              await cancelReminderNotification(rem.notificationId);
+            }
+            const cleared = { ...rem, notificationId: '' };
+            await dbUpdateReminder(cleared);
+            updatedReminders.push(cleared);
+          } else {
+            const newNotifId = await scheduleReminderNotification(rem, true);
+            const scheduled = { ...rem, notificationId: newNotifId };
+            await dbUpdateReminder(scheduled);
+            updatedReminders.push(scheduled);
+          }
         }
+        set({ reminders: updatedReminders });
+      } catch (err) {
+        set({
+          error:
+            err instanceof Error
+              ? err.message
+              : 'Could not update reminder notifications',
+        });
       }
-      set({ reminders: updatedReminders });
     }
+
+    return true;
   },
 
   // Accounts
@@ -250,9 +275,10 @@ export const useVaultStore = create<VaultState>((set, get) => ({
     if (get().isSubmitting) return;
     set({ isSubmitting: true, error: null });
     try {
+      const validated = accountSchema.parse(data);
       const now = new Date().toISOString();
       const newAcc: Account = {
-        ...data,
+        ...validated,
         id: `acc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
         createdAt: now,
         updatedAt: now,
@@ -275,9 +301,10 @@ export const useVaultStore = create<VaultState>((set, get) => ({
     try {
       const existing = get().accounts.find((a) => a.id === id);
       if (!existing) throw new Error('Account not found');
+      const validated = accountSchema.parse(data);
       const updated: Account = {
         ...existing,
-        ...data,
+        ...validated,
         updatedAt: new Date().toISOString(),
       };
       await dbUpdateAccount(updated);
@@ -310,25 +337,26 @@ export const useVaultStore = create<VaultState>((set, get) => ({
 
   // Transactions
   addTransaction: async (data) => {
-    if (get().isSubmitting) return;
+    if (get().isSubmitting) return null;
     set({ isSubmitting: true, error: null });
     try {
+      const validated = transactionSchema.parse(data);
       const now = new Date().toISOString();
       const accounts = get().accounts;
-      let accountId = data.accountId;
+      let accountId = validated.accountId;
       if (!accountId && accounts.length > 0) {
-        const scope = data.accountScope || 'Personal';
+        const scope = validated.accountScope || 'Personal';
         const matched = accounts.find((a) => {
           if (a.scope !== scope) return false;
-          if (data.paymentMethod === 'Bank Transfer' && a.paymentMethod === 'Bank Transfer') return true;
-          if (data.paymentMethod === 'Cash' && a.paymentMethod === 'Cash') return true;
-          return a.paymentMethod === data.paymentMethod;
+          if (validated.paymentMethod === 'Bank Transfer' && a.paymentMethod === 'Bank Transfer') return true;
+          if (validated.paymentMethod === 'Cash' && a.paymentMethod === 'Cash') return true;
+          return a.paymentMethod === validated.paymentMethod;
         });
         accountId = matched ? matched.id : accounts.find((a) => a.scope === scope)?.id || accounts[0]?.id;
       }
 
       const newTxn: Transaction = {
-        ...data,
+        ...validated,
         accountId,
         id: `txn_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
         createdAt: now,
@@ -337,6 +365,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
       await dbInsertTransaction(newTxn);
       const transactions = await dbGetAllTransactions();
       set({ transactions, isSubmitting: false });
+      return newTxn;
     } catch (err) {
       set({
         isSubmitting: false,
@@ -356,11 +385,13 @@ export const useVaultStore = create<VaultState>((set, get) => ({
         return;
       }
 
+      const validated = transactionSchema.parse(data);
       const accounts = get().accounts;
-      let accountId = data.accountId || existing.accountId;
+      let accountId = validated.accountId || existing.accountId;
       if (accounts.length > 0) {
-        const scope = data.accountScope || existing.accountScope || 'Personal';
-        const payment = data.paymentMethod || existing.paymentMethod;
+        const scope =
+          validated.accountScope || existing.accountScope || 'Personal';
+        const payment = validated.paymentMethod || existing.paymentMethod;
         const matched = accounts.find((a) => {
           if (a.scope !== scope) return false;
           if (payment === 'Bank Transfer' && a.paymentMethod === 'Bank Transfer') return true;
@@ -372,7 +403,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
 
       const updated: Transaction = {
         ...existing,
-        ...data,
+        ...validated,
         accountId,
         updatedAt: new Date().toISOString(),
       };
@@ -389,20 +420,29 @@ export const useVaultStore = create<VaultState>((set, get) => ({
   },
 
   removeTransaction: async (id) => {
-    await dbDeleteTransaction(id);
-    set((state) => ({
-      transactions: state.transactions.filter((t) => t.id !== id),
-    }));
+    try {
+      await dbDeleteTransaction(id);
+      set((state) => ({
+        transactions: state.transactions.filter((t) => t.id !== id),
+        error: null,
+      }));
+    } catch (err) {
+      set({
+        error:
+          err instanceof Error ? err.message : 'Failed to delete transaction',
+      });
+    }
   },
 
   // Items
   addItem: async (data, note) => {
-    if (get().isSubmitting) return;
+    if (get().isSubmitting) return null;
     set({ isSubmitting: true, error: null });
     try {
+      const validated = itemSchema.parse(data);
       const now = new Date().toISOString();
       const newItem: PersonalItem = {
-        ...data,
+        ...validated,
         id: `itm_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
         createdAt: now,
         updatedAt: now,
@@ -413,6 +453,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
         dbGetItemHistory(),
       ]);
       set({ items, itemHistory, isSubmitting: false });
+      return newItem;
     } catch (err) {
       set({
         isSubmitting: false,
@@ -431,12 +472,16 @@ export const useVaultStore = create<VaultState>((set, get) => ({
         set({ isSubmitting: false });
         return;
       }
+      const validated = itemSchema.parse(data);
       const updated: PersonalItem = {
         ...existing,
-        ...data,
+        ...validated,
         updatedAt: new Date().toISOString(),
       };
       await dbUpdateItem(updated, existing.status, note);
+      if (existing.imageUri && existing.imageUri !== updated.imageUri) {
+        deletePersistedItemImage(existing.imageUri);
+      }
       const [items, itemHistory] = await Promise.all([
         dbGetAllItems(),
         dbGetItemHistory(),
@@ -452,21 +497,31 @@ export const useVaultStore = create<VaultState>((set, get) => ({
   },
 
   removeItem: async (id) => {
-    await dbDeleteItem(id);
-    set((state) => ({
-      items: state.items.filter((i) => i.id !== id),
-      itemHistory: state.itemHistory.filter((h) => h.itemId !== id),
-    }));
+    const existing = get().items.find((item) => item.id === id);
+    try {
+      await dbDeleteItem(id);
+      if (existing?.imageUri) deletePersistedItemImage(existing.imageUri);
+      set((state) => ({
+        items: state.items.filter((i) => i.id !== id),
+        itemHistory: state.itemHistory.filter((h) => h.itemId !== id),
+        error: null,
+      }));
+    } catch (err) {
+      set({
+        error: err instanceof Error ? err.message : 'Failed to delete item',
+      });
+    }
   },
 
   // Activities
   addActivity: async (data) => {
-    if (get().isSubmitting) return;
+    if (get().isSubmitting) return null;
     set({ isSubmitting: true, error: null });
     try {
+      const validated = activitySchema.parse(data);
       const now = new Date().toISOString();
       const newActivity: ActivityRecord = {
-        ...data,
+        ...validated,
         id: `act_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
         createdAt: now,
         updatedAt: now,
@@ -474,6 +529,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
       await dbInsertActivity(newActivity);
       const activities = await dbGetAllActivities();
       set({ activities, isSubmitting: false });
+      return newActivity;
     } catch (err) {
       set({
         isSubmitting: false,
@@ -492,9 +548,10 @@ export const useVaultStore = create<VaultState>((set, get) => ({
         set({ isSubmitting: false });
         return;
       }
+      const validated = activitySchema.parse(data);
       const updated: ActivityRecord = {
         ...existing,
-        ...data,
+        ...validated,
         updatedAt: new Date().toISOString(),
       };
       await dbUpdateActivity(updated);
@@ -517,27 +574,44 @@ export const useVaultStore = create<VaultState>((set, get) => ({
       status: existing.status === 'completed' ? 'pending' : 'completed',
       updatedAt: new Date().toISOString(),
     };
-    await dbUpdateActivity(updated);
-    set((state) => ({
-      activities: state.activities.map((a) => (a.id === id ? updated : a)),
-    }));
+    try {
+      await dbUpdateActivity(updated);
+      set((state) => ({
+        activities: state.activities.map((a) => (a.id === id ? updated : a)),
+        error: null,
+      }));
+    } catch (err) {
+      set({
+        error:
+          err instanceof Error ? err.message : 'Failed to update activity',
+      });
+    }
   },
 
   removeActivity: async (id) => {
-    await dbDeleteActivity(id);
-    set((state) => ({
-      activities: state.activities.filter((a) => a.id !== id),
-    }));
+    try {
+      await dbDeleteActivity(id);
+      set((state) => ({
+        activities: state.activities.filter((a) => a.id !== id),
+        error: null,
+      }));
+    } catch (err) {
+      set({
+        error:
+          err instanceof Error ? err.message : 'Failed to delete activity',
+      });
+    }
   },
 
   // Reminders
   addReminder: async (data) => {
-    if (get().isSubmitting) return;
+    if (get().isSubmitting) return null;
     set({ isSubmitting: true, error: null });
     try {
+      const validated = reminderSchema.parse(data);
       const now = new Date().toISOString();
       const draft: ReminderItem = {
-        ...data,
+        ...validated,
         id: `rem_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
         isCompleted: false,
         notificationId: '',
@@ -555,6 +629,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
       await dbInsertReminder(finalReminder);
       const reminders = await dbGetAllReminders();
       set({ reminders, isSubmitting: false });
+      return finalReminder;
     } catch (err) {
       set({
         isSubmitting: false,
@@ -573,12 +648,10 @@ export const useVaultStore = create<VaultState>((set, get) => ({
         set({ isSubmitting: false });
         return;
       }
-      if (existing.notificationId) {
-        await cancelReminderNotification(existing.notificationId);
-      }
+      const validated = reminderSchema.parse(data);
       const draft: ReminderItem = {
         ...existing,
-        ...data,
+        ...validated,
         updatedAt: new Date().toISOString(),
       };
       const notifId = await scheduleReminderNotification(
@@ -608,37 +681,53 @@ export const useVaultStore = create<VaultState>((set, get) => ({
     const nextCompleted = !existing.isCompleted;
     let notifId = existing.notificationId || '';
 
-    if (nextCompleted && notifId) {
-      await cancelReminderNotification(notifId);
-      notifId = '';
-    } else if (!nextCompleted) {
-      notifId = await scheduleReminderNotification(
-        { ...existing, isCompleted: false },
-        get().settings.notificationsEnabled
-      );
-    }
+    try {
+      if (nextCompleted && notifId) {
+        await cancelReminderNotification(notifId);
+        notifId = '';
+      } else if (!nextCompleted) {
+        notifId = await scheduleReminderNotification(
+          { ...existing, isCompleted: false },
+          get().settings.notificationsEnabled
+        );
+      }
 
-    const updated: ReminderItem = {
-      ...existing,
-      isCompleted: nextCompleted,
-      notificationId: notifId,
-      updatedAt: new Date().toISOString(),
-    };
-    await dbUpdateReminder(updated);
-    set((state) => ({
-      reminders: state.reminders.map((r) => (r.id === id ? updated : r)),
-    }));
+      const updated: ReminderItem = {
+        ...existing,
+        isCompleted: nextCompleted,
+        notificationId: notifId,
+        updatedAt: new Date().toISOString(),
+      };
+      await dbUpdateReminder(updated);
+      set((state) => ({
+        reminders: state.reminders.map((r) => (r.id === id ? updated : r)),
+        error: null,
+      }));
+    } catch (err) {
+      set({
+        error:
+          err instanceof Error ? err.message : 'Failed to update reminder',
+      });
+    }
   },
 
   removeReminder: async (id) => {
     const existing = get().reminders.find((r) => r.id === id);
-    if (existing?.notificationId) {
-      await cancelReminderNotification(existing.notificationId);
+    try {
+      if (existing?.notificationId) {
+        await cancelReminderNotification(existing.notificationId);
+      }
+      await dbDeleteReminder(id);
+      set((state) => ({
+        reminders: state.reminders.filter((r) => r.id !== id),
+        error: null,
+      }));
+    } catch (err) {
+      set({
+        error:
+          err instanceof Error ? err.message : 'Failed to delete reminder',
+      });
     }
-    await dbDeleteReminder(id);
-    set((state) => ({
-      reminders: state.reminders.filter((r) => r.id !== id),
-    }));
   },
 
   processQuickCommand: async (rawText: string) => {
@@ -656,7 +745,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
         const title = parsed.title;
         const dateISO = parsed.dateISO || npt.isoDate;
         const timeString = parsed.timeString || '09:00';
-        await get().addReminder({
+        const created = await get().addReminder({
           title,
           description: `Created via Quick Input: "${rawText}"`,
           dateISO,
@@ -665,8 +754,10 @@ export const useVaultStore = create<VaultState>((set, get) => ({
           category: parsed.category || 'Bills & Finance',
           recurrence: 'none',
         });
-        const created = get().reminders[0];
-        if (created) createdIds.reminderId = created.id;
+        if (!created) {
+          throw new Error('Could not save the reminder. Please try again.');
+        }
+        createdIds.reminderId = created.id;
 
         return {
           success: true,
@@ -681,7 +772,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
       }
 
       if (parsed.intent === 'activity') {
-        await get().addActivity({
+        const created = await get().addActivity({
           title: parsed.title,
           description: `Logged via Quick Input: "${rawText}"`,
           category: parsed.category || 'Fitness & Health',
@@ -691,8 +782,10 @@ export const useVaultStore = create<VaultState>((set, get) => ({
           unit: parsed.unit || 'mins',
           status: 'completed',
         });
-        const created = get().activities[0];
-        if (created) createdIds.activityId = created.id;
+        if (!created) {
+          throw new Error('Could not save the activity. Please try again.');
+        }
+        createdIds.activityId = created.id;
 
         return {
           success: true,
@@ -719,9 +812,17 @@ export const useVaultStore = create<VaultState>((set, get) => ({
         matchedAccount = accounts.find((a) => a.scope === (parsed.accountScope || 'Personal')) || accounts[0];
       }
 
-      const txnAmount = parsed.amount || (parsed.intent === 'income' ? 200 : 0);
+      const txnAmount = parsed.amount || 0;
+      if (txnAmount <= 0) {
+        return {
+          success: false,
+          message:
+            'Please include a positive amount, for example “coffee 150 cash”.',
+          parsed,
+        };
+      }
 
-      await get().addTransaction({
+      const createdTxn = await get().addTransaction({
         type: parsed.intent === 'income' ? 'income' : 'expense',
         title: parsed.title,
         amount: txnAmount,
@@ -732,12 +833,14 @@ export const useVaultStore = create<VaultState>((set, get) => ({
         accountScope: parsed.accountScope || matchedAccount?.scope || 'Personal',
         description: `Added via Quick Input: "${rawText}"`,
       });
-      const createdTxn = get().transactions[0];
-      if (createdTxn) createdIds.transactionId = createdTxn.id;
+      if (!createdTxn) {
+        throw new Error('Could not save the transaction. Please try again.');
+      }
+      createdIds.transactionId = createdTxn.id;
 
       // If user bought an item (e.g. "bought notebook, 5000"), also catalog into items inventory!
       if (parsed.isItemAndExpense) {
-        await get().addItem(
+        const createdItem = await get().addItem(
           {
             name: parsed.itemName || parsed.title,
             description: `Auto-cataloged via Quick Input: "${rawText}"`,
@@ -751,7 +854,6 @@ export const useVaultStore = create<VaultState>((set, get) => ({
           },
           'Auto-cataloged from Quick Input message'
         );
-        const createdItem = get().items[0];
         if (createdItem) createdIds.itemId = createdItem.id;
       }
 
@@ -769,6 +871,29 @@ export const useVaultStore = create<VaultState>((set, get) => ({
         },
       };
     } catch (err) {
+      // Avoid leaving a partial multi-record command behind (for example, a
+      // transaction saved before its linked item failed to save).
+      const rollbackActions = [
+        createdIds.itemId ? () => get().removeItem(createdIds.itemId!) : null,
+        createdIds.transactionId
+          ? () => get().removeTransaction(createdIds.transactionId!)
+          : null,
+        createdIds.activityId
+          ? () => get().removeActivity(createdIds.activityId!)
+          : null,
+        createdIds.reminderId
+          ? () => get().removeReminder(createdIds.reminderId!)
+          : null,
+      ].filter((action): action is () => Promise<void> => action !== null);
+
+      for (const rollback of rollbackActions) {
+        try {
+          await rollback();
+        } catch {
+          // Best-effort cleanup; preserve the original error below.
+        }
+      }
+
       return {
         success: false,
         message: err instanceof Error ? err.message : 'Failed to process command',

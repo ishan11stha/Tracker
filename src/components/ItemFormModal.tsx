@@ -32,12 +32,14 @@ import {
 } from '../types';
 import { useVaultStore } from '../store/useVaultStore';
 import { getSectionPalette, getThemeColors } from '../theme/colors';
+import { LAYOUT } from '../theme/layout';
 import {
   adToBs,
   formatADDateFull,
   formatBSDateNepali,
   getNowInNPT,
 } from '../utils/nepaliDate';
+import { persistItemImage } from '../utils/itemImages';
 import {
   sanitizeDecimalInput,
   sanitizeIntegerInput,
@@ -152,7 +154,8 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
           allowsEditing: true,
         });
         if (!res.canceled && res.assets?.[0]?.uri) {
-          setValue('imageUri', res.assets[0].uri);
+          const persistedUri = await persistItemImage(res.assets[0].uri);
+          setValue('imageUri', persistedUri);
         }
       } else {
         const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -163,11 +166,12 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
           allowsEditing: true,
         });
         if (!res.canceled && res.assets?.[0]?.uri) {
-          setValue('imageUri', res.assets[0].uri);
+          const persistedUri = await persistItemImage(res.assets[0].uri);
+          setValue('imageUri', persistedUri);
         }
       }
     } catch {
-      // ignore if cancelled
+      // Permission denial or picker cancellation: leave the current image.
     }
   };
 
@@ -208,7 +212,13 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
             <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>
               {editingItem ? 'Edit Personal Item' : 'Add Personal Item'}
             </Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+            <TouchableOpacity
+              onPress={onClose}
+              style={styles.closeBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Close item form"
+              hitSlop={8}
+            >
               <X size={20} color={theme.textSecondary} />
             </TouchableOpacity>
           </View>
@@ -617,6 +627,9 @@ const styles = StyleSheet.create({
     left: 0,
   },
   sheet: {
+    width: '100%',
+    maxWidth: LAYOUT.maxModalWidth,
+    alignSelf: 'center',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingHorizontal: 20,
@@ -659,7 +672,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 14,
     paddingHorizontal: 14,
-    height: 48,
+    paddingVertical: 10,
+    minHeight: 48,
     fontSize: 14,
   },
   textArea: {

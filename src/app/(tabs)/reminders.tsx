@@ -24,6 +24,7 @@ import {
 } from 'lucide-react-native';
 import { useVaultStore } from '../../store/useVaultStore';
 import { getSectionPalette, getThemeColors } from '../../theme/colors';
+import { LAYOUT } from '../../theme/layout';
 import {
   BS_MONTHS_EN,
   BS_MONTHS_NE,
@@ -32,9 +33,9 @@ import {
   buildBSMonthGrid,
   formatBSDateNepali,
   formatTimeString,
-  getNowInNPT,
   toNepaliDigits,
 } from '../../utils/nepaliDate';
+import { useCurrentNPT } from '../../hooks/useCurrentNPT';
 import { ReminderItem } from '../../types';
 import { ReminderFormModal } from '../../components/ReminderFormModal';
 
@@ -51,7 +52,7 @@ export default function RemindersScreen() {
   const theme = getThemeColors(isDark);
   const palette = getSectionPalette('reminders', isDark);
 
-  const nptNow = useMemo(() => getNowInNPT(), []);
+  const nptNow = useCurrentNPT();
   const currentTime24 = `${String(nptNow.hours).padStart(2, '0')}:${String(
     nptNow.minutes
   ).padStart(2, '0')}`;
@@ -204,6 +205,8 @@ export default function RemindersScreen() {
               <TouchableOpacity
                 key={t.key}
                 onPress={() => setActiveTab(t.key)}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: active }}
                 style={[
                   styles.tabButton,
                   active && { backgroundColor: palette.accent },
@@ -238,6 +241,8 @@ export default function RemindersScreen() {
               <TouchableOpacity
                 onPress={handlePrevMonth}
                 style={[styles.calNavBtn, { borderColor: theme.border }]}
+                accessibilityRole="button"
+                accessibilityLabel="Previous Nepali month"
               >
                 <ChevronLeft size={18} color={theme.textPrimary} />
               </TouchableOpacity>
@@ -258,6 +263,8 @@ export default function RemindersScreen() {
               <TouchableOpacity
                 onPress={handleNextMonth}
                 style={[styles.calNavBtn, { borderColor: theme.border }]}
+                accessibilityRole="button"
+                accessibilityLabel="Next Nepali month"
               >
                 <ChevronRight size={18} color={theme.textPrimary} />
               </TouchableOpacity>
@@ -294,6 +301,12 @@ export default function RemindersScreen() {
                     key={cell.isoDate}
                     onPress={() => setSelectedCalDateISO(cell.isoDate)}
                     style={styles.calCell}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isSelected }}
+                    accessibilityLabel={`${formatBSDateNepali(
+                      adToBs(cell.isoDate),
+                      true
+                    )}${count > 0 ? `, ${count} reminders` : ''}`}
                   >
                     <View
                       style={[
@@ -412,6 +425,11 @@ export default function RemindersScreen() {
                   <TouchableOpacity
                     onPress={() => toggleReminderCompleted(rem.id)}
                     style={styles.checkWrap}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: rem.isCompleted }}
+                    accessibilityLabel={`Mark ${rem.title} as ${
+                      rem.isCompleted ? 'not completed' : 'completed'
+                    }`}
                   >
                     {rem.isCompleted ? (
                       <CheckCircle2 size={24} color="#16A34A" />
@@ -514,12 +532,18 @@ export default function RemindersScreen() {
                         setFormVisible(true);
                       }}
                       style={styles.iconBtn}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Edit reminder ${rem.title}`}
+                      hitSlop={8}
                     >
                       <Edit3 size={15} color={theme.textSecondary} />
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => handleDelete(rem)}
                       style={styles.iconBtn}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Delete reminder ${rem.title}`}
+                      hitSlop={8}
                     >
                       <Trash2 size={15} color="#DC2626" />
                     </TouchableOpacity>
@@ -565,6 +589,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
+    width: '100%',
+    maxWidth: LAYOUT.maxContentWidth,
+    alignSelf: 'center',
     paddingHorizontal: 18,
     paddingTop: 12,
     paddingBottom: 32,

@@ -3,11 +3,7 @@ import * as Sharing from 'expo-sharing';
 import { VaultBackupPayload } from '../db/database';
 import { vaultBackupSchema } from '../types';
 import { adToBs, formatBSDateEnglish, formatBSDateNepali } from './nepaliDate';
-
-function escapeCSV(val: unknown): string {
-  const str = String(val ?? '').replace(/"/g, '""');
-  return `"${str}"`;
-}
+import { escapeCSV } from './csv';
 
 export async function exportVaultDataToCSV(
   payload: VaultBackupPayload
@@ -19,7 +15,27 @@ export async function exportVaultDataToCSV(
   lines.push(`Currency,${escapeCSV(payload.settings.currency)}`);
   lines.push('');
 
-  // 1. Transactions
+  // 1. Accounts & Wallets
+  lines.push('--- ACCOUNTS & WALLETS ---');
+  lines.push(
+    'ID,Name,Scope,Initial Balance,Payment Method,Created At,Updated At'
+  );
+  for (const account of payload.accounts || []) {
+    lines.push(
+      [
+        escapeCSV(account.id),
+        escapeCSV(account.name),
+        escapeCSV(account.scope),
+        account.initialBalance,
+        escapeCSV(account.paymentMethod),
+        escapeCSV(account.createdAt),
+        escapeCSV(account.updatedAt),
+      ].join(',')
+    );
+  }
+  lines.push('');
+
+  // 2. Transactions
   lines.push('--- TRANSACTIONS ---');
   lines.push(
     'ID,Type,Title,Amount,Category,Gregorian Date (AD),Nepali Date (BS),Nepali Script,Payment Method,Description'
@@ -43,7 +59,7 @@ export async function exportVaultDataToCSV(
   }
   lines.push('');
 
-  // 2. Items
+  // 3. Items
   lines.push('--- PERSONAL ITEMS ---');
   lines.push(
     'ID,Name,Category,Status,Purchase Price,Quantity,Location,Purchase Date (AD),Purchase Date (BS),Description'
@@ -67,7 +83,7 @@ export async function exportVaultDataToCSV(
   }
   lines.push('');
 
-  // 3. Activities
+  // 4. Activities
   lines.push('--- DAILY ACTIVITIES ---');
   lines.push(
     'ID,Title,Category,Status,Value,Unit,Date (AD),Date (BS),Time (NPT),Description'
@@ -91,7 +107,7 @@ export async function exportVaultDataToCSV(
   }
   lines.push('');
 
-  // 4. Reminders
+  // 5. Reminders
   lines.push('--- REMINDERS ---');
   lines.push(
     'ID,Title,Category,Priority,Recurrence,Completed,Date (AD),Date (BS),Time (NPT),Description'

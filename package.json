@@ -38,6 +38,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "typecheck": "tsc --noEmit",
+    "verify": "node scripts/verify-vault.ts",
     "apk:cloud": "npx eas-cli@latest build --platform android --profile preview",
     "apk:production": "npx eas-cli@latest build --platform android --profile production",
     "apk:local": "npx expo prebuild --platform android && cd android && gradlew assembleRelease"

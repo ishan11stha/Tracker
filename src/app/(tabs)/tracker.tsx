@@ -20,6 +20,7 @@ import {
 } from 'lucide-react-native';
 import { useVaultStore } from '../../store/useVaultStore';
 import { getSectionPalette, getThemeColors } from '../../theme/colors';
+import { LAYOUT } from '../../theme/layout';
 import {
   BS_MONTHS_NE,
   adToBs,
@@ -216,6 +217,11 @@ export default function ActivityTrackerScreen() {
               styles.activeDateBanner,
               { backgroundColor: theme.inputBg, borderColor: theme.border },
             ]}
+            accessibilityRole="button"
+            accessibilityLabel={`Change activity date. Current date ${formatBSDateNepali(
+              selectedBS,
+              true
+            )}`}
           >
             <Calendar size={18} color={palette.accent} />
             <View style={{ flex: 1 }}>
@@ -296,6 +302,8 @@ export default function ActivityTrackerScreen() {
               <TouchableOpacity
                 key={cat}
                 onPress={() => setSelectedCategory(cat)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
                 style={[
                   styles.filterChip,
                   {
@@ -360,6 +368,11 @@ export default function ActivityTrackerScreen() {
                   <TouchableOpacity
                     onPress={() => toggleActivityStatus(act.id)}
                     style={styles.checkBtn}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: isCompleted }}
+                    accessibilityLabel={`Mark ${act.title} as ${
+                      isCompleted ? 'pending' : 'completed'
+                    }`}
                   >
                     {isCompleted ? (
                       <CheckCircle2 size={24} color={palette.accent} />
@@ -431,12 +444,18 @@ export default function ActivityTrackerScreen() {
                           setFormVisible(true);
                         }}
                         style={styles.iconBtn}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Edit activity ${act.title}`}
+                        hitSlop={8}
                       >
                         <Edit3 size={15} color={theme.textMuted} />
                       </TouchableOpacity>
                       <TouchableOpacity
                         onPress={() => handleDelete(act)}
                         style={styles.iconBtn}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Delete activity ${act.title}`}
+                        hitSlop={8}
                       >
                         <Trash2 size={15} color="#EF4444" />
                       </TouchableOpacity>
@@ -466,6 +485,7 @@ export default function ActivityTrackerScreen() {
       <ActivityFormModal
         visible={formVisible}
         editingActivity={editingActivity}
+        initialDateISO={selectedDateISO}
         onClose={() => {
           setFormVisible(false);
           setEditingActivity(null);
@@ -490,7 +510,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 16,
+    width: '100%',
+    maxWidth: LAYOUT.maxContentWidth,
+    alignSelf: 'center',
+    paddingHorizontal: LAYOUT.horizontalPadding,
     paddingTop: 10,
     paddingBottom: 32,
   },

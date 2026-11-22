@@ -189,7 +189,13 @@ export const NepaliCalendarModal: React.FC<NepaliCalendarModalProps> = ({
                 {title}
               </Text>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+            <TouchableOpacity
+              onPress={onClose}
+              style={styles.closeBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Close calendar"
+              hitSlop={8}
+            >
               <X size={20} color={theme.textSecondary} />
             </TouchableOpacity>
           </View>
@@ -280,6 +286,8 @@ export const NepaliCalendarModal: React.FC<NepaliCalendarModalProps> = ({
               <TouchableOpacity
                 onPress={handlePrevMonth}
                 style={[styles.navIconBtn, { borderColor: theme.border }]}
+                accessibilityRole="button"
+                accessibilityLabel="Previous month"
               >
                 <ChevronLeft size={18} color={theme.textPrimary} />
               </TouchableOpacity>
@@ -312,6 +320,8 @@ export const NepaliCalendarModal: React.FC<NepaliCalendarModalProps> = ({
               <TouchableOpacity
                 onPress={handleNextMonth}
                 style={[styles.navIconBtn, { borderColor: theme.border }]}
+                accessibilityRole="button"
+                accessibilityLabel="Next month"
               >
                 <ChevronRight size={18} color={theme.textPrimary} />
               </TouchableOpacity>
@@ -426,6 +436,12 @@ export const NepaliCalendarModal: React.FC<NepaliCalendarModalProps> = ({
                     onSelectDate(cell.isoDate);
                     onClose();
                   }}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isSelected }}
+                  accessibilityLabel={`${formatBSDateNepali(
+                    adToBs(cell.isoDate),
+                    true
+                  )}, ${formatADDateFull(cell.isoDate)}`}
                 >
                   <View
                     style={[

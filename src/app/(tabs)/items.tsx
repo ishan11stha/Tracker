@@ -24,6 +24,7 @@ import {
 } from 'lucide-react-native';
 import { useVaultStore } from '../../store/useVaultStore';
 import { getSectionPalette, getThemeColors } from '../../theme/colors';
+import { LAYOUT } from '../../theme/layout';
 import { formatCurrency } from '../../utils/currency';
 import { adToBs, formatBSDateNepali } from '../../utils/nepaliDate';
 import { ITEM_STATUSES, ItemStatus, PersonalItem } from '../../types';
@@ -258,9 +259,16 @@ export default function ItemTrackerScreen() {
             placeholder="Search items by name, category, location..."
             placeholderTextColor={theme.textMuted}
             style={[styles.searchInput, { color: theme.textPrimary }]}
+            accessibilityLabel="Search personal items"
+            returnKeyType="search"
           />
           {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <TouchableOpacity
+              onPress={() => setSearchQuery('')}
+              accessibilityRole="button"
+              accessibilityLabel="Clear item search"
+              hitSlop={8}
+            >
               <X size={16} color={theme.textMuted} />
             </TouchableOpacity>
           )}
@@ -278,6 +286,8 @@ export default function ItemTrackerScreen() {
               <TouchableOpacity
                 key={st}
                 onPress={() => setStatusFilter(st)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
                 style={[
                   styles.filterChip,
                   {
@@ -446,6 +456,8 @@ export default function ItemTrackerScreen() {
                         styles.actionPillBtn,
                         { backgroundColor: theme.surfaceContainerHigh },
                       ]}
+                      accessibilityRole="button"
+                      accessibilityLabel={`View history for ${item.name}`}
                     >
                       <History size={13} color={palette.accent} />
                       <Text
@@ -467,6 +479,9 @@ export default function ItemTrackerScreen() {
                         styles.iconBtn,
                         { backgroundColor: theme.surfaceContainerHigh },
                       ]}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Edit ${item.name}`}
+                      hitSlop={8}
                     >
                       <Edit3 size={15} color={theme.textSecondary} />
                     </TouchableOpacity>
@@ -477,6 +492,9 @@ export default function ItemTrackerScreen() {
                         styles.iconBtn,
                         { backgroundColor: theme.expenseBg },
                       ]}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Delete ${item.name}`}
+                      hitSlop={8}
                     >
                       <Trash2 size={15} color="#EF4444" />
                     </TouchableOpacity>
@@ -605,7 +623,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 16,
+    width: '100%',
+    maxWidth: LAYOUT.maxContentWidth,
+    alignSelf: 'center',
+    paddingHorizontal: LAYOUT.horizontalPadding,
     paddingTop: 10,
     paddingBottom: 32,
   },
@@ -687,7 +708,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 16,
     paddingHorizontal: 12,
-    height: 44,
+    paddingVertical: 8,
+    minHeight: 44,
     gap: 8,
     marginBottom: 10,
   },

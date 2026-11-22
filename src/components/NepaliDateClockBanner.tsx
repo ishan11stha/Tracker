@@ -30,6 +30,8 @@ export const NepaliDateClockBanner: React.FC<NepaliDateClockBannerProps> =
             borderColor: theme.border,
           },
         ]}
+        accessibilityRole="button"
+        accessibilityLabel={`Open Nepali calendar. ${clock.bsNepaliText}. ${clock.adFullText}. Current time ${clock.liveTimeText}`}
       >
         <View style={styles.topRow}>
           <View

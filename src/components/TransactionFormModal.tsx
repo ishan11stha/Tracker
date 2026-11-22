@@ -32,6 +32,7 @@ import {
 } from '../types';
 import { useVaultStore } from '../store/useVaultStore';
 import { getSectionPalette, getThemeColors } from '../theme/colors';
+import { LAYOUT } from '../theme/layout';
 import {
   adToBs,
   formatADDateFull,
@@ -193,7 +194,13 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
                 ? 'Add Income (आम्दानी)'
                 : 'Add Expense (खर्च)'}
             </Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+            <TouchableOpacity
+              onPress={onClose}
+              style={styles.closeBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Close transaction form"
+              hitSlop={8}
+            >
               <X size={20} color={theme.textSecondary} />
             </TouchableOpacity>
           </View>
@@ -587,6 +594,9 @@ const styles = StyleSheet.create({
     left: 0,
   },
   sheet: {
+    width: '100%',
+    maxWidth: LAYOUT.maxModalWidth,
+    alignSelf: 'center',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingHorizontal: 20,
@@ -647,7 +657,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 14,
     paddingHorizontal: 14,
-    height: 54,
+    minHeight: 54,
   },
   currencyPrefix: {
     fontSize: 16,
@@ -663,7 +673,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 14,
     paddingHorizontal: 14,
-    height: 48,
+    paddingVertical: 10,
+    minHeight: 48,
     fontSize: 14,
   },
   textArea: {

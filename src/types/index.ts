@@ -1,5 +1,41 @@
 import { z } from 'zod';
 
+/**
+ * Validates a real Gregorian calendar date, not just the YYYY-MM-DD shape.
+ * This also protects JSON backup restoration from malformed dates such as
+ * 2026-02-31 or 2026-99-99.
+ */
+export function isValidISODate(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  );
+}
+
+/** Validates 24-hour HH:mm values in the range 00:00 through 23:59. */
+export function isValidTime24(value: string): boolean {
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+}
+
+const isoDateSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format')
+  .refine(isValidISODate, 'Invalid calendar date');
+
+const time24Schema = z
+  .string()
+  .regex(/^\d{2}:\d{2}$/, 'Invalid time format (HH:MM)')
+  .refine(isValidTime24, 'Invalid time (00:00–23:59)');
+
 export type TransactionType = 'income' | 'expense';
 
 export type AccountScope = 'Personal' | 'Family';
@@ -67,7 +103,7 @@ export const transactionSchema = z.object({
     .positive('Amount must be greater than 0')
     .max(1000000000, 'Amount exceeds maximum limit'),
   category: z.string().trim().min(1, 'Category is required'),
-  dateISO: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format'),
+  dateISO: isoDateSchema,
   paymentMethod: z.enum([
     'Cash',
     'eSewa',
@@ -114,9 +150,8 @@ export const itemSchema = z.object({
   description: z.string().max(500),
   category: z.string().trim().min(1, 'Category is required'),
   purchasePrice: z.number().min(0, 'Price cannot be negative'),
-  purchaseDateISO: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid purchase date'),
+  purchaseDateISO: isoDateSchema,
+
   quantity: z
     .number()
     .int('Quantity must be a whole number')
@@ -146,8 +181,8 @@ export const activitySchema = z.object({
   title: z.string().trim().min(1, 'Activity title is required').max(100),
   description: z.string().max(500),
   category: z.string().trim().min(1, 'Category is required'),
-  dateISO: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
-  timeString: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time (HH:MM)'),
+  dateISO: isoDateSchema,
+  timeString: time24Schema,
   numericValue: z.number().min(0, 'Cannot be negative'),
   unit: z.string().trim().max(30),
   status: z.enum(['completed', 'pending']),
@@ -179,8 +214,8 @@ export interface ReminderItem {
 export const reminderSchema = z.object({
   title: z.string().trim().min(1, 'Reminder title is required').max(100),
   description: z.string().max(500),
-  dateISO: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
-  timeString: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time (HH:MM)'),
+  dateISO: isoDateSchema,
+  timeString: time24Schema,
   priority: z.enum(['Low', 'Medium', 'High']),
   category: z.string().trim().min(1, 'Category is required'),
   recurrence: z.enum(['none', 'daily', 'weekly', 'monthly', 'yearly']),
@@ -199,7 +234,8 @@ export interface AppSettings {
 }
 
 export const appSettingsSchema = z.object({
-  userName: z.string().trim().min(1).max(100),
+  // A profile name is optional: backups must remain restorable before setup.
+  userName: z.string().trim().max(100),
   userTitle: z.string().trim().max(100),
   currency: z.enum(['NPR', 'USD', 'INR']),
   language: z.enum(['ne', 'en']),
@@ -211,7 +247,9 @@ export const appSettingsSchema = z.object({
 });
 
 export const vaultBackupSchema = z.object({
-  version: z.number().int().min(1),
+  // Only schema version 1 is understood by this application. Rejecting newer
+  // backups is safer than silently importing data with an unknown format.
+  version: z.number().int().min(1).max(1, 'Unsupported backup version'),
   exportedAt: z.string(),
   settings: appSettingsSchema,
   transactions: z.array(
