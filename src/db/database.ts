@@ -283,7 +283,7 @@ async function seedInitialData(db: SQLite.SQLiteDatabase): Promise<void> {
       }
     } else {
       await db.runAsync(
-        `INSERT OR REPLACE INTO settings (key, value) VALUES ('app_settings', ?), ('is_seeded', 'true')`,
+        `INSERT OR REPLACE INTO settings (key, value) VALUES ('app_settings', ?), ('is_seeded', 'true'), ('has_fresh_cleaned_seeds', 'true'), ('has_zeroed_default_wallets_v2', 'true')`,
         [JSON.stringify(DEFAULT_SETTINGS)]
       );
     }
