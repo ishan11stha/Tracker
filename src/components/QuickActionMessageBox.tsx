@@ -29,12 +29,12 @@ interface QuickActionMessageBoxProps {
 }
 
 const EXAMPLE_PROMPTS = [
-  'get by mom 200, add to bank',
-  'bought notebook, 5000',
-  'drank coffee 150 cash',
-  '5km run 30 mins',
-  'remind me tomorrow 5pm to pay wifi',
-  'family bank deposit 500',
+  { text: 'get by mom 200, add to bank', tag: 'Money' },
+  { text: 'bought notebook, 5000', tag: 'Item' },
+  { text: 'drank coffee 150 cash', tag: 'Expense' },
+  { text: '5km run 30 mins', tag: 'Habit' },
+  { text: 'remind me tomorrow 5pm to pay wifi', tag: 'Reminder' },
+  { text: 'family bank deposit 500', tag: 'Family' },
 ];
 
 export function QuickActionMessageBox({
@@ -193,7 +193,7 @@ export function QuickActionMessageBox({
         contentContainerStyle={styles.chipsScroll}
       >
         <View style={styles.hintBadge}>
-          <Sparkles size={11} color="#6366F1" />
+          <Sparkles size={12} color="#6366F1" />
           <Text style={styles.hintBadgeText}>Try prompt:</Text>
         </View>
         {EXAMPLE_PROMPTS.map((prompt, idx) => (
@@ -201,7 +201,7 @@ export function QuickActionMessageBox({
             key={idx}
             activeOpacity={0.75}
             onPress={() => {
-              setInputVal(prompt);
+              setInputVal(prompt.text);
             }}
             style={[
               styles.chipPill,
@@ -211,13 +211,25 @@ export function QuickActionMessageBox({
               },
             ]}
           >
+            <View
+              style={[
+                styles.chipTag,
+                {
+                  backgroundColor: isDark
+                    ? 'rgba(99, 102, 241, 0.25)'
+                    : 'rgba(99, 102, 241, 0.12)',
+                },
+              ]}
+            >
+              <Text style={styles.chipTagText}>{prompt.tag}</Text>
+            </View>
             <Text
               style={[
                 styles.chipText,
-                { color: isDark ? '#CBD5E1' : '#475569' },
+                { color: isDark ? '#E2E8F0' : '#334155' },
               ]}
             >
-              {prompt}
+              {prompt.text}
             </Text>
           </TouchableOpacity>
         ))}
@@ -369,13 +381,28 @@ const styles = StyleSheet.create({
     color: '#6366F1',
   },
   chipPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 4.5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingLeft: 6,
+    paddingRight: 12,
+    paddingVertical: 5,
     borderRadius: 999,
     borderWidth: 1,
   },
+  chipTag: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 999,
+  },
+  chipTagText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: '#6366F1',
+    letterSpacing: 0.3,
+  },
   chipText: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: '600',
   },
   inputRow: {
@@ -388,9 +415,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   manualPlusBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -398,12 +425,12 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     fontWeight: '600',
-    paddingVertical: Platform.OS === 'ios' ? 6 : 4,
+    paddingVertical: Platform.OS === 'ios' ? 8 : 6,
   },
   sendButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },

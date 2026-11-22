@@ -1216,7 +1216,8 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   iconActionBtn: {
-    padding: 3,
+    padding: 6,
+    borderRadius: 8,
   },
   scopeDetailsGrid: {
     flexDirection: 'row',

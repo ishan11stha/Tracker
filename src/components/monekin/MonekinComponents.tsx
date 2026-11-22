@@ -78,12 +78,17 @@ export const CardWithHeader: React.FC<CardWithHeaderProps> = ({
         {onHeaderActionPress && (
           <TouchableOpacity
             onPress={onHeaderActionPress}
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={[
               styles.headerActionBtn,
               {
                 backgroundColor: isDark
-                  ? 'rgba(255,255,255,0.06)'
-                  : 'rgba(15, 51, 117, 0.07)',
+                  ? 'rgba(255,255,255,0.08)'
+                  : 'rgba(15, 51, 117, 0.08)',
+                borderColor: isDark
+                  ? 'rgba(255,255,255,0.12)'
+                  : 'rgba(15, 51, 117, 0.12)',
               },
             ]}
           >
@@ -308,41 +313,57 @@ export const DateRangeChips: React.FC<DateRangeChipsProps> = ({
   const theme = getThemeColors(isDark);
 
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.chipsRow}
-    >
-      {MONEKIN_PERIODS.map((p) => {
-        const isSelected = p.key === selected;
-        return (
-          <TouchableOpacity
-            key={p.key}
-            onPress={() => onSelect(p.key)}
-            style={[
-              styles.periodChip,
-              {
-                backgroundColor: isSelected
-                  ? `${accentColor}24`
-                  : 'transparent',
-              },
-            ]}
-          >
-            <Text
+    <View style={styles.chipsContainer}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.chipsRow,
+          {
+            backgroundColor: isDark
+              ? 'rgba(30, 41, 59, 0.65)'
+              : 'rgba(241, 245, 249, 0.9)',
+            borderColor: isDark
+              ? 'rgba(255, 255, 255, 0.08)'
+              : 'rgba(0, 0, 0, 0.06)',
+          },
+        ]}
+      >
+        {MONEKIN_PERIODS.map((p) => {
+          const isSelected = p.key === selected;
+          return (
+            <TouchableOpacity
+              key={p.key}
+              onPress={() => onSelect(p.key)}
+              activeOpacity={0.75}
               style={[
-                styles.periodChipText,
-                {
-                  color: isSelected ? accentColor : theme.textMuted,
-                  fontWeight: isSelected ? '800' : '600',
+                styles.periodChip,
+                isSelected && {
+                  backgroundColor: accentColor,
+                  shadowColor: accentColor,
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 4,
+                  elevation: 2,
                 },
               ]}
             >
-              {p.label}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
-    </ScrollView>
+              <Text
+                style={[
+                  styles.periodChipText,
+                  {
+                    color: isSelected ? '#FFFFFF' : theme.textMuted,
+                    fontWeight: isSelected ? '800' : '600',
+                  },
+                ]}
+              >
+                {p.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    </View>
   );
 };
 
@@ -352,6 +373,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     overflow: 'hidden',
     marginBottom: 16,
+    elevation: 2,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1.5 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -378,6 +404,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 999,
+    borderWidth: 1,
   },
   headerActionText: {
     fontSize: 12,
@@ -426,12 +453,20 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
   },
+  chipsContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 4,
+  },
   chipsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
+    gap: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
   },
   periodChip: {
     paddingHorizontal: 14,

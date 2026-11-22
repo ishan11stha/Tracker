@@ -687,10 +687,11 @@ const styles = StyleSheet.create({
   },
   actionsGroup: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
   },
   iconBtn: {
-    padding: 3,
+    padding: 6,
+    borderRadius: 8,
   },
   activityDesc: {
     fontSize: 12,

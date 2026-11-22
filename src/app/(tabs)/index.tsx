@@ -650,66 +650,151 @@ export default function DashboardScreen() {
             contentContainerStyle={styles.quickPillsScroll}
           >
             <TouchableOpacity
+              activeOpacity={0.75}
               onPress={() => openQuickTxn('income')}
               style={[
                 styles.quickPill,
-                { backgroundColor: '#E8F5E9', borderColor: '#BBF7D0' },
+                {
+                  backgroundColor: isDark
+                    ? 'rgba(55, 161, 59, 0.18)'
+                    : '#E8F5E9',
+                  borderColor: isDark
+                    ? 'rgba(55, 161, 59, 0.4)'
+                    : '#BBF7D0',
+                },
               ]}
             >
-              <Plus size={14} color="#37A13B" strokeWidth={2.6} />
-              <Text style={[styles.quickPillText, { color: '#14532D' }]}>
+              <Plus
+                size={14}
+                color={isDark ? '#4ADE80' : '#37A13B'}
+                strokeWidth={2.6}
+              />
+              <Text
+                style={[
+                  styles.quickPillText,
+                  { color: isDark ? '#86EFAC' : '#14532D' },
+                ]}
+              >
                 Add Money
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
+              activeOpacity={0.75}
               onPress={() => openQuickTxn('expense')}
               style={[
                 styles.quickPill,
-                { backgroundColor: '#FEE2E2', borderColor: '#FECACA' },
+                {
+                  backgroundColor: isDark
+                    ? 'rgba(239, 68, 68, 0.18)'
+                    : '#FEE2E2',
+                  borderColor: isDark
+                    ? 'rgba(239, 68, 68, 0.4)'
+                    : '#FECACA',
+                },
               ]}
             >
-              <Plus size={14} color="#EF4444" strokeWidth={2.6} />
-              <Text style={[styles.quickPillText, { color: '#7F1D1D' }]}>
+              <Plus
+                size={14}
+                color={isDark ? '#F87171' : '#EF4444'}
+                strokeWidth={2.6}
+              />
+              <Text
+                style={[
+                  styles.quickPillText,
+                  { color: isDark ? '#FCA5A5' : '#7F1D1D' },
+                ]}
+              >
                 Add Expense
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
+              activeOpacity={0.75}
               onPress={() => setItemModalVisible(true)}
               style={[
                 styles.quickPill,
-                { backgroundColor: '#E8F1FC', borderColor: '#BFDBFE' },
+                {
+                  backgroundColor: isDark
+                    ? 'rgba(37, 99, 235, 0.18)'
+                    : '#E8F1FC',
+                  borderColor: isDark
+                    ? 'rgba(37, 99, 235, 0.4)'
+                    : '#BFDBFE',
+                },
               ]}
             >
-              <Package size={14} color="#1D4ED8" strokeWidth={2.3} />
-              <Text style={[styles.quickPillText, { color: '#1E3A8A' }]}>
+              <Package
+                size={14}
+                color={isDark ? '#60A5FA' : '#1D4ED8'}
+                strokeWidth={2.3}
+              />
+              <Text
+                style={[
+                  styles.quickPillText,
+                  { color: isDark ? '#93C5FD' : '#1E3A8A' },
+                ]}
+              >
                 Add Item
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
+              activeOpacity={0.75}
               onPress={() => setActivityModalVisible(true)}
               style={[
                 styles.quickPill,
-                { backgroundColor: '#F0EBFA', borderColor: '#DDD6FE' },
+                {
+                  backgroundColor: isDark
+                    ? 'rgba(109, 40, 217, 0.18)'
+                    : '#F0EBFA',
+                  borderColor: isDark
+                    ? 'rgba(109, 40, 217, 0.4)'
+                    : '#DDD6FE',
+                },
               ]}
             >
-              <Activity size={14} color="#6D28D9" strokeWidth={2.3} />
-              <Text style={[styles.quickPillText, { color: '#4C1D95' }]}>
+              <Activity
+                size={14}
+                color={isDark ? '#A78BFA' : '#6D28D9'}
+                strokeWidth={2.3}
+              />
+              <Text
+                style={[
+                  styles.quickPillText,
+                  { color: isDark ? '#C4B5FD' : '#4C1D95' },
+                ]}
+              >
                 Add Activity
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
+              activeOpacity={0.75}
               onPress={() => setReminderModalVisible(true)}
               style={[
                 styles.quickPill,
-                { backgroundColor: '#FFF0E6', borderColor: '#FED7AA' },
+                {
+                  backgroundColor: isDark
+                    ? 'rgba(234, 88, 12, 0.18)'
+                    : '#FFF0E6',
+                  borderColor: isDark
+                    ? 'rgba(234, 88, 12, 0.4)'
+                    : '#FED7AA',
+                },
               ]}
             >
-              <Bell size={14} color="#EA580C" strokeWidth={2.3} />
-              <Text style={[styles.quickPillText, { color: '#7C2D12' }]}>
+              <Bell
+                size={14}
+                color={isDark ? '#FB923C' : '#EA580C'}
+                strokeWidth={2.3}
+              />
+              <Text
+                style={[
+                  styles.quickPillText,
+                  { color: isDark ? '#FDBA74' : '#7C2D12' },
+                ]}
+              >
                 Create Reminder
               </Text>
             </TouchableOpacity>

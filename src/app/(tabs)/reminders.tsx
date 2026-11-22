@@ -187,29 +187,40 @@ export default function RemindersScreen() {
             [
               {
                 key: 'upcoming',
-                label: `Upcoming (${categorized.upcoming.length})`,
+                label: 'Upcoming',
+                count: categorized.upcoming.length,
               },
               {
                 key: 'overdue',
-                label: `Overdue (${categorized.overdue.length})`,
+                label: 'Overdue',
+                count: categorized.overdue.length,
               },
               {
                 key: 'completed',
-                label: `Done (${categorized.completed.length})`,
+                label: 'Done',
+                count: categorized.completed.length,
               },
-              { key: 'calendar', label: 'Calendar' },
-            ] as { key: ReminderTabKey; label: string }[]
+              { key: 'calendar', label: 'Calendar', count: 0 },
+            ] as { key: ReminderTabKey; label: string; count: number }[]
           ).map((t) => {
             const active = activeTab === t.key;
             return (
               <TouchableOpacity
                 key={t.key}
                 onPress={() => setActiveTab(t.key)}
+                activeOpacity={0.75}
                 accessibilityRole="tab"
                 accessibilityState={{ selected: active }}
                 style={[
                   styles.tabButton,
-                  active && { backgroundColor: palette.accent },
+                  active && {
+                    backgroundColor: palette.accent,
+                    shadowColor: palette.accent,
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.3,
+                    shadowRadius: 3,
+                    elevation: 2,
+                  },
                 ]}
               >
                 <Text
@@ -221,6 +232,29 @@ export default function RemindersScreen() {
                 >
                   {t.label}
                 </Text>
+                {t.count > 0 && (
+                  <View
+                    style={[
+                      styles.tabBadge,
+                      {
+                        backgroundColor: active
+                          ? 'rgba(255, 255, 255, 0.28)'
+                          : isDark
+                          ? 'rgba(255, 255, 255, 0.1)'
+                          : 'rgba(0, 0, 0, 0.08)',
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.tabBadgeText,
+                        { color: active ? '#FFFFFF' : theme.textPrimary },
+                      ]}
+                    >
+                      {t.count}
+                    </Text>
+                  </View>
+                )}
               </TouchableOpacity>
             );
           })}
@@ -634,14 +668,26 @@ const styles = StyleSheet.create({
   },
   tabButton: {
     flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
     paddingVertical: 8,
     paddingHorizontal: 4,
     borderRadius: 10,
     alignItems: 'center',
+    gap: 4,
   },
   tabButtonText: {
     fontSize: 11,
     fontWeight: '700',
+  },
+  tabBadge: {
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 999,
+  },
+  tabBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
   },
   calendarCard: {
     borderRadius: 22,
