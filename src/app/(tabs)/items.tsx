@@ -132,12 +132,13 @@ export default function ItemTrackerScreen() {
       >
         {/* Header */}
         <View style={styles.headerRow}>
-          <View>
+          <View style={{ flex: 1, marginRight: 10 }}>
             <Text style={[styles.screenTitle, { color: theme.textPrimary }]}>
               Assets & Items
             </Text>
             <Text
               style={[styles.screenSubtitle, { color: theme.textMuted }]}
+              numberOfLines={1}
             >
               सामान तथा सम्पत्ति अभिलेख • Inventory & Lending
             </Text>

@@ -33,8 +33,7 @@ c:\Users\user\Documents\Tracker
 │   │   ├── ActivityFormModal.tsx     # Daily activity logger
 │   │   └── ReminderFormModal.tsx     # Reminder & notification scheduler
 │   ├── constants/
-│   │   ├── appSettings.ts            # Canonical first-run settings
-│   │   └── categories.ts             # Domain categories, units, statuses & priorities
+│   │   └── appSettings.ts            # Canonical first-run settings
 │   ├── db/
 │   │   └── database.ts               # Expo SQLite WAL database, migrations & transactional CRUD
 │   ├── hooks/

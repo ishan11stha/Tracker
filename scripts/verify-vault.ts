@@ -36,6 +36,8 @@ import {
   vaultBackupSchema,
   isValidISODate,
   isValidTime24,
+  parseRecurrenceWeekdays,
+  formatRecurrenceLabel,
 } from '../src/types/index.ts';
 import { escapeCSV } from '../src/utils/csv.ts';
 import { computeNextOccurrenceDate, getNPTTargetDate } from '../src/utils/dateRecurrence.ts';
@@ -529,7 +531,44 @@ assert(pastDaily !== null && pastDaily.getTime() > new Date('2026-11-20T10:00:00
 
 const pastWeekly = computeNextOccurrenceDate('2026-11-01', '09:00', 'weekly', new Date('2026-11-20T10:00:00Z'));
 assert(pastWeekly !== null && pastWeekly.getTime() > new Date('2026-11-20T10:00:00Z').getTime(), 'Past weekly reminder should advance to next week');
-console.log('15. Notification Recurrence & Scheduling Engine: PASSED');
+
+// Weekday recurrence names verification (e.g. 'sunday', 'monday,wednesday,friday')
+assert(
+  JSON.stringify(parseRecurrenceWeekdays('monday,wednesday,friday')) ===
+    JSON.stringify(['monday', 'wednesday', 'friday']),
+  'Failed parsing comma-separated weekday recurrence'
+);
+assert(
+  formatRecurrenceLabel('sunday') === 'Sunday',
+  `Expected 'Sunday', got '${formatRecurrenceLabel('sunday')}'`
+);
+assert(
+  formatRecurrenceLabel('monday,wednesday,friday') === 'Mon, Wed, Fri',
+  `Expected 'Mon, Wed, Fri', got '${formatRecurrenceLabel('monday,wednesday,friday')}'`
+);
+const weekdayReminderParse = reminderSchema.safeParse({
+  title: 'Team Sync',
+  description: 'Weekly check-in',
+  dateISO: '2026-11-20',
+  timeString: '10:00',
+  priority: 'Medium',
+  category: 'Work & Deadlines',
+  recurrence: 'sunday,monday',
+});
+assert(weekdayReminderParse.success, 'Weekday recurrence must pass reminderSchema validation');
+
+const nextSundayTrigger = computeNextOccurrenceDate(
+  '2026-11-20', // Friday
+  '09:00',
+  'sunday',
+  new Date('2026-11-20T10:00:00Z')
+);
+assert(
+  nextSundayTrigger !== null &&
+    nextSundayTrigger.getTime() > new Date('2026-11-20T10:00:00Z').getTime(),
+  'Weekday recurrence should schedule for the next matching weekday'
+);
+console.log('15. Notification Recurrence & Scheduling Engine (including Weekday Names): PASSED');
 
 // 16. Full Backup Payload & Restoration Roundtrip Schema Check
 const fullPayload = {

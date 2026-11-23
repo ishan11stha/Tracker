@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Alert,
   ScrollView,
@@ -62,6 +62,13 @@ export default function SettingsScreen() {
   const [titleInput, setTitleInput] = useState(settings.userTitle);
   const [profileSaved, setProfileSaved] = useState(false);
   const [profileError, setProfileError] = useState('');
+
+  useEffect(() => {
+    setNameInput(settings.userName);
+    setTitleInput(settings.userTitle);
+  }, [settings.userName, settings.userTitle]);
+
+  const activeControlFill = isDark ? '#2563EB' : '#0F3375';
 
   const handleSaveProfile = async () => {
     if (!nameInput.trim()) {
@@ -293,7 +300,7 @@ export default function SettingsScreen() {
             style={[
               styles.saveProfileBtn,
               {
-                backgroundColor: profileSaved ? '#16A34A' : '#0F172A',
+                backgroundColor: profileSaved ? '#16A34A' : activeControlFill,
               },
             ]}
           >
@@ -331,9 +338,12 @@ export default function SettingsScreen() {
                   {
                     backgroundColor:
                       settings.preferredCalendar === 'BS'
-                        ? '#0F172A'
+                        ? activeControlFill
                         : theme.inputBg,
-                    borderColor: theme.border,
+                    borderColor:
+                      settings.preferredCalendar === 'BS'
+                        ? activeControlFill
+                        : theme.border,
                   },
                 ]}
               >
@@ -359,9 +369,12 @@ export default function SettingsScreen() {
                   {
                     backgroundColor:
                       settings.preferredCalendar === 'AD'
-                        ? '#0F172A'
+                        ? activeControlFill
                         : theme.inputBg,
-                    borderColor: theme.border,
+                    borderColor:
+                      settings.preferredCalendar === 'AD'
+                        ? activeControlFill
+                        : theme.border,
                   },
                 ]}
               >
@@ -397,8 +410,13 @@ export default function SettingsScreen() {
                   styles.segmentBtn,
                   {
                     backgroundColor:
-                      settings.language === 'ne' ? '#0F172A' : theme.inputBg,
-                    borderColor: theme.border,
+                      settings.language === 'ne'
+                        ? activeControlFill
+                        : theme.inputBg,
+                    borderColor:
+                      settings.language === 'ne'
+                        ? activeControlFill
+                        : theme.border,
                   },
                 ]}
               >
@@ -423,8 +441,13 @@ export default function SettingsScreen() {
                   styles.segmentBtn,
                   {
                     backgroundColor:
-                      settings.language === 'en' ? '#0F172A' : theme.inputBg,
-                    borderColor: theme.border,
+                      settings.language === 'en'
+                        ? activeControlFill
+                        : theme.inputBg,
+                    borderColor:
+                      settings.language === 'en'
+                        ? activeControlFill
+                        : theme.border,
                   },
                 ]}
               >
@@ -460,8 +483,13 @@ export default function SettingsScreen() {
                   styles.segmentBtn,
                   {
                     backgroundColor:
-                      settings.timeFormat === '12h' ? '#0F172A' : theme.inputBg,
-                    borderColor: theme.border,
+                      settings.timeFormat === '12h'
+                        ? activeControlFill
+                        : theme.inputBg,
+                    borderColor:
+                      settings.timeFormat === '12h'
+                        ? activeControlFill
+                        : theme.border,
                   },
                 ]}
               >
@@ -486,8 +514,13 @@ export default function SettingsScreen() {
                   styles.segmentBtn,
                   {
                     backgroundColor:
-                      settings.timeFormat === '24h' ? '#0F172A' : theme.inputBg,
-                    borderColor: theme.border,
+                      settings.timeFormat === '24h'
+                        ? activeControlFill
+                        : theme.inputBg,
+                    borderColor:
+                      settings.timeFormat === '24h'
+                        ? activeControlFill
+                        : theme.border,
                   },
                 ]}
               >
@@ -681,15 +714,33 @@ export default function SettingsScreen() {
             onPress={handleExportCSV}
             style={[
               styles.dataActionBtn,
-              { backgroundColor: '#E8F5E9', borderColor: '#BBF7D0' },
+              {
+                backgroundColor: isDark
+                  ? 'rgba(22, 163, 74, 0.16)'
+                  : '#E8F5E9',
+                borderColor: isDark ? 'rgba(22, 163, 74, 0.4)' : '#BBF7D0',
+              },
             ]}
           >
-            <FileSpreadsheet size={18} color="#16A34A" />
+            <FileSpreadsheet
+              size={18}
+              color={isDark ? '#4ADE80' : '#16A34A'}
+            />
             <View style={{ flex: 1 }}>
-              <Text style={[styles.dataActionTitle, { color: '#14532D' }]}>
+              <Text
+                style={[
+                  styles.dataActionTitle,
+                  { color: isDark ? '#86EFAC' : '#14532D' },
+                ]}
+              >
                 Export All Records to CSV
               </Text>
-              <Text style={[styles.dataActionSub, { color: '#166534' }]}>
+              <Text
+                style={[
+                  styles.dataActionSub,
+                  { color: isDark ? '#A7F3D0' : '#166534' },
+                ]}
+              >
                 Includes both Bikram Sambat (BS) and Gregorian (AD) dates
               </Text>
             </View>
@@ -699,15 +750,30 @@ export default function SettingsScreen() {
             onPress={handleBackupJSON}
             style={[
               styles.dataActionBtn,
-              { backgroundColor: '#E8F1FC', borderColor: '#BFDBFE' },
+              {
+                backgroundColor: isDark
+                  ? 'rgba(37, 99, 235, 0.16)'
+                  : '#E8F1FC',
+                borderColor: isDark ? 'rgba(37, 99, 235, 0.4)' : '#BFDBFE',
+              },
             ]}
           >
-            <Download size={18} color="#2563EB" />
+            <Download size={18} color={isDark ? '#60A5FA' : '#2563EB'} />
             <View style={{ flex: 1 }}>
-              <Text style={[styles.dataActionTitle, { color: '#1E3A8A' }]}>
+              <Text
+                style={[
+                  styles.dataActionTitle,
+                  { color: isDark ? '#93C5FD' : '#1E3A8A' },
+                ]}
+              >
                 Create Full Database Backup (JSON)
               </Text>
-              <Text style={[styles.dataActionSub, { color: '#1D4ED8' }]}>
+              <Text
+                style={[
+                  styles.dataActionSub,
+                  { color: isDark ? '#BFDBFE' : '#1D4ED8' },
+                ]}
+              >
                 Save or share your complete offline VAULT snapshot
               </Text>
             </View>
@@ -717,15 +783,30 @@ export default function SettingsScreen() {
             onPress={handleRestoreJSON}
             style={[
               styles.dataActionBtn,
-              { backgroundColor: '#FFF0E6', borderColor: '#FED7AA' },
+              {
+                backgroundColor: isDark
+                  ? 'rgba(234, 88, 12, 0.16)'
+                  : '#FFF0E6',
+                borderColor: isDark ? 'rgba(234, 88, 12, 0.4)' : '#FED7AA',
+              },
             ]}
           >
-            <Upload size={18} color="#EA580C" />
+            <Upload size={18} color={isDark ? '#FB923C' : '#EA580C'} />
             <View style={{ flex: 1 }}>
-              <Text style={[styles.dataActionTitle, { color: '#7C2D12' }]}>
+              <Text
+                style={[
+                  styles.dataActionTitle,
+                  { color: isDark ? '#FDBA74' : '#7C2D12' },
+                ]}
+              >
                 Restore from Backup File
               </Text>
-              <Text style={[styles.dataActionSub, { color: '#9A3412' }]}>
+              <Text
+                style={[
+                  styles.dataActionSub,
+                  { color: isDark ? '#FED7AA' : '#9A3412' },
+                ]}
+              >
                 Import a previously exported VAULT JSON backup
               </Text>
             </View>

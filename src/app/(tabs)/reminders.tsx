@@ -36,7 +36,7 @@ import {
   toNepaliDigits,
 } from '../../utils/nepaliDate';
 import { useCurrentNPT } from '../../hooks/useCurrentNPT';
-import { ReminderItem } from '../../types';
+import { ReminderItem, formatRecurrenceLabel } from '../../types';
 import { ReminderFormModal } from '../../components/ReminderFormModal';
 
 type ReminderTabKey = 'upcoming' | 'overdue' | 'completed' | 'calendar';
@@ -154,12 +154,13 @@ export default function RemindersScreen() {
       >
         {/* Header */}
         <View style={styles.headerRow}>
-          <View>
+          <View style={{ flex: 1, marginRight: 10 }}>
             <Text style={[styles.screenTitle, { color: theme.textPrimary }]}>
               Reminder Manager
             </Text>
             <Text
               style={[styles.screenSubtitle, { color: theme.textSecondary }]}
+              numberOfLines={1}
             >
               नेपाली मिति र समय अनुसार अलर्ट • Asia/Kathmandu
             </Text>
@@ -543,7 +544,7 @@ export default function RemindersScreen() {
                               { color: palette.accent },
                             ]}
                           >
-                            {rem.recurrence}
+                            {formatRecurrenceLabel(rem.recurrence)}
                           </Text>
                         </View>
                       )}

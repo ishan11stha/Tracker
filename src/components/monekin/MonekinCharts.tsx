@@ -411,52 +411,48 @@ export const ScopeDistributionChart: React.FC<ScopeDistributionChartProps> = ({
         />
       </View>
 
-      {/* Legend & Stats Row */}
+      {/* Compact Proportional Legend Row (amounts shown in detail cards below) */}
       <View style={styles.scopeDistLegend}>
         <View style={styles.scopeLegendItem}>
           <View style={[styles.scopeColorDot, { backgroundColor: '#2563EB' }]} />
-          <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={[styles.scopeLegendTitle, { color: theme.textPrimary }]}>
-                Personal (Own)
-              </Text>
-              <View
-                style={[
-                  styles.pctPill,
-                  { backgroundColor: isDark ? '#1E3A8A' : '#DBEAFE' },
-                ]}
-              >
-                <Text style={[styles.pctPillText, { color: '#2563EB' }]}>
-                  {personalPct}%
-                </Text>
-              </View>
-            </View>
-            <Text style={[styles.scopeLegendAmount, { color: '#2563EB' }]}>
-              {formatCurrency(personalAmount, currency, false, privateMode)}
+          <Text style={[styles.scopeLegendTitle, { color: theme.textPrimary }]}>
+            Personal (Own)
+          </Text>
+          <View
+            style={[
+              styles.pctPill,
+              { backgroundColor: isDark ? '#1E3A8A' : '#DBEAFE' },
+            ]}
+          >
+            <Text
+              style={[
+                styles.pctPillText,
+                { color: isDark ? '#60A5FA' : '#2563EB' },
+              ]}
+            >
+              {personalPct}%
             </Text>
           </View>
         </View>
 
         <View style={styles.scopeLegendItem}>
           <View style={[styles.scopeColorDot, { backgroundColor: '#7C3AED' }]} />
-          <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={[styles.scopeLegendTitle, { color: theme.textPrimary }]}>
-                Family
-              </Text>
-              <View
-                style={[
-                  styles.pctPill,
-                  { backgroundColor: isDark ? '#4C1D95' : '#EDE9FE' },
-                ]}
-              >
-                <Text style={[styles.pctPillText, { color: '#7C3AED' }]}>
-                  {familyPct}%
-                </Text>
-              </View>
-            </View>
-            <Text style={[styles.scopeLegendAmount, { color: '#7C3AED' }]}>
-              {formatCurrency(familyAmount, currency, false, privateMode)}
+          <Text style={[styles.scopeLegendTitle, { color: theme.textPrimary }]}>
+            Family
+          </Text>
+          <View
+            style={[
+              styles.pctPill,
+              { backgroundColor: isDark ? '#4C1D95' : '#EDE9FE' },
+            ]}
+          >
+            <Text
+              style={[
+                styles.pctPillText,
+                { color: isDark ? '#A78BFA' : '#7C3AED' },
+              ]}
+            >
+              {familyPct}%
             </Text>
           </View>
         </View>
@@ -485,25 +481,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   scopeLegendItem: {
-    flex: 1,
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: 8,
   },
   scopeColorDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    marginTop: 4,
   },
   scopeLegendTitle: {
     fontSize: 12,
     fontWeight: '700',
-  },
-  scopeLegendAmount: {
-    fontSize: 13,
-    fontWeight: '800',
-    marginTop: 2,
   },
   gaugeCenter: {
     position: 'absolute',

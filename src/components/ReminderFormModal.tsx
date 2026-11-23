@@ -17,10 +17,12 @@ import { Bell, Calendar, Check, Clock, Repeat, X } from 'lucide-react-native';
 import {
   REMINDER_CATEGORIES,
   REMINDER_PRIORITIES,
-  REMINDER_RECURRENCES,
+  REMINDER_WEEKDAYS,
   ReminderItem,
   ReminderPriority,
   ReminderRecurrence,
+  WeekdayRecurrenceKey,
+  parseRecurrenceWeekdays,
   reminderSchema,
 } from '../types';
 import { useVaultStore } from '../store/useVaultStore';
@@ -72,6 +74,7 @@ export const ReminderFormModal: React.FC<ReminderFormModalProps> = ({
     control,
     handleSubmit,
     setValue,
+    getValues,
     watch,
     reset,
     formState: { errors },
@@ -304,21 +307,41 @@ export const ReminderFormModal: React.FC<ReminderFormModalProps> = ({
               </View>
             </View>
 
-            {/* Recurrence */}
+            {/* Recurrence (Days of the Week) */}
             <View style={styles.fieldGroup}>
               <View style={styles.labelRow}>
                 <Repeat size={13} color={theme.textSecondary} />
                 <Text style={[styles.label, { color: theme.textSecondary, marginBottom: 0 }]}>
-                  Recurrence
+                  Repeat Days
                 </Text>
               </View>
               <View style={styles.chipsWrap}>
-                {REMINDER_RECURRENCES.map((rec) => {
-                  const selected = currentRecurrence === rec.key;
+                {REMINDER_WEEKDAYS.map((day) => {
+                  const selectedDays = parseRecurrenceWeekdays(currentRecurrence);
+                  const selected = selectedDays.includes(day.key);
+                  const handleToggleDay = (key: WeekdayRecurrenceKey) => {
+                    const liveDays = parseRecurrenceWeekdays(
+                      getValues('recurrence')
+                    );
+                    const isCurrentlySelected = liveDays.includes(key);
+                    const nextDays = isCurrentlySelected
+                      ? liveDays.filter((d) => d !== key)
+                      : REMINDER_WEEKDAYS.filter(
+                          (d) => liveDays.includes(d.key) || d.key === key
+                        ).map((d) => d.key);
+                    setValue(
+                      'recurrence',
+                      nextDays.length > 0 ? nextDays.join(',') : 'none',
+                      { shouldValidate: true }
+                    );
+                  };
                   return (
                     <TouchableOpacity
-                      key={rec.key}
-                      onPress={() => setValue('recurrence', rec.key)}
+                      key={day.key}
+                      onPress={() => handleToggleDay(day.key)}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: selected }}
+                      accessibilityLabel={`Repeat on ${day.label}`}
                       style={[
                         styles.chip,
                         {
@@ -335,7 +358,7 @@ export const ReminderFormModal: React.FC<ReminderFormModalProps> = ({
                           { color: selected ? '#FFFFFF' : theme.textPrimary },
                         ]}
                       >
-                        {rec.label}
+                        {day.label}
                       </Text>
                     </TouchableOpacity>
                   );

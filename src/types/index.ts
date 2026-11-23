@@ -189,12 +189,61 @@ export const activitySchema = z.object({
 });
 
 export type ReminderPriority = 'Low' | 'Medium' | 'High';
-export type ReminderRecurrence =
+
+export type WeekdayRecurrenceKey =
+  | 'sunday'
+  | 'monday'
+  | 'tuesday'
+  | 'wednesday'
+  | 'thursday'
+  | 'friday'
+  | 'saturday';
+
+export type LegacyReminderRecurrence =
   | 'none'
   | 'daily'
   | 'weekly'
   | 'monthly'
   | 'yearly';
+
+/**
+ * Supports single weekday ('sunday'..'saturday'), comma-separated weekdays
+ * ('monday,wednesday,friday'), or legacy interval keys ('none', 'daily', etc.).
+ */
+export type ReminderRecurrence =
+  | LegacyReminderRecurrence
+  | WeekdayRecurrenceKey
+  | string;
+
+const VALID_WEEKDAY_SET = new Set<string>([
+  'sunday',
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday',
+]);
+
+const VALID_LEGACY_RECURRENCE_SET = new Set<string>([
+  'none',
+  'daily',
+  'weekly',
+  'monthly',
+  'yearly',
+]);
+
+export function isValidReminderRecurrence(value: string): boolean {
+  if (!value) return false;
+  const trimmed = value.trim().toLowerCase();
+  if (VALID_LEGACY_RECURRENCE_SET.has(trimmed)) return true;
+  const parts = trimmed
+    .split(',')
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.length === 0) return false;
+  return parts.every((p) => VALID_WEEKDAY_SET.has(p));
+}
 
 export interface ReminderItem {
   id: string;
@@ -218,7 +267,10 @@ export const reminderSchema = z.object({
   timeString: time24Schema,
   priority: z.enum(['Low', 'Medium', 'High']),
   category: z.string().trim().min(1, 'Category is required'),
-  recurrence: z.enum(['none', 'daily', 'weekly', 'monthly', 'yearly']),
+  recurrence: z
+    .string()
+    .trim()
+    .refine(isValidReminderRecurrence, 'Invalid recurrence value'),
 });
 
 export interface AppSettings {
@@ -433,10 +485,63 @@ export const REMINDER_PRIORITIES: { label: ReminderPriority; color: string }[] =
   { label: 'High', color: '#DC2626' },
 ];
 
-export const REMINDER_RECURRENCES: { key: ReminderRecurrence; label: string }[] = [
-  { key: 'none', label: 'Once' },
-  { key: 'daily', label: 'Daily' },
-  { key: 'weekly', label: 'Weekly' },
-  { key: 'monthly', label: 'Monthly' },
-  { key: 'yearly', label: 'Yearly' },
+export const REMINDER_WEEKDAYS: {
+  key: WeekdayRecurrenceKey;
+  label: string;
+  shortLabel: string;
+  weekdayIndex: number;
+}[] = [
+  { key: 'sunday', label: 'Sunday', shortLabel: 'Sun', weekdayIndex: 0 },
+  { key: 'monday', label: 'Monday', shortLabel: 'Mon', weekdayIndex: 1 },
+  { key: 'tuesday', label: 'Tuesday', shortLabel: 'Tue', weekdayIndex: 2 },
+  { key: 'wednesday', label: 'Wednesday', shortLabel: 'Wed', weekdayIndex: 3 },
+  { key: 'thursday', label: 'Thursday', shortLabel: 'Thu', weekdayIndex: 4 },
+  { key: 'friday', label: 'Friday', shortLabel: 'Fri', weekdayIndex: 5 },
+  { key: 'saturday', label: 'Saturday', shortLabel: 'Sat', weekdayIndex: 6 },
 ];
+
+export const REMINDER_RECURRENCES: {
+  key: WeekdayRecurrenceKey;
+  label: string;
+  shortLabel: string;
+}[] = REMINDER_WEEKDAYS;
+
+export function parseRecurrenceWeekdays(
+  recurrence: ReminderRecurrence
+): WeekdayRecurrenceKey[] {
+  if (!recurrence || recurrence === 'none') return [];
+  const lower = recurrence.toLowerCase();
+  if (lower === 'daily') {
+    return REMINDER_WEEKDAYS.map((d) => d.key);
+  }
+  const parts = lower
+    .split(',')
+    .map((p) => p.trim())
+    .filter(Boolean);
+  return REMINDER_WEEKDAYS.filter((d) => parts.includes(d.key)).map(
+    (d) => d.key
+  );
+}
+
+export function formatRecurrenceLabel(recurrence: ReminderRecurrence): string {
+  if (!recurrence || recurrence === 'none') return 'Once';
+  const lower = recurrence.trim().toLowerCase();
+  if (lower === 'daily') return 'Every Day';
+  if (lower === 'weekly') return 'Weekly';
+  if (lower === 'monthly') return 'Monthly';
+  if (lower === 'yearly') return 'Yearly';
+
+  const days = parseRecurrenceWeekdays(lower);
+  if (days.length === 0) return recurrence;
+  if (days.length === 7) return 'Every Day';
+  if (days.length === 1) {
+    return (
+      REMINDER_WEEKDAYS.find((d) => d.key === days[0])?.label || days[0]
+    );
+  }
+  return days
+    .map(
+      (k) => REMINDER_WEEKDAYS.find((d) => d.key === k)?.shortLabel || k
+    )
+    .join(', ');
+}

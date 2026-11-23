@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import { Platform } from 'react-native';
 import {
   Account,
   ActivityRecord,
@@ -10,6 +11,127 @@ import {
   appSettingsSchema,
 } from '../types';
 import { DEFAULT_SETTINGS } from '../constants/appSettings';
+
+const isWeb = Platform.OS === 'web';
+const WEB_STORAGE_KEY = 'vault_web_sqlite_store_v1';
+
+interface WebVaultStore {
+  settings: AppSettings;
+  accounts: Account[];
+  transactions: Transaction[];
+  items: PersonalItem[];
+  itemHistory: ItemHistoryLog[];
+  activities: ActivityRecord[];
+  reminders: ReminderItem[];
+}
+
+function getDefaultAccountsList(): Account[] {
+  const nowStamp = new Date().toISOString();
+  return [
+    {
+      id: 'acc_personal_bank',
+      name: 'Bank',
+      scope: 'Personal',
+      initialBalance: 0,
+      paymentMethod: 'Bank Transfer',
+      color: '#1E40AF',
+      createdAt: nowStamp,
+      updatedAt: nowStamp,
+    },
+    {
+      id: 'acc_personal_cash',
+      name: 'Cash',
+      scope: 'Personal',
+      initialBalance: 0,
+      paymentMethod: 'Cash',
+      color: '#059669',
+      createdAt: nowStamp,
+      updatedAt: nowStamp,
+    },
+    {
+      id: 'acc_family_bank',
+      name: 'Bank',
+      scope: 'Family',
+      initialBalance: 0,
+      paymentMethod: 'Bank Transfer',
+      color: '#7C3AED',
+      createdAt: nowStamp,
+      updatedAt: nowStamp,
+    },
+    {
+      id: 'acc_family_cash',
+      name: 'Cash',
+      scope: 'Family',
+      initialBalance: 0,
+      paymentMethod: 'Cash',
+      color: '#D97706',
+      createdAt: nowStamp,
+      updatedAt: nowStamp,
+    },
+  ];
+}
+
+let memoryWebStore: WebVaultStore | null = null;
+
+function readWebStore(): WebVaultStore {
+  if (memoryWebStore) return memoryWebStore;
+  const fresh: WebVaultStore = {
+    settings: { ...DEFAULT_SETTINGS },
+    accounts: getDefaultAccountsList(),
+    transactions: [],
+    items: [],
+    itemHistory: [],
+    activities: [],
+    reminders: [],
+  };
+  try {
+    if (typeof globalThis !== 'undefined' && 'localStorage' in globalThis) {
+      const raw = globalThis.localStorage.getItem(WEB_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as Partial<WebVaultStore>;
+        const validatedSettings = appSettingsSchema.safeParse({
+          ...DEFAULT_SETTINGS,
+          ...(parsed.settings || {}),
+        });
+        memoryWebStore = {
+          settings: validatedSettings.success
+            ? validatedSettings.data
+            : { ...DEFAULT_SETTINGS },
+          accounts:
+            Array.isArray(parsed.accounts) && parsed.accounts.length > 0
+              ? parsed.accounts
+              : getDefaultAccountsList(),
+          transactions: Array.isArray(parsed.transactions)
+            ? parsed.transactions
+            : [],
+          items: Array.isArray(parsed.items) ? parsed.items : [],
+          itemHistory: Array.isArray(parsed.itemHistory)
+            ? parsed.itemHistory
+            : [],
+          activities: Array.isArray(parsed.activities) ? parsed.activities : [],
+          reminders: Array.isArray(parsed.reminders) ? parsed.reminders : [],
+        };
+        return memoryWebStore;
+      }
+    }
+  } catch {
+    // Fallback to in-memory store
+  }
+  memoryWebStore = fresh;
+  writeWebStore(fresh);
+  return fresh;
+}
+
+function writeWebStore(next: WebVaultStore): void {
+  memoryWebStore = next;
+  try {
+    if (typeof globalThis !== 'undefined' && 'localStorage' in globalThis) {
+      globalThis.localStorage.setItem(WEB_STORAGE_KEY, JSON.stringify(next));
+    }
+  } catch {
+    // Ignore storage quota errors in restricted web contexts
+  }
+}
 
 let dbInstance: SQLite.SQLiteDatabase | null = null;
 let dbInitPromise: Promise<SQLite.SQLiteDatabase> | null = null;
@@ -200,49 +322,7 @@ async function initializeSchema(db: SQLite.SQLiteDatabase): Promise<void> {
 }
 
 export async function seedDefaultAccounts(db: SQLite.SQLiteDatabase): Promise<void> {
-  const nowStamp = new Date().toISOString();
-  const defaultAccounts: Account[] = [
-    {
-      id: 'acc_personal_bank',
-      name: 'Bank',
-      scope: 'Personal',
-      initialBalance: 0,
-      paymentMethod: 'Bank Transfer',
-      color: '#1E40AF',
-      createdAt: nowStamp,
-      updatedAt: nowStamp,
-    },
-    {
-      id: 'acc_personal_cash',
-      name: 'Cash',
-      scope: 'Personal',
-      initialBalance: 0,
-      paymentMethod: 'Cash',
-      color: '#059669',
-      createdAt: nowStamp,
-      updatedAt: nowStamp,
-    },
-    {
-      id: 'acc_family_bank',
-      name: 'Bank',
-      scope: 'Family',
-      initialBalance: 0,
-      paymentMethod: 'Bank Transfer',
-      color: '#7C3AED',
-      createdAt: nowStamp,
-      updatedAt: nowStamp,
-    },
-    {
-      id: 'acc_family_cash',
-      name: 'Cash',
-      scope: 'Family',
-      initialBalance: 0,
-      paymentMethod: 'Cash',
-      color: '#D97706',
-      createdAt: nowStamp,
-      updatedAt: nowStamp,
-    },
-  ];
+  const defaultAccounts = getDefaultAccountsList();
 
   for (const acc of defaultAccounts) {
     await db.runAsync(
@@ -298,6 +378,19 @@ async function seedInitialData(db: SQLite.SQLiteDatabase): Promise<void> {
  * Re-seeds the four foundational accounts (Personal/Family Bank and Cash) at zero.
  */
 export async function dbResetAllUserData(): Promise<void> {
+  if (isWeb) {
+    const store = readWebStore();
+    writeWebStore({
+      settings: store.settings,
+      accounts: getDefaultAccountsList(),
+      transactions: [],
+      items: [],
+      itemHistory: [],
+      activities: [],
+      reminders: [],
+    });
+    return;
+  }
   const db = await getDatabase();
   await db.withTransactionAsync(async () => {
     await db.runAsync(`DELETE FROM item_history`);
@@ -316,6 +409,9 @@ export async function dbResetAllUserData(): Promise<void> {
 // CRUD Operations
 
 export async function dbGetSettings(): Promise<AppSettings> {
+  if (isWeb) {
+    return { ...readWebStore().settings };
+  }
   const db = await getDatabase();
   const row = await db.getFirstAsync<{ value: string }>(
     `SELECT value FROM settings WHERE key = 'app_settings'`
@@ -338,6 +434,11 @@ export async function dbGetSettings(): Promise<AppSettings> {
 }
 
 export async function dbSaveSettings(settings: AppSettings): Promise<void> {
+  if (isWeb) {
+    const store = readWebStore();
+    writeWebStore({ ...store, settings });
+    return;
+  }
   const db = await getDatabase();
   await db.runAsync(
     `INSERT OR REPLACE INTO settings (key, value) VALUES ('app_settings', ?)`,
@@ -347,6 +448,13 @@ export async function dbSaveSettings(settings: AppSettings): Promise<void> {
 
 // Transactions CRUD
 export async function dbGetAllTransactions(): Promise<Transaction[]> {
+  if (isWeb) {
+    return [...readWebStore().transactions].sort(
+      (a, b) =>
+        b.dateISO.localeCompare(a.dateISO) ||
+        b.createdAt.localeCompare(a.createdAt)
+    );
+  }
   const db = await getDatabase();
   return await db.getAllAsync<Transaction>(
     `SELECT * FROM transactions ORDER BY dateISO DESC, createdAt DESC`
@@ -354,6 +462,14 @@ export async function dbGetAllTransactions(): Promise<Transaction[]> {
 }
 
 export async function dbInsertTransaction(txn: Transaction): Promise<void> {
+  if (isWeb) {
+    const store = readWebStore();
+    writeWebStore({
+      ...store,
+      transactions: [txn, ...store.transactions],
+    });
+    return;
+  }
   const db = await getDatabase();
   await db.withTransactionAsync(async () => {
     await db.runAsync(
@@ -378,6 +494,14 @@ export async function dbInsertTransaction(txn: Transaction): Promise<void> {
 }
 
 export async function dbUpdateTransaction(txn: Transaction): Promise<void> {
+  if (isWeb) {
+    const store = readWebStore();
+    writeWebStore({
+      ...store,
+      transactions: store.transactions.map((t) => (t.id === txn.id ? txn : t)),
+    });
+    return;
+  }
   const db = await getDatabase();
   await db.withTransactionAsync(async () => {
     await db.runAsync(
@@ -402,6 +526,14 @@ export async function dbUpdateTransaction(txn: Transaction): Promise<void> {
 }
 
 export async function dbDeleteTransaction(id: string): Promise<void> {
+  if (isWeb) {
+    const store = readWebStore();
+    writeWebStore({
+      ...store,
+      transactions: store.transactions.filter((t) => t.id !== id),
+    });
+    return;
+  }
   const db = await getDatabase();
   await db.withTransactionAsync(async () => {
     await db.runAsync(`DELETE FROM transactions WHERE id = ?`, [id]);
@@ -410,6 +542,12 @@ export async function dbDeleteTransaction(id: string): Promise<void> {
 
 // Accounts CRUD (Multi-wallet & Scope tracking)
 export async function dbGetAllAccounts(): Promise<Account[]> {
+  if (isWeb) {
+    return [...readWebStore().accounts].sort(
+      (a, b) =>
+        a.scope.localeCompare(b.scope) || a.createdAt.localeCompare(b.createdAt)
+    );
+  }
   const db = await getDatabase();
   return await db.getAllAsync<Account>(
     `SELECT * FROM accounts ORDER BY scope ASC, createdAt ASC`
@@ -417,6 +555,14 @@ export async function dbGetAllAccounts(): Promise<Account[]> {
 }
 
 export async function dbInsertAccount(account: Account): Promise<void> {
+  if (isWeb) {
+    const store = readWebStore();
+    writeWebStore({
+      ...store,
+      accounts: [...store.accounts, account],
+    });
+    return;
+  }
   const db = await getDatabase();
   await db.withTransactionAsync(async () => {
     await db.runAsync(
@@ -437,6 +583,14 @@ export async function dbInsertAccount(account: Account): Promise<void> {
 }
 
 export async function dbUpdateAccount(account: Account): Promise<void> {
+  if (isWeb) {
+    const store = readWebStore();
+    writeWebStore({
+      ...store,
+      accounts: store.accounts.map((a) => (a.id === account.id ? account : a)),
+    });
+    return;
+  }
   const db = await getDatabase();
   await db.withTransactionAsync(async () => {
     await db.runAsync(
@@ -457,6 +611,14 @@ export async function dbUpdateAccount(account: Account): Promise<void> {
 }
 
 export async function dbDeleteAccount(id: string): Promise<void> {
+  if (isWeb) {
+    const store = readWebStore();
+    writeWebStore({
+      ...store,
+      accounts: store.accounts.filter((a) => a.id !== id),
+    });
+    return;
+  }
   const db = await getDatabase();
   await db.withTransactionAsync(async () => {
     await db.runAsync(`DELETE FROM accounts WHERE id = ?`, [id]);
@@ -465,6 +627,11 @@ export async function dbDeleteAccount(id: string): Promise<void> {
 
 // Items CRUD & History
 export async function dbGetAllItems(): Promise<PersonalItem[]> {
+  if (isWeb) {
+    return [...readWebStore().items].sort((a, b) =>
+      b.updatedAt.localeCompare(a.updatedAt)
+    );
+  }
   const db = await getDatabase();
   return await db.getAllAsync<PersonalItem>(
     `SELECT * FROM items ORDER BY updatedAt DESC`
@@ -472,6 +639,11 @@ export async function dbGetAllItems(): Promise<PersonalItem[]> {
 }
 
 export async function dbGetItemHistory(itemId?: string): Promise<ItemHistoryLog[]> {
+  if (isWeb) {
+    const list = readWebStore().itemHistory;
+    const filtered = itemId ? list.filter((h) => h.itemId === itemId) : list;
+    return [...filtered].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+  }
   const db = await getDatabase();
   if (itemId) {
     return await db.getAllAsync<ItemHistoryLog>(
@@ -485,6 +657,25 @@ export async function dbGetItemHistory(itemId?: string): Promise<ItemHistoryLog[
 }
 
 export async function dbInsertItem(item: PersonalItem, note?: string): Promise<void> {
+  const historyId = `hist_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const historyEntry: ItemHistoryLog = {
+    id: historyId,
+    itemId: item.id,
+    action: 'Added Item',
+    previousStatus: undefined,
+    newStatus: item.status,
+    note: note || `Added ${item.name} (${item.status}) at ${item.location}`,
+    timestamp: item.createdAt,
+  };
+  if (isWeb) {
+    const store = readWebStore();
+    writeWebStore({
+      ...store,
+      items: [item, ...store.items],
+      itemHistory: [historyEntry, ...store.itemHistory],
+    });
+    return;
+  }
   const db = await getDatabase();
   await db.withTransactionAsync(async () => {
     await db.runAsync(
@@ -506,7 +697,6 @@ export async function dbInsertItem(item: PersonalItem, note?: string): Promise<v
       ]
     );
 
-    const historyId = `hist_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     await db.runAsync(
       `INSERT INTO item_history (id, itemId, action, previousStatus, newStatus, note, timestamp)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -528,6 +718,29 @@ export async function dbUpdateItem(
   previousStatus?: PersonalItem['status'],
   note?: string
 ): Promise<void> {
+  const historyId = `hist_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const actionLabel =
+    previousStatus && previousStatus !== item.status
+      ? `Status: ${previousStatus} → ${item.status}`
+      : 'Updated Details';
+  if (isWeb) {
+    const store = readWebStore();
+    const historyEntry: ItemHistoryLog = {
+      id: historyId,
+      itemId: item.id,
+      action: actionLabel,
+      previousStatus: previousStatus || item.status,
+      newStatus: item.status,
+      note: note || `Location: ${item.location}, Qty: ${item.quantity}`,
+      timestamp: item.updatedAt,
+    };
+    writeWebStore({
+      ...store,
+      items: store.items.map((i) => (i.id === item.id ? item : i)),
+      itemHistory: [historyEntry, ...store.itemHistory],
+    });
+    return;
+  }
   const db = await getDatabase();
   await db.withTransactionAsync(async () => {
     await db.runAsync(
@@ -549,12 +762,6 @@ export async function dbUpdateItem(
       ]
     );
 
-    const historyId = `hist_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-    const actionLabel =
-      previousStatus && previousStatus !== item.status
-        ? `Status: ${previousStatus} → ${item.status}`
-        : 'Updated Details';
-
     await db.runAsync(
       `INSERT INTO item_history (id, itemId, action, previousStatus, newStatus, note, timestamp)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -572,6 +779,15 @@ export async function dbUpdateItem(
 }
 
 export async function dbDeleteItem(id: string): Promise<void> {
+  if (isWeb) {
+    const store = readWebStore();
+    writeWebStore({
+      ...store,
+      items: store.items.filter((i) => i.id !== id),
+      itemHistory: store.itemHistory.filter((h) => h.itemId !== id),
+    });
+    return;
+  }
   const db = await getDatabase();
   await db.withTransactionAsync(async () => {
     await db.runAsync(`DELETE FROM item_history WHERE itemId = ?`, [id]);
@@ -581,6 +797,13 @@ export async function dbDeleteItem(id: string): Promise<void> {
 
 // Activities CRUD
 export async function dbGetAllActivities(): Promise<ActivityRecord[]> {
+  if (isWeb) {
+    return [...readWebStore().activities].sort(
+      (a, b) =>
+        b.dateISO.localeCompare(a.dateISO) ||
+        b.timeString.localeCompare(a.timeString)
+    );
+  }
   const db = await getDatabase();
   return await db.getAllAsync<ActivityRecord>(
     `SELECT * FROM activities ORDER BY dateISO DESC, timeString DESC`
@@ -588,6 +811,14 @@ export async function dbGetAllActivities(): Promise<ActivityRecord[]> {
 }
 
 export async function dbInsertActivity(activity: ActivityRecord): Promise<void> {
+  if (isWeb) {
+    const store = readWebStore();
+    writeWebStore({
+      ...store,
+      activities: [activity, ...store.activities],
+    });
+    return;
+  }
   const db = await getDatabase();
   await db.withTransactionAsync(async () => {
     await db.runAsync(
@@ -611,6 +842,16 @@ export async function dbInsertActivity(activity: ActivityRecord): Promise<void> 
 }
 
 export async function dbUpdateActivity(activity: ActivityRecord): Promise<void> {
+  if (isWeb) {
+    const store = readWebStore();
+    writeWebStore({
+      ...store,
+      activities: store.activities.map((a) =>
+        a.id === activity.id ? activity : a
+      ),
+    });
+    return;
+  }
   const db = await getDatabase();
   await db.withTransactionAsync(async () => {
     await db.runAsync(
@@ -634,6 +875,14 @@ export async function dbUpdateActivity(activity: ActivityRecord): Promise<void> 
 }
 
 export async function dbDeleteActivity(id: string): Promise<void> {
+  if (isWeb) {
+    const store = readWebStore();
+    writeWebStore({
+      ...store,
+      activities: store.activities.filter((a) => a.id !== id),
+    });
+    return;
+  }
   const db = await getDatabase();
   await db.withTransactionAsync(async () => {
     await db.runAsync(`DELETE FROM activities WHERE id = ?`, [id]);
@@ -646,6 +895,13 @@ interface ReminderRow extends Omit<ReminderItem, 'isCompleted'> {
 }
 
 export async function dbGetAllReminders(): Promise<ReminderItem[]> {
+  if (isWeb) {
+    return [...readWebStore().reminders].sort(
+      (a, b) =>
+        a.dateISO.localeCompare(b.dateISO) ||
+        a.timeString.localeCompare(b.timeString)
+    );
+  }
   const db = await getDatabase();
   const rows = await db.getAllAsync<ReminderRow>(
     `SELECT * FROM reminders ORDER BY dateISO ASC, timeString ASC`
@@ -657,6 +913,14 @@ export async function dbGetAllReminders(): Promise<ReminderItem[]> {
 }
 
 export async function dbInsertReminder(reminder: ReminderItem): Promise<void> {
+  if (isWeb) {
+    const store = readWebStore();
+    writeWebStore({
+      ...store,
+      reminders: [...store.reminders, reminder],
+    });
+    return;
+  }
   const db = await getDatabase();
   await db.withTransactionAsync(async () => {
     await db.runAsync(
@@ -681,6 +945,16 @@ export async function dbInsertReminder(reminder: ReminderItem): Promise<void> {
 }
 
 export async function dbUpdateReminder(reminder: ReminderItem): Promise<void> {
+  if (isWeb) {
+    const store = readWebStore();
+    writeWebStore({
+      ...store,
+      reminders: store.reminders.map((r) =>
+        r.id === reminder.id ? reminder : r
+      ),
+    });
+    return;
+  }
   const db = await getDatabase();
   await db.withTransactionAsync(async () => {
     await db.runAsync(
@@ -705,6 +979,14 @@ export async function dbUpdateReminder(reminder: ReminderItem): Promise<void> {
 }
 
 export async function dbDeleteReminder(id: string): Promise<void> {
+  if (isWeb) {
+    const store = readWebStore();
+    writeWebStore({
+      ...store,
+      reminders: store.reminders.filter((r) => r.id !== id),
+    });
+    return;
+  }
   const db = await getDatabase();
   await db.withTransactionAsync(async () => {
     await db.runAsync(`DELETE FROM reminders WHERE id = ?`, [id]);
@@ -725,6 +1007,22 @@ export interface VaultBackupPayload {
 }
 
 export async function dbRestoreBackup(payload: VaultBackupPayload): Promise<void> {
+  if (isWeb) {
+    const store = readWebStore();
+    writeWebStore({
+      settings: payload.settings || store.settings,
+      accounts:
+        payload.accounts && payload.accounts.length > 0
+          ? payload.accounts
+          : getDefaultAccountsList(),
+      transactions: payload.transactions || [],
+      items: payload.items || [],
+      itemHistory: payload.itemHistory || [],
+      activities: payload.activities || [],
+      reminders: payload.reminders || [],
+    });
+    return;
+  }
   const db = await getDatabase();
   await db.withTransactionAsync(async () => {
     if (payload.settings) {

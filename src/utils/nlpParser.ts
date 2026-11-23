@@ -2,15 +2,15 @@ import type {
   AccountScope,
   ParsedQuickInput,
   PaymentMethod,
-  QuickIntent,
 } from '../types';
 
 /**
- * Calculates current timestamp in Nepal Standard Time (UTC+05:45)
+ * Calculates current timestamp in Nepal Standard Time (UTC+05:45).
+ * Kept self-contained so standalone Node verification scripts can import
+ * nlpParser.ts directly under Node ESM type-stripping.
  */
 export function getNPTNow(): { isoDate: string; time24: string } {
-  const now = new Date();
-  const nptMillis = now.getTime() + 345 * 60 * 1000;
+  const nptMillis = Date.now() + 345 * 60 * 1000;
   const d = new Date(nptMillis);
   const isoDate = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
   const time24 = `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
@@ -471,8 +471,8 @@ export function parseQuickInput(rawText: string): ParsedQuickInput {
 
     const category =
       lower.includes('salary') ? 'Salary' :
-      lower.includes('freelance') ? 'Freelance' :
-      lower.includes('mom') || lower.includes('dad') || lower.includes('gift') ? 'Gift' : 'Other Income';
+        lower.includes('freelance') ? 'Freelance' :
+          lower.includes('mom') || lower.includes('dad') || lower.includes('gift') ? 'Gift' : 'Other Income';
 
     return {
       rawText,

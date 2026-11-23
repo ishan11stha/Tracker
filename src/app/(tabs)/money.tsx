@@ -272,12 +272,16 @@ export default function MoneyManagerScreen() {
       >
         {/* Header */}
         <View style={styles.headerRow}>
-          <View>
-            <Text style={[styles.screenTitle, { color: theme.textPrimary }]}>
+          <View style={{ flex: 1, marginRight: 8 }}>
+            <Text
+              style={[styles.screenTitle, { color: theme.textPrimary }]}
+              numberOfLines={1}
+            >
               Transactions & Stats
             </Text>
             <Text
               style={[styles.screenSubtitle, { color: theme.textMuted }]}
+              numberOfLines={1}
             >
               आम्दानी र खर्च विवरण • {formatBSDateNepali(todayBS, false)}
             </Text>
@@ -674,8 +678,8 @@ export default function MoneyManagerScreen() {
             [
               { key: 'date_desc', label: 'Newest ↓' },
               { key: 'date_asc', label: 'Oldest ↑' },
-              { key: 'amount_desc', label: 'Highest 💰' },
-              { key: 'amount_asc', label: 'Lowest 🪙' },
+              { key: 'amount_desc', label: 'Highest' },
+              { key: 'amount_asc', label: 'Lowest' },
               { key: 'title_asc', label: 'Name A–Z' },
             ] as const
           ).map((st) => {

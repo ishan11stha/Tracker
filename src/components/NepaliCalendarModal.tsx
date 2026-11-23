@@ -380,7 +380,12 @@ export const NepaliCalendarModal: React.FC<NepaliCalendarModalProps> = ({
           )}
 
           {/* Weekday Headers */}
-          <View style={styles.weekHeaderRow}>
+          <View
+            style={[
+              styles.weekHeaderRow,
+              { borderBottomColor: theme.divider },
+            ]}
+          >
             {[0, 1, 2, 3, 4, 5, 6].map((wIdx) => (
               <View key={wIdx} style={styles.weekHeaderCell}>
                 <Text

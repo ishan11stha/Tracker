@@ -27,9 +27,9 @@ import {
   formatADDateFull,
   formatBSDateNepali,
   formatTimeString,
-  getNowInNPT,
   toNepaliDigits,
 } from '../../utils/nepaliDate';
+import { useCurrentNPT } from '../../hooks/useCurrentNPT';
 import { ACTIVITY_CATEGORIES, ActivityRecord } from '../../types';
 import { ActivityFormModal } from '../../components/ActivityFormModal';
 import { NepaliCalendarModal } from '../../components/NepaliCalendarModal';
@@ -46,7 +46,7 @@ export default function ActivityTrackerScreen() {
   const theme = getThemeColors(isDark);
   const palette = getSectionPalette('tracker', isDark);
 
-  const nptToday = useMemo(() => getNowInNPT(), []);
+  const nptToday = useCurrentNPT();
   const [viewMode, setViewMode] = useState<'daily' | 'monthly'>('daily');
   const [selectedDateISO, setSelectedDateISO] = useState(nptToday.isoDate);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
@@ -135,12 +135,13 @@ export default function ActivityTrackerScreen() {
       >
         {/* Header */}
         <View style={styles.headerRow}>
-          <View>
+          <View style={{ flex: 1, marginRight: 10 }}>
             <Text style={[styles.screenTitle, { color: theme.textPrimary }]}>
               Activity & Habits
             </Text>
             <Text
               style={[styles.screenSubtitle, { color: theme.textMuted }]}
+              numberOfLines={1}
             >
               दैनिक क्रियाकलाप तथा बानी ट्र्याकर
             </Text>
