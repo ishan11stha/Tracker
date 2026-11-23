@@ -7,17 +7,29 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "env": {
+        "EXPO_UNSTABLE_TREE_SHAKING": "1",
+        "EXPO_UNSTABLE_METRO_OPTIMIZE_GRAPH": "1"
+      },
       "android": {
         "buildType": "apk"
       }
     },
     "preview": {
       "distribution": "internal",
+      "env": {
+        "EXPO_UNSTABLE_TREE_SHAKING": "1",
+        "EXPO_UNSTABLE_METRO_OPTIMIZE_GRAPH": "1"
+      },
       "android": {
         "buildType": "apk"
       }
     },
     "production": {
+      "env": {
+        "EXPO_UNSTABLE_TREE_SHAKING": "1",
+        "EXPO_UNSTABLE_METRO_OPTIMIZE_GRAPH": "1"
+      },
       "android": {
         "buildType": "apk"
       }
