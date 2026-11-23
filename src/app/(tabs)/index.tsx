@@ -598,166 +598,126 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {/* 4. 5-TILE QUICK LAUNCH DOCK (No horizontal scrolling required) */}
+        {/* 4. 5-ICON QUICK LAUNCH DOCK (Icons only, no text labels) */}
         <View style={styles.quickDockRow}>
           <TouchableOpacity
             activeOpacity={0.78}
             onPress={() => openQuickTxn('income')}
+            accessibilityRole="button"
+            accessibilityLabel="Add income"
             style={[
               styles.quickDockBtn,
-              { backgroundColor: theme.card, borderColor: theme.border },
+              {
+                backgroundColor: isDark
+                  ? 'rgba(55, 161, 59, 0.16)'
+                  : '#E8F5E9',
+                borderColor: isDark
+                  ? 'rgba(55, 161, 59, 0.35)'
+                  : '#BBF7D0',
+              },
             ]}
           >
-            <View
-              style={[
-                styles.quickDockIcon,
-                {
-                  backgroundColor: isDark
-                    ? 'rgba(55, 161, 59, 0.2)'
-                    : '#DCFCE7',
-                },
-              ]}
-            >
-              <ArrowDownLeft
-                size={16}
-                color={isDark ? '#4ADE80' : '#16A34A'}
-                strokeWidth={2.5}
-              />
-            </View>
-            <Text
-              style={[styles.quickDockLabel, { color: theme.textPrimary }]}
-              numberOfLines={1}
-            >
-              Income
-            </Text>
+            <ArrowDownLeft
+              size={20}
+              color={isDark ? '#4ADE80' : '#16A34A'}
+              strokeWidth={2.5}
+            />
           </TouchableOpacity>
 
           <TouchableOpacity
             activeOpacity={0.78}
             onPress={() => openQuickTxn('expense')}
+            accessibilityRole="button"
+            accessibilityLabel="Add expense"
             style={[
               styles.quickDockBtn,
-              { backgroundColor: theme.card, borderColor: theme.border },
+              {
+                backgroundColor: isDark
+                  ? 'rgba(239, 68, 68, 0.16)'
+                  : '#FEE2E2',
+                borderColor: isDark
+                  ? 'rgba(239, 68, 68, 0.35)'
+                  : '#FECACA',
+              },
             ]}
           >
-            <View
-              style={[
-                styles.quickDockIcon,
-                {
-                  backgroundColor: isDark
-                    ? 'rgba(239, 68, 68, 0.2)'
-                    : '#FEE2E2',
-                },
-              ]}
-            >
-              <ArrowUpRight
-                size={16}
-                color={isDark ? '#F87171' : '#DC2626'}
-                strokeWidth={2.5}
-              />
-            </View>
-            <Text
-              style={[styles.quickDockLabel, { color: theme.textPrimary }]}
-              numberOfLines={1}
-            >
-              Expense
-            </Text>
+            <ArrowUpRight
+              size={20}
+              color={isDark ? '#F87171' : '#DC2626'}
+              strokeWidth={2.5}
+            />
           </TouchableOpacity>
 
           <TouchableOpacity
             activeOpacity={0.78}
             onPress={() => setItemModalVisible(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Add item"
             style={[
               styles.quickDockBtn,
-              { backgroundColor: theme.card, borderColor: theme.border },
+              {
+                backgroundColor: isDark
+                  ? 'rgba(37, 99, 235, 0.16)'
+                  : '#E8F1FC',
+                borderColor: isDark
+                  ? 'rgba(37, 99, 235, 0.35)'
+                  : '#BFDBFE',
+              },
             ]}
           >
-            <View
-              style={[
-                styles.quickDockIcon,
-                {
-                  backgroundColor: isDark
-                    ? 'rgba(37, 99, 235, 0.2)'
-                    : '#DBEAFE',
-                },
-              ]}
-            >
-              <Package
-                size={16}
-                color={isDark ? '#60A5FA' : '#2563EB'}
-                strokeWidth={2.3}
-              />
-            </View>
-            <Text
-              style={[styles.quickDockLabel, { color: theme.textPrimary }]}
-              numberOfLines={1}
-            >
-              Item
-            </Text>
+            <Package
+              size={20}
+              color={isDark ? '#60A5FA' : '#2563EB'}
+              strokeWidth={2.3}
+            />
           </TouchableOpacity>
 
           <TouchableOpacity
             activeOpacity={0.78}
             onPress={() => setActivityModalVisible(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Log habit or activity"
             style={[
               styles.quickDockBtn,
-              { backgroundColor: theme.card, borderColor: theme.border },
+              {
+                backgroundColor: isDark
+                  ? 'rgba(109, 40, 217, 0.16)'
+                  : '#F0EBFA',
+                borderColor: isDark
+                  ? 'rgba(109, 40, 217, 0.35)'
+                  : '#DDD6FE',
+              },
             ]}
           >
-            <View
-              style={[
-                styles.quickDockIcon,
-                {
-                  backgroundColor: isDark
-                    ? 'rgba(109, 40, 217, 0.2)'
-                    : '#EDE9FE',
-                },
-              ]}
-            >
-              <Activity
-                size={16}
-                color={isDark ? '#A78BFA' : '#7C3AED'}
-                strokeWidth={2.3}
-              />
-            </View>
-            <Text
-              style={[styles.quickDockLabel, { color: theme.textPrimary }]}
-              numberOfLines={1}
-            >
-              Habit
-            </Text>
+            <Activity
+              size={20}
+              color={isDark ? '#A78BFA' : '#7C3AED'}
+              strokeWidth={2.3}
+            />
           </TouchableOpacity>
 
           <TouchableOpacity
             activeOpacity={0.78}
             onPress={() => setReminderModalVisible(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Create reminder alert"
             style={[
               styles.quickDockBtn,
-              { backgroundColor: theme.card, borderColor: theme.border },
+              {
+                backgroundColor: isDark
+                  ? 'rgba(234, 88, 12, 0.16)'
+                  : '#FFF0E6',
+                borderColor: isDark
+                  ? 'rgba(234, 88, 12, 0.35)'
+                  : '#FED7AA',
+              },
             ]}
           >
-            <View
-              style={[
-                styles.quickDockIcon,
-                {
-                  backgroundColor: isDark
-                    ? 'rgba(234, 88, 12, 0.2)'
-                    : '#FFEDD5',
-                },
-              ]}
-            >
-              <Bell
-                size={16}
-                color={isDark ? '#FB923C' : '#EA580C'}
-                strokeWidth={2.3}
-              />
-            </View>
-            <Text
-              style={[styles.quickDockLabel, { color: theme.textPrimary }]}
-              numberOfLines={1}
-            >
-              Alert
-            </Text>
+            <Bell
+              size={20}
+              color={isDark ? '#FB923C' : '#EA580C'}
+              strokeWidth={2.3}
+            />
           </TouchableOpacity>
         </View>
 
@@ -1436,29 +1396,16 @@ const styles = StyleSheet.create({
   },
   quickDockRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
     marginBottom: 12,
   },
   quickDockBtn: {
     flex: 1,
+    height: 46,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 4,
-    borderRadius: 16,
+    borderRadius: 15,
     borderWidth: 1,
-    gap: 6,
-  },
-  quickDockIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  quickDockLabel: {
-    fontSize: 11,
-    fontWeight: '700',
   },
   bentoGrid: {
     gap: 10,
