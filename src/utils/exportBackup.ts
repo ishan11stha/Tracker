@@ -1,29 +1,9 @@
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import { Platform } from 'react-native';
 import { VaultBackupPayload } from '../db/database';
 import { vaultBackupSchema } from '../types';
 import { adToBs, formatBSDateEnglish, formatBSDateNepali } from './nepaliDate';
 import { escapeCSV } from './csv';
-
-function triggerWebDownload(
-  content: string,
-  fileName: string,
-  mimeType: string
-): string {
-  if (typeof document !== 'undefined' && typeof Blob !== 'undefined') {
-    const blob = new Blob([content], { type: mimeType });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = fileName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  }
-  return fileName;
-}
 
 export async function exportVaultDataToCSV(
   payload: VaultBackupPayload
@@ -130,7 +110,7 @@ export async function exportVaultDataToCSV(
   // 5. Reminders
   lines.push('--- REMINDERS ---');
   lines.push(
-    'ID,Title,Category,Priority,Recurrence,Completed,Date (AD),Date (BS),Time (NPT),Description'
+    'ID,Title,Category,Priority,Recurrence,Alert Mode,Completed,Date (AD),Date (BS),Time (NPT),Description'
   );
   for (const r of payload.reminders) {
     const bs = adToBs(r.dateISO);
@@ -141,6 +121,7 @@ export async function exportVaultDataToCSV(
         escapeCSV(r.category),
         escapeCSV(r.priority),
         escapeCSV(r.recurrence),
+        escapeCSV(r.alertMode || 'both'),
         escapeCSV(r.isCompleted ? 'Yes' : 'No'),
         escapeCSV(r.dateISO),
         escapeCSV(formatBSDateEnglish(bs, false)),
@@ -152,11 +133,6 @@ export async function exportVaultDataToCSV(
 
   const csvContent = '\uFEFF' + lines.join('\n');
   const fileName = `VAULT_Export_${new Date().toISOString().slice(0, 10)}.csv`;
-
-  if (Platform.OS === 'web') {
-    return triggerWebDownload(csvContent, fileName, 'text/csv;charset=utf-8');
-  }
-
   const csvFile = new File(Paths.document, fileName);
 
   await csvFile.write(csvContent);
@@ -176,15 +152,6 @@ export async function exportVaultBackupJSON(
 ): Promise<string> {
   const jsonContent = JSON.stringify(payload, null, 2);
   const fileName = `VAULT_Backup_${new Date().toISOString().slice(0, 10)}.json`;
-
-  if (Platform.OS === 'web') {
-    return triggerWebDownload(
-      jsonContent,
-      fileName,
-      'application/json;charset=utf-8'
-    );
-  }
-
   const jsonFile = new File(Paths.document, fileName);
 
   await jsonFile.write(jsonContent);

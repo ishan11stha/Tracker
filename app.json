@@ -3,13 +3,12 @@
     "name": "VAULT",
     "slug": "vault-personal-tracker",
     "scheme": "vault",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "platforms": [
-      "android",
-      "web"
+      "android"
     ],
     "androidStatusBar": {
       "backgroundColor": "#F5F6F8",
@@ -17,7 +16,7 @@
     },
     "android": {
       "package": "com.vault.lifetracker",
-      "versionCode": 1,
+      "versionCode": 2,
       "softwareKeyboardLayoutMode": "pan",
       "permissions": [
         "android.permission.RECEIVE_BOOT_COMPLETED",
@@ -59,17 +58,21 @@
           "android": {
             "buildArchs": [
               "arm64-v8a"
-            ]
+            ],
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "enablePngCrunchInReleaseBuilds": true,
+            "useLegacyPackaging": true,
+            "enableBundleCompression": true,
+            "gifEnabled": false,
+            "webpAnimated": false,
+            "networkInspector": false,
+            "usesCleartextTraffic": false
           }
         }
       ]
     ],
     "extra": {
-      "router": {
-        "asyncRoutes": {
-          "web": true
-        }
-      },
       "eas": {
         "projectId": "1605a62a-85ea-4abd-aae4-e16132954a4b"
       }
