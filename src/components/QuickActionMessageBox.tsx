@@ -14,8 +14,6 @@ import {
 import {
   ArrowUp,
   CheckCircle2,
-  Package,
-  Plus,
   RotateCcw,
   Sparkles,
   X,
@@ -25,21 +23,18 @@ import { getThemeColors } from '../theme/colors';
 
 interface QuickActionMessageBoxProps {
   isDark?: boolean;
-  onOpenManualForm?: () => void;
 }
 
 const EXAMPLE_PROMPTS = [
-  { text: 'get by mom 200, add to bank', tag: 'Money' },
-  { text: 'bought notebook, 5000', tag: 'Item' },
-  { text: 'drank coffee 150 cash', tag: 'Expense' },
-  { text: '5km run 30 mins', tag: 'Habit' },
-  { text: 'remind me tomorrow 5pm to pay wifi', tag: 'Reminder' },
-  { text: 'family bank deposit 500', tag: 'Family' },
+  'get by mom 200, add to bank',
+  'drank coffee 150 cash',
+  'bought notebook, 5000',
+  '5km run 30 mins',
+  'remind me tomorrow 5pm to pay wifi',
 ];
 
 export function QuickActionMessageBox({
   isDark = false,
-  onOpenManualForm,
 }: QuickActionMessageBoxProps) {
   const { processQuickCommand } = useVaultStore();
   const theme = getThemeColors(isDark);
@@ -77,7 +72,6 @@ export function QuickActionMessageBox({
             undo: result.undoAction,
           });
 
-          // Auto-hide feedback after 6 seconds, replacing any previous timer.
           if (feedbackTimer.current) clearTimeout(feedbackTimer.current);
           feedbackTimer.current = setTimeout(() => {
             setFeedback((current) =>
@@ -118,7 +112,6 @@ export function QuickActionMessageBox({
         {
           backgroundColor: theme.card,
           borderColor: theme.border,
-          shadowColor: isDark ? '#000000' : '#1E293B',
         },
       ]}
     >
@@ -135,7 +128,7 @@ export function QuickActionMessageBox({
         >
           <View style={styles.feedbackLeft}>
             <CheckCircle2
-              size={16}
+              size={15}
               color={isDark ? '#34D399' : '#059669'}
               style={{ marginRight: 6 }}
             />
@@ -162,7 +155,7 @@ export function QuickActionMessageBox({
                 ]}
               >
                 <RotateCcw
-                  size={12}
+                  size={11}
                   color={isDark ? '#FFFFFF' : '#047857'}
                   style={{ marginRight: 4 }}
                 />
@@ -186,55 +179,6 @@ export function QuickActionMessageBox({
         </View>
       )}
 
-      {/* Suggested Quick Prompt Pills */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.chipsScroll}
-      >
-        <View style={styles.hintBadge}>
-          <Sparkles size={12} color="#6366F1" />
-          <Text style={styles.hintBadgeText}>Try prompt:</Text>
-        </View>
-        {EXAMPLE_PROMPTS.map((prompt, idx) => (
-          <TouchableOpacity
-            key={idx}
-            activeOpacity={0.75}
-            onPress={() => {
-              setInputVal(prompt.text);
-            }}
-            style={[
-              styles.chipPill,
-              {
-                backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
-                borderColor: isDark ? '#334155' : '#E2E8F0',
-              },
-            ]}
-          >
-            <View
-              style={[
-                styles.chipTag,
-                {
-                  backgroundColor: isDark
-                    ? 'rgba(99, 102, 241, 0.25)'
-                    : 'rgba(99, 102, 241, 0.12)',
-                },
-              ]}
-            >
-              <Text style={styles.chipTagText}>{prompt.tag}</Text>
-            </View>
-            <Text
-              style={[
-                styles.chipText,
-                { color: isDark ? '#E2E8F0' : '#334155' },
-              ]}
-            >
-              {prompt.text}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
       {/* Main Input Row */}
       <View
         style={[
@@ -245,30 +189,24 @@ export function QuickActionMessageBox({
           },
         ]}
       >
-        {onOpenManualForm && (
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={onOpenManualForm}
-            style={[
-              styles.manualPlusBtn,
-              {
-                backgroundColor: isDark ? '#1E293B' : '#E0E7FF',
-              },
-            ]}
-            accessibilityLabel="Open manual forms"
-          >
-            <Plus size={16} color={isDark ? '#818CF8' : '#4338CA'} strokeWidth={2.4} />
-          </TouchableOpacity>
-        )}
+        <View
+          style={[
+            styles.sparkleBadge,
+            {
+              backgroundColor: isDark
+                ? 'rgba(99, 102, 241, 0.2)'
+                : 'rgba(79, 70, 229, 0.1)',
+            },
+          ]}
+        >
+          <Sparkles size={15} color={isDark ? '#818CF8' : '#4F46E5'} />
+        </View>
 
         <TextInput
-          style={[
-            styles.textInput,
-            { color: theme.textPrimary },
-          ]}
+          style={[styles.textInput, { color: theme.textPrimary }]}
           value={inputVal}
           onChangeText={setInputVal}
-          placeholder="e.g. get by mom 200, add to bank"
+          placeholder="Quick log: 'coffee 150 cash' or '5km run'..."
           placeholderTextColor={theme.textMuted}
           accessibilityLabel="Quick add command"
           returnKeyType="send"
@@ -282,7 +220,7 @@ export function QuickActionMessageBox({
           <TouchableOpacity
             onPress={() => setInputVal('')}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            style={{ marginRight: 6 }}
+            style={{ marginRight: 4 }}
           >
             <X size={15} color={theme.textMuted} />
           </TouchableOpacity>
@@ -299,39 +237,68 @@ export function QuickActionMessageBox({
             styles.sendButton,
             {
               backgroundColor:
-                inputVal.trim().length > 0 ? '#4F46E5' : isDark ? '#334155' : '#CBD5E1',
+                inputVal.trim().length > 0
+                  ? '#4F46E5'
+                  : isDark
+                    ? '#334155'
+                    : '#CBD5E1',
             },
           ]}
         >
           {isProcessing ? (
             <ActivityIndicator size="small" color="#FFFFFF" />
           ) : (
-            <ArrowUp size={16} color="#FFFFFF" strokeWidth={2.8} />
+            <ArrowUp size={15} color="#FFFFFF" strokeWidth={2.8} />
           )}
         </TouchableOpacity>
       </View>
+
+      {/* Clean Single-Line Prompt Suggestions */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.chipsScroll}
+      >
+        {EXAMPLE_PROMPTS.map((prompt) => (
+          <TouchableOpacity
+            key={prompt}
+            activeOpacity={0.75}
+            onPress={() => setInputVal(prompt)}
+            style={[
+              styles.chipPill,
+              {
+                backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.chipText,
+                { color: isDark ? '#CBD5E1' : '#475569' },
+              ]}
+            >
+              {prompt}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    marginHorizontal: 0,
-    marginVertical: 10,
+    marginBottom: 14,
     borderRadius: 20,
     padding: 12,
     borderWidth: 1,
-    elevation: 4,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
   },
   feedbackBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 12,
-    paddingVertical: 9,
+    paddingVertical: 8,
     borderRadius: 12,
     borderWidth: 1,
     marginBottom: 10,
@@ -363,61 +330,19 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
   },
-  chipsScroll: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingBottom: 10,
-  },
-  hintBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingRight: 4,
-  },
-  hintBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#6366F1',
-  },
-  chipPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingLeft: 6,
-    paddingRight: 12,
-    paddingVertical: 5,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  chipTag: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 999,
-  },
-  chipTagText: {
-    fontSize: 9.5,
-    fontWeight: '800',
-    color: '#6366F1',
-    letterSpacing: 0.3,
-  },
-  chipText: {
-    fontSize: 11.5,
-    fontWeight: '600',
-  },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 1,
     paddingHorizontal: 8,
-    paddingVertical: 6,
+    paddingVertical: 5,
     gap: 8,
   },
-  manualPlusBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  sparkleBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -425,13 +350,28 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     fontWeight: '600',
-    paddingVertical: Platform.OS === 'ios' ? 8 : 6,
+    paddingVertical: Platform.OS === 'ios' ? 7 : 5,
   },
   sendButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  chipsScroll: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingTop: 8,
+  },
+  chipPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4.5,
+    borderRadius: 999,
+  },
+  chipText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
 });

@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   ArrowDownLeft,
+  ArrowUpDown,
   ArrowUpRight,
   Edit3,
   Plus,
@@ -48,6 +49,14 @@ type SortOption =
   | 'amount_asc'
   | 'title_asc';
 
+const SORT_OPTIONS: { key: SortOption; label: string }[] = [
+  { key: 'date_desc', label: 'Newest ↓' },
+  { key: 'amount_desc', label: 'Highest ↓' },
+  { key: 'date_asc', label: 'Oldest ↑' },
+  { key: 'amount_asc', label: 'Lowest ↑' },
+  { key: 'title_asc', label: 'A–Z' },
+];
+
 export default function MoneyManagerScreen() {
   const { settings, accounts, transactions, removeTransaction } = useVaultStore();
   const isDark = settings.theme === 'dark';
@@ -70,19 +79,16 @@ export default function MoneyManagerScreen() {
   const nptToday = useCurrentNPT();
   const todayBS = useMemo(() => adToBs(nptToday.isoDate), [nptToday.isoDate]);
 
-  // Multi-wallet and ownership-scope balances.
   const accountSummary = useMemo(
     () => calculateAccountBalances(accounts, transactions),
     [accounts, transactions]
   );
 
-  // Overall all-time balance: Total Balance = Total Income - Total Expenses
   const allTimeSummary = useMemo(
     () => calculateFinancialSummary(transactions),
     [transactions]
   );
 
-  // Filter transactions by selected period (daily, weekly, monthly, yearly, all)
   const periodTransactions = useMemo(() => {
     const todayParts = nptToday.isoDate.split('-').map(Number);
     const todayUTC = Date.UTC(todayParts[0], todayParts[1] - 1, todayParts[2]);
@@ -130,7 +136,6 @@ export default function MoneyManagerScreen() {
     [periodTransactions]
   );
 
-  // Category distribution for Monekin Donut Chart
   const categoryChartItems = useMemo(() => {
     const map: Record<string, number> = {};
     for (const t of periodTransactions) {
@@ -143,8 +148,9 @@ export default function MoneyManagerScreen() {
       .sort((a, b) => b.amount - a.amount);
   }, [periodTransactions, typeFilter]);
 
-  const allCategories = useMemo(() => {
-    const set = new Set<string>(['All']);
+  // Dynamic category list without a duplicate 'All' chip
+  const dynamicCategories = useMemo(() => {
+    const set = new Set<string>();
     transactions.forEach((t) => {
       if (typeFilter !== 'all' && t.type !== typeFilter) return;
       set.add(t.category);
@@ -195,7 +201,6 @@ export default function MoneyManagerScreen() {
     sortBy,
   ]);
 
-  // Monekin Date-Grouped Ledger: Group filtered transactions by `dateISO` with daily net total
   const dateGroupedTransactions = useMemo(() => {
     const groups: {
       dateISO: string;
@@ -254,6 +259,15 @@ export default function MoneyManagerScreen() {
     );
   };
 
+  const cycleSort = () => {
+    const idx = SORT_OPTIONS.findIndex((s) => s.key === sortBy);
+    const next = SORT_OPTIONS[(idx + 1) % SORT_OPTIONS.length];
+    setSortBy(next.key);
+  };
+
+  const currentSortLabel =
+    SORT_OPTIONS.find((s) => s.key === sortBy)?.label || 'Newest ↓';
+
   const savingsPct =
     periodSummary.totalIncome > 0
       ? ((periodSummary.totalIncome - periodSummary.totalExpense) /
@@ -304,7 +318,7 @@ export default function MoneyManagerScreen() {
           </View>
         </View>
 
-        {/* Monekin Net Balance Summary Card */}
+        {/* Unified Net Balance + Period Summary + Period Selector Card */}
         <View
           style={[
             styles.balanceHeroCard,
@@ -312,33 +326,30 @@ export default function MoneyManagerScreen() {
           ]}
         >
           <View style={styles.heroTopRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.heroLabel, { color: theme.textMuted }]}>
-                NET AVAILABLE BALANCE (Total Income − Total Expenses)
-              </Text>
-              <View style={styles.heroValueLine}>
-                <CurrencyDisplayer
-                  amount={allTimeSummary.totalBalance}
-                  currency={settings.currency}
-                  isDark={isDark}
-                  privateMode={privateMode}
-                  size="xl"
-                  color={
-                    allTimeSummary.totalBalance >= 0
-                      ? theme.textPrimary
-                      : theme.expense
-                  }
-                />
-                <TrendingValueChip
-                  percentage={savingsPct}
-                  afterText="net ratio"
-                  isDark={isDark}
-                />
-              </View>
+            <Text style={[styles.heroLabel, { color: theme.textMuted }]}>
+              NET AVAILABLE BALANCE (कुल मौज्दात)
+            </Text>
+            <View style={styles.heroValueLine}>
+              <CurrencyDisplayer
+                amount={allTimeSummary.totalBalance}
+                currency={settings.currency}
+                isDark={isDark}
+                privateMode={privateMode}
+                size="xl"
+                color={
+                  allTimeSummary.totalBalance >= 0
+                    ? theme.textPrimary
+                    : theme.expense
+                }
+              />
+              <TrendingValueChip
+                percentage={savingsPct}
+                afterText="net ratio"
+                isDark={isDark}
+              />
             </View>
           </View>
 
-          {/* Monekin Side-by-Side Period Income & Expense Flow Pills */}
           <View style={styles.heroStatsRow}>
             <View
               style={[
@@ -388,57 +399,59 @@ export default function MoneyManagerScreen() {
               </View>
             </View>
           </View>
-        </View>
 
-        {/* Monekin Period Selector Chips (Daily, Weekly, Monthly, Yearly, All) */}
-        <View
-          style={[
-            styles.periodTabsBar,
-            { backgroundColor: theme.card, borderColor: theme.border },
-          ]}
-        >
-          {(
-            [
-              { key: 'daily', label: 'Daily' },
-              { key: 'weekly', label: 'Weekly' },
-              { key: 'monthly', label: 'Monthly' },
-              { key: 'yearly', label: 'Yearly' },
-              { key: 'all', label: 'All' },
-            ] as { key: TimeRangeKey; label: string }[]
-          ).map((tab) => {
-            const active = timeRange === tab.key;
-            return (
-              <TouchableOpacity
-                key={tab.key}
-                onPress={() => setTimeRange(tab.key)}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: active }}
-                accessibilityLabel={`Show ${tab.label} transactions`}
-                style={[
-                  styles.periodTabBtn,
-                  active && { backgroundColor: palette.accentSoft },
-                ]}
-              >
-                <Text
+          {/* Integrated Period Selector Chips */}
+          <View
+            style={[
+              styles.periodTabsBar,
+              {
+                backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
+              },
+            ]}
+          >
+            {(
+              [
+                { key: 'daily', label: 'Daily' },
+                { key: 'weekly', label: 'Weekly' },
+                { key: 'monthly', label: 'Monthly' },
+                { key: 'yearly', label: 'Yearly' },
+                { key: 'all', label: 'All' },
+              ] as { key: TimeRangeKey; label: string }[]
+            ).map((tab) => {
+              const active = timeRange === tab.key;
+              return (
+                <TouchableOpacity
+                  key={tab.key}
+                  onPress={() => setTimeRange(tab.key)}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: active }}
+                  accessibilityLabel={`Show ${tab.label} transactions`}
                   style={[
-                    styles.periodTabText,
-                    {
-                      color: active ? palette.accent : theme.textMuted,
-                      fontWeight: active ? '800' : '600',
-                    },
+                    styles.periodTabBtn,
+                    active && { backgroundColor: palette.accent },
                   ]}
                 >
-                  {tab.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+                  <Text
+                    style={[
+                      styles.periodTabText,
+                      {
+                        color: active ? '#FFFFFF' : theme.textMuted,
+                        fontWeight: active ? '800' : '600',
+                      },
+                    ]}
+                  >
+                    {tab.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
 
-        {/* Personal vs Family Portfolio & Details Breakdown */}
+        {/* Deduplicated Personal vs Family Portfolio & Wallets Card */}
         <CardWithHeader
-          title="Personal vs Family Portfolio"
-          subtitle="Ownership distribution & account details"
+          title="Personal vs Family Wallets"
+          subtitle="Ownership split & individual account balances"
           isDark={isDark}
           accentColor="#2563EB"
         >
@@ -450,9 +463,8 @@ export default function MoneyManagerScreen() {
             privateMode={privateMode}
           />
 
-          {/* Details by Personal or Family */}
+          {/* Compact 2-Column Wallet Breakdown (No duplicate Personal/Family total headers) */}
           <View style={styles.scopeDetailsGrid}>
-            {/* Personal Details */}
             <View
               style={[
                 styles.scopeDetailCard,
@@ -462,54 +474,31 @@ export default function MoneyManagerScreen() {
                 },
               ]}
             >
-              <View style={styles.scopeDetailHeader}>
-                <View
-                  style={[styles.scopeColorDot, { backgroundColor: '#2563EB' }]}
-                />
-                <Text
-                  style={[
-                    styles.scopeDetailTitle,
-                    { color: theme.textPrimary },
-                  ]}
-                >
-                  Personal (Own)
-                </Text>
-              </View>
-              <Text style={[styles.scopeDetailTotal, { color: '#2563EB' }]}>
-                {formatCurrency(
-                  accountSummary.personalTotal,
-                  settings.currency,
-                  false,
-                  privateMode
-                )}
-              </Text>
-              <View style={styles.scopeSubRows}>
-                {accountSummary.personalAccounts.map((a) => (
-                  <View key={a.id} style={styles.scopeSubRow}>
-                    <Text
-                      style={[styles.scopeSubLabel, { color: theme.textMuted }]}
-                    >
-                      {a.name}:
-                    </Text>
-                    <Text
-                      style={[
-                        styles.scopeSubVal,
-                        { color: theme.textPrimary },
-                      ]}
-                    >
-                      {formatCurrency(
-                        a.currentBalance,
-                        settings.currency,
-                        false,
-                        privateMode
-                      )}
-                    </Text>
-                  </View>
-                ))}
-              </View>
+              {accountSummary.personalAccounts.map((a) => (
+                <View key={a.id} style={styles.scopeSubRow}>
+                  <Text
+                    style={[styles.scopeSubLabel, { color: theme.textMuted }]}
+                    numberOfLines={1}
+                  >
+                    {a.name}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.scopeSubVal,
+                      { color: theme.textPrimary },
+                    ]}
+                  >
+                    {formatCurrency(
+                      a.currentBalance,
+                      settings.currency,
+                      true,
+                      privateMode
+                    )}
+                  </Text>
+                </View>
+              ))}
             </View>
 
-            {/* Family Details */}
             <View
               style={[
                 styles.scopeDetailCard,
@@ -519,203 +508,101 @@ export default function MoneyManagerScreen() {
                 },
               ]}
             >
-              <View style={styles.scopeDetailHeader}>
-                <View
-                  style={[styles.scopeColorDot, { backgroundColor: '#7C3AED' }]}
-                />
-                <Text
-                  style={[
-                    styles.scopeDetailTitle,
-                    { color: theme.textPrimary },
-                  ]}
-                >
-                  Family
-                </Text>
-              </View>
-              <Text style={[styles.scopeDetailTotal, { color: '#7C3AED' }]}>
-                {formatCurrency(
-                  accountSummary.familyTotal,
-                  settings.currency,
-                  false,
-                  privateMode
-                )}
-              </Text>
-              <View style={styles.scopeSubRows}>
-                {accountSummary.familyAccounts.map((a) => (
-                  <View key={a.id} style={styles.scopeSubRow}>
-                    <Text
-                      style={[styles.scopeSubLabel, { color: theme.textMuted }]}
-                    >
-                      {a.name}:
-                    </Text>
-                    <Text
-                      style={[
-                        styles.scopeSubVal,
-                        { color: theme.textPrimary },
-                      ]}
-                    >
-                      {formatCurrency(
-                        a.currentBalance,
-                        settings.currency,
-                        false,
-                        privateMode
-                      )}
-                    </Text>
-                  </View>
-                ))}
-              </View>
+              {accountSummary.familyAccounts.map((a) => (
+                <View key={a.id} style={styles.scopeSubRow}>
+                  <Text
+                    style={[styles.scopeSubLabel, { color: theme.textMuted }]}
+                    numberOfLines={1}
+                  >
+                    {a.name}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.scopeSubVal,
+                      { color: theme.textPrimary },
+                    ]}
+                  >
+                    {formatCurrency(
+                      a.currentBalance,
+                      settings.currency,
+                      true,
+                      privateMode
+                    )}
+                  </Text>
+                </View>
+              ))}
             </View>
           </View>
         </CardWithHeader>
 
-        {/* Monekin Category Distribution Card (`PieChartByCategories`) */}
-        <CardWithHeader
-          title="Movements by Category"
-          subtitle={`${
-            typeFilter === 'income' ? 'Income' : 'Expense'
-          } breakdown (${timeRange})`}
-          isDark={isDark}
-          accentColor={palette.accent}
-        >
-          <CategoryDonutChart
-            items={categoryChartItems}
-            currency={settings.currency}
+        {/* Only show Category Distribution Donut when movements exist */}
+        {categoryChartItems.length > 0 && (
+          <CardWithHeader
+            title="Movements by Category"
+            subtitle={`${
+              typeFilter === 'income' ? 'Income' : 'Expense'
+            } breakdown (${timeRange})`}
             isDark={isDark}
-            privateMode={privateMode}
-            emptyText="No category movements for this filter."
-          />
-        </CardWithHeader>
+            accentColor={palette.accent}
+          >
+            <CategoryDonutChart
+              items={categoryChartItems}
+              currency={settings.currency}
+              isDark={isDark}
+              privateMode={privateMode}
+              emptyText="No category movements for this filter."
+            />
+          </CardWithHeader>
+        )}
 
-        {/* Search & Filters */}
-        <View
-          style={[
-            styles.searchBar,
-            { backgroundColor: theme.card, borderColor: theme.border },
-          ]}
-        >
-          <Search size={18} color={theme.textMuted} />
-          <TextInput
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Search title, category, eSewa/Khalti, notes..."
-            placeholderTextColor={theme.textMuted}
-            style={[styles.searchInput, { color: theme.textPrimary }]}
-            accessibilityLabel="Search transactions"
-            returnKeyType="search"
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity
-              onPress={() => setSearchQuery('')}
-              accessibilityRole="button"
-              accessibilityLabel="Clear transaction search"
-              hitSlop={8}
-            >
-              <X size={16} color={theme.textMuted} />
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Scope Filter Tabs */}
-        <View style={styles.scopeFilterRow}>
-          {(
-            [
-              { key: 'all', label: 'All Scopes' },
-              { key: 'Personal', label: 'Personal (Own)' },
-              { key: 'Family', label: 'Family' },
-            ] as const
-          ).map((sf) => {
-            const active = scopeFilter === sf.key;
-            return (
+        {/* Consolidated Search + Sort Bar */}
+        <View style={styles.searchSortRow}>
+          <View
+            style={[
+              styles.searchBar,
+              { backgroundColor: theme.card, borderColor: theme.border },
+            ]}
+          >
+            <Search size={17} color={theme.textMuted} />
+            <TextInput
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search title, category, eSewa/Khalti..."
+              placeholderTextColor={theme.textMuted}
+              style={[styles.searchInput, { color: theme.textPrimary }]}
+              accessibilityLabel="Search transactions"
+              returnKeyType="search"
+            />
+            {searchQuery.length > 0 && (
               <TouchableOpacity
-                key={sf.key}
-                onPress={() => setScopeFilter(sf.key)}
+                onPress={() => setSearchQuery('')}
                 accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                style={[
-                  styles.scopeFilterBtn,
-                  active && {
-                    backgroundColor:
-                      sf.key === 'Personal'
-                        ? '#2563EB'
-                        : sf.key === 'Family'
-                        ? '#7C3AED'
-                        : palette.accent,
-                  },
-                  !active && {
-                    backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
-                    borderColor: theme.border,
-                  },
-                ]}
+                accessibilityLabel="Clear transaction search"
+                hitSlop={8}
               >
-                <Text
-                  style={[
-                    styles.scopeFilterBtnText,
-                    {
-                      color: active ? '#FFFFFF' : theme.textMuted,
-                      fontWeight: active ? '800' : '600',
-                    },
-                  ]}
-                >
-                  {sf.label}
-                </Text>
+                <X size={15} color={theme.textMuted} />
               </TouchableOpacity>
-            );
-          })}
+            )}
+          </View>
+
+          <TouchableOpacity
+            onPress={cycleSort}
+            activeOpacity={0.78}
+            accessibilityRole="button"
+            accessibilityLabel={`Sort transactions. Current sort: ${currentSortLabel}`}
+            style={[
+              styles.sortToggleBtn,
+              { backgroundColor: theme.card, borderColor: theme.border },
+            ]}
+          >
+            <ArrowUpDown size={14} color={palette.accent} />
+            <Text style={[styles.sortToggleText, { color: theme.textPrimary }]}>
+              {currentSortLabel}
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Sorting Chips Row */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.sortChipsRow}
-        >
-          <View style={styles.sortHintTag}>
-            <Text style={[styles.sortHintText, { color: theme.textMuted }]}>
-              Sort by:
-            </Text>
-          </View>
-          {(
-            [
-              { key: 'date_desc', label: 'Newest ↓' },
-              { key: 'date_asc', label: 'Oldest ↑' },
-              { key: 'amount_desc', label: 'Highest' },
-              { key: 'amount_asc', label: 'Lowest' },
-              { key: 'title_asc', label: 'Name A–Z' },
-            ] as const
-          ).map((st) => {
-            const isSel = sortBy === st.key;
-            return (
-              <TouchableOpacity
-                key={st.key}
-                onPress={() => setSortBy(st.key)}
-                style={[
-                  styles.sortChip,
-                  isSel && {
-                    backgroundColor: isDark ? '#1F2937' : '#F1F5F9',
-                    borderColor: palette.accent,
-                  },
-                  !isSel && {
-                    borderColor: theme.border,
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.sortChipText,
-                    {
-                      color: isSel ? palette.accent : theme.textMuted,
-                      fontWeight: isSel ? '800' : '600',
-                    },
-                  ]}
-                >
-                  {st.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-
-        {/* Type & Category Filter Chips */}
+        {/* Unified Scope + Type + Category Filter Strip */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -723,26 +610,35 @@ export default function MoneyManagerScreen() {
         >
           {(
             [
-              { key: 'all', label: 'All Movements' },
-              { key: 'income', label: 'Income' },
-              { key: 'expense', label: 'Expenses' },
+              { key: 'all', label: 'All Scopes' },
+              { key: 'Personal', label: 'Personal' },
+              { key: 'Family', label: 'Family' },
             ] as const
-          ).map((tf) => {
-            const active = typeFilter === tf.key;
+          ).map((sf) => {
+            const active = scopeFilter === sf.key;
             return (
               <TouchableOpacity
-                key={tf.key}
-                onPress={() => {
-                  setTypeFilter(tf.key);
-                  setSelectedCategory('All');
-                }}
+                key={`scope_${sf.key}`}
+                onPress={() => setScopeFilter(sf.key)}
                 accessibilityRole="button"
                 accessibilityState={{ selected: active }}
                 style={[
                   styles.filterChip,
                   {
-                    backgroundColor: active ? palette.accent : theme.card,
-                    borderColor: active ? palette.accent : theme.border,
+                    backgroundColor: active
+                      ? sf.key === 'Personal'
+                        ? '#2563EB'
+                        : sf.key === 'Family'
+                          ? '#7C3AED'
+                          : palette.accent
+                      : theme.card,
+                    borderColor: active
+                      ? sf.key === 'Personal'
+                        ? '#2563EB'
+                        : sf.key === 'Family'
+                          ? '#7C3AED'
+                          : palette.accent
+                      : theme.border,
                   },
                 ]}
               >
@@ -752,18 +648,27 @@ export default function MoneyManagerScreen() {
                     { color: active ? '#FFFFFF' : theme.textPrimary },
                   ]}
                 >
-                  {tf.label}
+                  {sf.label}
                 </Text>
               </TouchableOpacity>
             );
           })}
 
-          {allCategories.map((cat) => {
-            const active = selectedCategory === cat;
+          {(
+            [
+              { key: 'all', label: 'All Types' },
+              { key: 'income', label: 'Income' },
+              { key: 'expense', label: 'Expenses' },
+            ] as const
+          ).map((tf) => {
+            const active = typeFilter === tf.key;
             return (
               <TouchableOpacity
-                key={cat}
-                onPress={() => setSelectedCategory(cat)}
+                key={`type_${tf.key}`}
+                onPress={() => {
+                  setTypeFilter(tf.key);
+                  setSelectedCategory('All');
+                }}
                 accessibilityRole="button"
                 accessibilityState={{ selected: active }}
                 style={[
@@ -780,6 +685,36 @@ export default function MoneyManagerScreen() {
                     { color: active ? '#FFFFFF' : theme.textSecondary },
                   ]}
                 >
+                  {tf.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+
+          {dynamicCategories.map((cat) => {
+            const active = selectedCategory === cat;
+            return (
+              <TouchableOpacity
+                key={`cat_${cat}`}
+                onPress={() =>
+                  setSelectedCategory(active ? 'All' : cat)
+                }
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                style={[
+                  styles.filterChip,
+                  {
+                    backgroundColor: active ? palette.accent : theme.card,
+                    borderColor: active ? palette.accent : theme.border,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.filterChipText,
+                    { color: active ? '#FFFFFF' : theme.textSecondary },
+                  ]}
+                >
                   {cat}
                 </Text>
               </TouchableOpacity>
@@ -787,7 +722,7 @@ export default function MoneyManagerScreen() {
           })}
         </ScrollView>
 
-        {/* Monekin Date-Grouped Transaction Ledger */}
+        {/* Date-Grouped Transaction Ledger */}
         {dateGroupedTransactions.length === 0 ? (
           <View
             style={[
@@ -799,11 +734,19 @@ export default function MoneyManagerScreen() {
               No matching transactions
             </Text>
             <Text style={[styles.emptySub, { color: theme.textMuted }]}>
-              {searchQuery || selectedCategory !== 'All' || typeFilter !== 'all' || scopeFilter !== 'all' || timeRange !== 'all'
+              {searchQuery ||
+              selectedCategory !== 'All' ||
+              typeFilter !== 'all' ||
+              scopeFilter !== 'all' ||
+              timeRange !== 'all'
                 ? 'No transactions found with the active filters.'
-                : 'No transactions recorded yet in this period.'}
+                : 'Tap "+ Income" or "+ Expense" above to record your first transaction.'}
             </Text>
-            {(searchQuery.trim().length > 0 || selectedCategory !== 'All' || typeFilter !== 'all' || scopeFilter !== 'all' || timeRange !== 'all') && (
+            {(searchQuery.trim().length > 0 ||
+              selectedCategory !== 'All' ||
+              typeFilter !== 'all' ||
+              scopeFilter !== 'all' ||
+              timeRange !== 'all') && (
               <TouchableOpacity
                 onPress={() => {
                   setSearchQuery('');
@@ -812,7 +755,10 @@ export default function MoneyManagerScreen() {
                   setScopeFilter('all');
                   setTimeRange('all');
                 }}
-                style={[styles.resetFilterBtn, { backgroundColor: palette.accent }]}
+                style={[
+                  styles.resetFilterBtn,
+                  { backgroundColor: palette.accent },
+                ]}
               >
                 <Text style={styles.resetFilterBtnText}>Reset All Filters</Text>
               </TouchableOpacity>
@@ -827,7 +773,6 @@ export default function MoneyManagerScreen() {
                 { backgroundColor: theme.card, borderColor: theme.border },
               ]}
             >
-              {/* Monekin Date Group Header Bar */}
               <View
                 style={[
                   styles.dateGroupHeader,
@@ -869,7 +814,6 @@ export default function MoneyManagerScreen() {
                 </Text>
               </View>
 
-              {/* Transactions within this Date Group */}
               {group.items.map((t, idx) => {
                 const isIncome = t.type === 'income';
                 return (
@@ -901,9 +845,18 @@ export default function MoneyManagerScreen() {
                     </View>
 
                     <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 6,
+                        }}
+                      >
                         <Text
-                          style={[styles.txnTitle, { color: theme.textPrimary, flexShrink: 1 }]}
+                          style={[
+                            styles.txnTitle,
+                            { color: theme.textPrimary, flexShrink: 1 },
+                          ]}
                           numberOfLines={1}
                         >
                           {t.title}
@@ -918,8 +871,8 @@ export default function MoneyManagerScreen() {
                                     ? '#4C1D95'
                                     : '#EDE9FE'
                                   : isDark
-                                  ? '#1E3A8A'
-                                  : '#DBEAFE',
+                                    ? '#1E3A8A'
+                                    : '#DBEAFE',
                             },
                           ]}
                         >
@@ -929,12 +882,18 @@ export default function MoneyManagerScreen() {
                               {
                                 color:
                                   t.accountScope === 'Family'
-                                    ? '#A78BFA'
-                                    : '#60A5FA',
+                                    ? isDark
+                                      ? '#A78BFA'
+                                      : '#7C3AED'
+                                    : isDark
+                                      ? '#60A5FA'
+                                      : '#2563EB',
                               },
                             ]}
                           >
-                            {t.accountScope === 'Family' ? 'Family' : 'Personal'}
+                            {t.accountScope === 'Family'
+                              ? 'Family'
+                              : 'Personal'}
                           </Text>
                         </View>
                       </View>
@@ -1082,6 +1041,7 @@ const styles = StyleSheet.create({
   heroStatsRow: {
     flexDirection: 'row',
     gap: 10,
+    marginBottom: 12,
   },
   heroStatPill: {
     flex: 1,
@@ -1101,45 +1061,62 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     borderRadius: 999,
     padding: 4,
-    borderWidth: 1,
-    marginBottom: 14,
   },
   periodTabBtn: {
     flex: 1,
-    paddingVertical: 7,
+    paddingVertical: 6.5,
     borderRadius: 999,
     alignItems: 'center',
   },
   periodTabText: {
-    fontSize: 12,
+    fontSize: 11.5,
+  },
+  searchSortRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
   },
   searchBar: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderRadius: 16,
+    borderRadius: 14,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    minHeight: 44,
+    paddingVertical: 6,
+    minHeight: 42,
     gap: 8,
-    marginBottom: 10,
   },
   searchInput: {
     flex: 1,
     fontSize: 13,
   },
+  sortToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    minHeight: 42,
+  },
+  sortToggleText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+  },
   filterChipsRow: {
-    gap: 8,
+    gap: 7,
     paddingBottom: 14,
   },
   filterChip: {
-    paddingHorizontal: 13,
-    paddingVertical: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 6.5,
     borderRadius: 999,
     borderWidth: 1,
   },
   filterChipText: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '700',
   },
   emptyCard: {
@@ -1226,86 +1203,30 @@ const styles = StyleSheet.create({
   scopeDetailsGrid: {
     flexDirection: 'row',
     gap: 10,
-    marginTop: 14,
+    marginTop: 12,
   },
   scopeDetailCard: {
     flex: 1,
     borderRadius: 14,
-    padding: 12,
+    paddingHorizontal: 11,
+    paddingVertical: 9,
     borderWidth: 1,
-  },
-  scopeDetailHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: 6,
-    marginBottom: 6,
-  },
-  scopeColorDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  scopeDetailTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  scopeDetailTotal: {
-    fontSize: 16,
-    fontWeight: '800',
-    marginBottom: 8,
-  },
-  scopeSubRows: {
-    gap: 4,
   },
   scopeSubRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 6,
   },
   scopeSubLabel: {
     fontSize: 11,
     fontWeight: '600',
+    flex: 1,
   },
   scopeSubVal: {
     fontSize: 11,
-    fontWeight: '700',
-  },
-  scopeFilterRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 10,
-  },
-  scopeFilterBtn: {
-    flex: 1,
-    paddingVertical: 7,
-    borderRadius: 999,
-    alignItems: 'center',
-    borderWidth: 1,
-  },
-  scopeFilterBtnText: {
-    fontSize: 12,
-  },
-  sortChipsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingBottom: 10,
-  },
-  sortHintTag: {
-    paddingRight: 4,
-  },
-  sortHintText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  sortChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  sortChipText: {
-    fontSize: 11,
+    fontWeight: '800',
   },
   scopeTag: {
     paddingHorizontal: 6,

@@ -14,12 +14,14 @@ import {
   ArrowUpRight,
   Bell,
   CheckCircle2,
+  ChevronRight,
   Circle,
   Eye,
   EyeOff,
   Package,
   Plus,
   Settings,
+  ShieldCheck,
 } from 'lucide-react-native';
 import {
   calculateAccountBalances,
@@ -51,8 +53,6 @@ import {
 } from '../../components/monekin/MonekinComponents';
 import {
   BalanceEvolutionChart,
-  CategoryDonutChart,
-  FinanceHealthGauge,
   getFinanceHealthMeta,
 } from '../../components/monekin/MonekinCharts';
 import { TransactionType } from '../../types';
@@ -78,11 +78,8 @@ export default function DashboardScreen() {
 
   const [selectedPeriod, setSelectedPeriod] =
     useState<MonekinPeriodKey>('1M');
-
-  // Refresh on focus and each minute so period filters survive midnight.
   const initialNpt = useCurrentNPT();
 
-  // Monekin time-of-day welcome greeting (`_pickWelcomeGreeting`)
   const welcomeGreeting = useMemo(() => {
     const h = initialNpt.hours;
     if (settings.language === 'ne') {
@@ -90,15 +87,14 @@ export default function DashboardScreen() {
       if (h >= 12 && h < 18) return 'शुभ दिन • Good afternoon';
       return 'शुभ सन्ध्या • Good evening';
     }
-    if (h >= 6 && h < 12) return 'Good morning, welcome back';
-    if (h >= 12 && h < 18) return 'Good afternoon, welcome back';
-    return 'Good evening, welcome back';
+    if (h >= 6 && h < 12) return 'Good morning';
+    if (h >= 12 && h < 18) return 'Good afternoon';
+    return 'Good evening';
   }, [initialNpt.hours, settings.language]);
 
   const [overviewScope, setOverviewScope] =
     useState<'All' | 'Personal' | 'Family'>('All');
 
-  // Transactions filtered by selected top overview scope (All vs Personal vs Family)
   const scopedTransactions = useMemo(() => {
     if (overviewScope === 'All') return transactions;
     return transactions.filter(
@@ -106,17 +102,13 @@ export default function DashboardScreen() {
     );
   }, [transactions, overviewScope]);
 
-  // All-time total balance: Total Balance = Total Income - Total Expenses
   const allTimeSummary = useMemo(
     () => calculateFinancialSummary(scopedTransactions),
     [scopedTransactions]
   );
 
-  // Period-filtered transactions & previous-period comparison (Monekin `DatePeriodState`)
   const {
-    periodTransactions,
     periodSummary,
-    prevPeriodSummary,
     incomeTrendPct,
     expenseTrendPct,
     balanceDelta,
@@ -153,7 +145,6 @@ export default function DashboardScreen() {
       return ((curr - prev) / prev) * 100;
     };
 
-    // Build chronological running balance points for the SVG Area Chart
     const sortedAsc = [...scopedTransactions].sort((a, b) =>
       a.dateISO.localeCompare(b.dateISO)
     );
@@ -168,9 +159,7 @@ export default function DashboardScreen() {
     }
 
     return {
-      periodTransactions: currentList,
       periodSummary: currSum,
-      prevPeriodSummary: prevSum,
       incomeTrendPct: calcPct(currSum.totalIncome, prevSum.totalIncome),
       expenseTrendPct: calcPct(currSum.totalExpense, prevSum.totalExpense),
       balanceDelta: currSum.totalBalance,
@@ -180,9 +169,13 @@ export default function DashboardScreen() {
           : 0,
       evolutionPoints: pts,
     };
-  }, [scopedTransactions, selectedPeriod, initialNpt.isoDate, allTimeSummary.totalIncome]);
+  }, [
+    scopedTransactions,
+    selectedPeriod,
+    initialNpt.isoDate,
+    allTimeSummary.totalIncome,
+  ]);
 
-  // Multi-wallet & Scope Balances
   const accountSummary = useMemo(
     () => calculateAccountBalances(accounts, transactions),
     [accounts, transactions]
@@ -197,17 +190,16 @@ export default function DashboardScreen() {
   const hasAnyRecords =
     transactions.length > 0 || activities.length > 0 || reminders.length > 0;
 
-  // Monekin `FinanceHealthCard` score (0-100) from savings rate, cash flow, and task completion
   const financeHealthScore = useMemo(() => {
     if (!hasAnyRecords) return 0;
 
     const savingsRatio =
       allTimeSummary.totalIncome > 0
         ? Math.max(
-          0,
-          (allTimeSummary.totalIncome - allTimeSummary.totalExpense) /
-          allTimeSummary.totalIncome
-        )
+            0,
+            (allTimeSummary.totalIncome - allTimeSummary.totalExpense) /
+              allTimeSummary.totalIncome
+          )
         : allTimeSummary.totalExpense > 0
           ? 0
           : 0.5;
@@ -233,51 +225,35 @@ export default function DashboardScreen() {
       return {
         color: palette.accent,
         label: 'NEW VAULT',
-        description:
-          'Add your first income, expense, or habit to calculate your live financial & life health score.',
       };
     }
     return getFinanceHealthMeta(financeHealthScore);
   }, [hasAnyRecords, financeHealthScore, palette.accent]);
 
-  // Monekin `PieChartByCategories` data
-  const expenseCategories = useMemo(() => {
-    const map: Record<string, number> = {};
-    for (const t of periodTransactions) {
-      if (t.type === 'expense') {
-        map[t.category] = (map[t.category] || 0) + t.amount;
-      }
-    }
-    return Object.entries(map)
-      .map(([category, amount]) => ({ category, amount }))
-      .sort((a, b) => b.amount - a.amount);
-  }, [periodTransactions]);
+  const [recentSort, setRecentSort] = useState<'date_desc' | 'amount_desc'>(
+    'date_desc'
+  );
 
-  const [recentSort, setRecentSort] = useState<
-    'date_desc' | 'date_asc' | 'amount_desc' | 'amount_asc'
-  >('date_desc');
-
-  // Slices for life tracker cards (synchronized with top overviewScope & Sorting)
   const recentTransactions = useMemo(() => {
-    let list = transactions.filter((t) => {
-      if (overviewScope !== 'All' && (t.accountScope || 'Personal') !== overviewScope) {
+    const list = transactions.filter((t) => {
+      if (
+        overviewScope !== 'All' &&
+        (t.accountScope || 'Personal') !== overviewScope
+      ) {
         return false;
       }
       return true;
     });
 
-    list = [...list].sort((a, b) => {
-      if (recentSort === 'date_desc') return b.dateISO.localeCompare(a.dateISO);
-      if (recentSort === 'date_asc') return a.dateISO.localeCompare(b.dateISO);
-      if (recentSort === 'amount_desc') return b.amount - a.amount;
-      if (recentSort === 'amount_asc') return a.amount - b.amount;
-      return 0;
-    });
-
-    return list.slice(0, 5);
+    return [...list]
+      .sort((a, b) => {
+        if (recentSort === 'amount_desc') return b.amount - a.amount;
+        return b.dateISO.localeCompare(a.dateISO);
+      })
+      .slice(0, 5);
   }, [transactions, overviewScope, recentSort]);
 
-  const upcomingReminders = useMemo(
+  const pendingReminders = useMemo(
     () =>
       reminders
         .filter((r) => !r.isCompleted)
@@ -285,13 +261,22 @@ export default function DashboardScreen() {
           `${a.dateISO}T${a.timeString}`.localeCompare(
             `${b.dateISO}T${b.timeString}`
           )
-        )
-        .slice(0, 3),
+        ),
     [reminders]
+  );
+
+  const upcomingReminders = useMemo(
+    () => pendingReminders.slice(0, 3),
+    [pendingReminders]
   );
 
   const recentActivities = useMemo(
     () => activities.slice(0, 3),
+    [activities]
+  );
+
+  const completedActivitiesCount = useMemo(
+    () => activities.filter((a) => a.status === 'completed').length,
     [activities]
   );
 
@@ -301,10 +286,10 @@ export default function DashboardScreen() {
       (acc, i) => acc + (i.purchasePrice || 0) * (i.quantity || 1),
       0
     );
-    const owned = items.filter((i) => i.status === 'Owned').length;
-    const lent = items.filter((i) => i.status === 'Lent').length;
-    const borrowed = items.filter((i) => i.status === 'Borrowed').length;
-    return { totalCount, totalValue, owned, lent, borrowed };
+    const lentOrBorrowed = items.filter(
+      (i) => i.status === 'Lent' || i.status === 'Borrowed'
+    ).length;
+    return { totalCount, totalValue, lentOrBorrowed };
   }, [items]);
 
   // Modal states
@@ -347,250 +332,192 @@ export default function DashboardScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* 1. MONEKIN HEADER: UserAvatar + Welcome Greeting + Private Mode Eye Button + Settings */}
-        <View style={styles.headerGutter}>
-          <View style={styles.headerRow}>
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => router.push('/settings')}
-              style={styles.welcomeTouch}
-              accessibilityRole="button"
-              accessibilityLabel="Open personal profile and settings"
+        {/* 1. EXECUTIVE HEADER */}
+        <View style={styles.headerRow}>
+          <View style={styles.welcomeLeft}>
+            <View
+              style={[
+                styles.userAvatar,
+                { backgroundColor: palette.accent },
+              ]}
             >
-              <View
-                style={[
-                  styles.userAvatar,
-                  { backgroundColor: palette.accent },
-                ]}
+              <Text style={styles.userAvatarText}>{userInitials}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text
+                style={[styles.welcomeHint, { color: theme.textMuted }]}
+                numberOfLines={1}
               >
-                <Text style={styles.userAvatarText}>{userInitials}</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text
-                  style={[styles.welcomeHint, { color: theme.textMuted }]}
-                  numberOfLines={1}
-                >
-                  {welcomeGreeting}
-                </Text>
-                <View style={styles.userNameRow}>
-                  <Text
-                    style={[styles.userNameText, { color: theme.textPrimary }]}
-                    numberOfLines={1}
-                  >
-                    {settings.userName || 'Tap to set name'}
-                  </Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-
-            <View style={styles.headerBtnsGroup}>
-              {/* Monekin Private Mode Button (`_buildPrivateModeButton`) */}
-              <TouchableOpacity
-                onPress={togglePrivateMode}
-                style={[
-                  styles.circleIconBtn,
-                  { backgroundColor: theme.surfaceContainerHigh },
-                ]}
-                accessibilityRole="switch"
-                accessibilityLabel="Hide balances in private mode"
-                accessibilityState={{ checked: privateMode }}
+                {welcomeGreeting}
+              </Text>
+              <Text
+                style={[styles.userNameText, { color: theme.textPrimary }]}
+                numberOfLines={1}
               >
-                {privateMode ? (
-                  <EyeOff size={19} color={theme.textPrimary} />
-                ) : (
-                  <Eye size={19} color={theme.textPrimary} />
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => router.push('/settings')}
-                style={[
-                  styles.circleIconBtn,
-                  { backgroundColor: theme.surfaceContainerHigh },
-                ]}
-                accessibilityRole="button"
-                accessibilityLabel="Open settings"
-              >
-                <Settings size={19} color={theme.textPrimary} />
-              </TouchableOpacity>
+                {settings.userName || 'My Vault'}
+              </Text>
             </View>
           </View>
 
-          {/* 2. NEPALI BIKRAM SAMBAT & LIVE NPT CLOCK BANNER */}
-          <NepaliDateClockBanner
-            timeFormat={settings.timeFormat}
-            isDark={isDark}
-            onPressCalendar={handleOpenCalendar}
-          />
+          <View style={styles.headerBtnsGroup}>
+            <TouchableOpacity
+              onPress={togglePrivateMode}
+              style={[
+                styles.circleIconBtn,
+                {
+                  backgroundColor: theme.card,
+                  borderColor: theme.border,
+                },
+              ]}
+              accessibilityRole="switch"
+              accessibilityLabel="Hide balances in private mode"
+              accessibilityState={{ checked: privateMode }}
+            >
+              {privateMode ? (
+                <EyeOff size={18} color={theme.textPrimary} />
+              ) : (
+                <Eye size={18} color={theme.textPrimary} />
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => router.push('/settings')}
+              style={[
+                styles.circleIconBtn,
+                {
+                  backgroundColor: theme.card,
+                  borderColor: theme.border,
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Open settings"
+            >
+              <Settings size={18} color={theme.textPrimary} />
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {/* 3. MONEKIN `EvolutionCard` BALANCE HERO (Full-Bleed SVG Area Chart + DateRangeChips) */}
-        <View style={styles.evolutionBlock}>
-          <View style={styles.evolutionHeaderInset}>
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: 4,
-              }}
-            >
-              <Text style={[styles.evolutionLabel, { color: theme.textMuted }]}>
-                {overviewScope === 'Personal'
-                  ? 'PERSONAL BALANCE (आफ्नो)'
-                  : overviewScope === 'Family'
-                    ? 'FAMILY BALANCE (परिवार)'
-                    : 'TOTAL NET WORTH (कुल मौज्दात)'}
-              </Text>
+        {/* 2. COMPACT NEPALI BIKRAM SAMBAT & LIVE NPT CLOCK BANNER */}
+        <NepaliDateClockBanner
+          timeFormat={settings.timeFormat}
+          isDark={isDark}
+          onPressCalendar={handleOpenCalendar}
+        />
 
-              {/* Scope Switcher */}
-              <View
-                style={[
-                  styles.scopeMiniTabs,
-                  {
-                    backgroundColor: isDark ? '#1F2937' : '#F1F5F9',
-                    borderColor: theme.border,
-                  },
-                ]}
-              >
-                {(['All', 'Personal', 'Family'] as const).map((sc) => {
-                  const isSel = overviewScope === sc;
-                  return (
-                    <TouchableOpacity
-                      key={sc}
-                      onPress={() => setOverviewScope(sc)}
-                      accessibilityRole="tab"
-                      accessibilityState={{ selected: isSel }}
-                      accessibilityLabel={`Show ${sc} accounts`}
+        {/* 3. UNIFIED FLAGSHIP FINANCIAL HERO CARD */}
+        <View
+          style={[
+            styles.heroCard,
+            { backgroundColor: theme.card, borderColor: theme.border },
+          ]}
+        >
+          <View style={styles.heroHeaderRow}>
+            <Text style={[styles.evolutionLabel, { color: theme.textMuted }]}>
+              {overviewScope === 'Personal'
+                ? 'PERSONAL BALANCE (आफ्नो)'
+                : overviewScope === 'Family'
+                  ? 'FAMILY BALANCE (परिवार)'
+                  : 'TOTAL NET WORTH (कुल मौज्दात)'}
+            </Text>
+
+            <View
+              style={[
+                styles.scopeMiniTabs,
+                {
+                  backgroundColor: isDark ? '#1F2937' : '#F1F5F9',
+                  borderColor: theme.border,
+                },
+              ]}
+            >
+              {(['All', 'Personal', 'Family'] as const).map((sc) => {
+                const isSel = overviewScope === sc;
+                return (
+                  <TouchableOpacity
+                    key={sc}
+                    onPress={() => setOverviewScope(sc)}
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected: isSel }}
+                    accessibilityLabel={`Show ${sc} accounts`}
+                    style={[
+                      styles.scopeMiniTab,
+                      isSel && {
+                        backgroundColor:
+                          sc === 'Personal'
+                            ? '#2563EB'
+                            : sc === 'Family'
+                              ? '#7C3AED'
+                              : palette.accent,
+                      },
+                    ]}
+                  >
+                    <Text
                       style={[
-                        styles.scopeMiniTab,
-                        isSel && {
-                          backgroundColor:
-                            sc === 'Personal'
-                              ? '#2563EB'
-                              : sc === 'Family'
-                                ? '#7C3AED'
-                                : palette.accent,
+                        styles.scopeMiniTabText,
+                        {
+                          color: isSel ? '#FFFFFF' : theme.textMuted,
+                          fontWeight: isSel ? '800' : '600',
                         },
                       ]}
                     >
-                      <Text
-                        style={[
-                          styles.scopeMiniTabText,
-                          {
-                            color: isSel ? '#FFFFFF' : theme.textMuted,
-                            fontWeight: isSel ? '800' : '600',
-                          },
-                        ]}
-                      >
-                        {sc}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-
-            <View style={styles.evolutionValueRow}>
-              <CurrencyDisplayer
-                amount={displayedHeroBalance}
-                currency={settings.currency}
-                isDark={isDark}
-                privateMode={privateMode}
-                size="xl"
-              />
-              <TrendingValueChip
-                percentage={balanceTrendPct}
-                deltaText={formatCurrency(
-                  Math.abs(balanceDelta),
-                  settings.currency,
-                  true,
-                  privateMode
-                )}
-                isDark={isDark}
-              />
+                      {sc}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
 
-          {/* Full-bleed Smooth Area Chart (`DashboardBalanceChart`) */}
+          <View style={styles.evolutionValueRow}>
+            <CurrencyDisplayer
+              amount={displayedHeroBalance}
+              currency={settings.currency}
+              isDark={isDark}
+              privateMode={privateMode}
+              size="xl"
+            />
+            <TrendingValueChip
+              percentage={balanceTrendPct}
+              deltaText={formatCurrency(
+                Math.abs(balanceDelta),
+                settings.currency,
+                true,
+                privateMode
+              )}
+              isDark={isDark}
+            />
+          </View>
+
           <View style={styles.chartWrapper}>
             <BalanceEvolutionChart
               dataPoints={evolutionPoints}
               lineColor={palette.accent}
-              height={118}
+              height={92}
             />
           </View>
 
-          {/* Monekin DateRangeChips (`7D`, `1M`, `3M`, `1Y`, `ALL`) */}
           <DateRangeChips
             selected={selectedPeriod}
             onSelect={setSelectedPeriod}
             accentColor={palette.accent}
             isDark={isDark}
           />
-        </View>
 
-        {/* Main Content Gutter (16px horizontal padding as in Monekin `dashboard.page.dart`) */}
-        <View style={styles.contentGutter}>
-          {/* 4. MONEKIN `IncomeExpenseFlowCard` PAIR (Expenses Left, Income Right) */}
-          <View style={styles.flowCardsRow}>
-            {/* Expenses Flow Card (inverse: true — drop in expenses is green!) */}
+          {/* Integrated Period Income & Expense Flow Tiles */}
+          <View
+            style={[
+              styles.heroFlowsRow,
+              { borderTopColor: theme.divider },
+            ]}
+          >
             <TouchableOpacity
-              activeOpacity={0.88}
-              onPress={() => openQuickTxn('expense')}
-              style={[
-                styles.flowCard,
-                {
-                  backgroundColor: theme.card,
-                  borderColor: theme.border,
-                },
-              ]}
-            >
-              <View style={styles.flowCardTop}>
-                <View
-                  style={[
-                    styles.flowIconBadge,
-                    { backgroundColor: theme.expenseBg },
-                  ]}
-                >
-                  <ArrowUpRight size={16} color={theme.expense} />
-                </View>
-                <Text
-                  style={[styles.flowLabelText, { color: theme.textMuted }]}
-                  numberOfLines={1}
-                >
-                  EXPENSES
-                </Text>
-              </View>
-
-              <View style={styles.flowAmountWrap}>
-                <CurrencyDisplayer
-                  amount={periodSummary.totalExpense}
-                  currency={settings.currency}
-                  isDark={isDark}
-                  privateMode={privateMode}
-                  size="lg"
-                  compact={periodSummary.totalExpense >= 1000000}
-                />
-              </View>
-
-              <TrendingValueChip
-                percentage={expenseTrendPct}
-                afterText={`vs prev ${selectedPeriod}`}
-                inverse
-                isDark={isDark}
-              />
-            </TouchableOpacity>
-
-            {/* Income Flow Card */}
-            <TouchableOpacity
-              activeOpacity={0.88}
+              activeOpacity={0.8}
               onPress={() => openQuickTxn('income')}
               style={[
-                styles.flowCard,
+                styles.heroFlowTile,
                 {
-                  backgroundColor: theme.card,
-                  borderColor: theme.border,
+                  backgroundColor: isDark
+                    ? 'rgba(55, 161, 59, 0.12)'
+                    : '#F0FDF4',
                 },
               ]}
             >
@@ -601,293 +528,440 @@ export default function DashboardScreen() {
                     { backgroundColor: theme.incomeBg },
                   ]}
                 >
-                  <ArrowDownLeft size={16} color={theme.income} />
+                  <ArrowDownLeft size={14} color={theme.income} />
                 </View>
                 <Text
-                  style={[styles.flowLabelText, { color: theme.textMuted }]}
+                  style={[styles.flowLabelText, { color: theme.income }]}
                   numberOfLines={1}
                 >
-                  INCOME
+                  INCOME ({selectedPeriod})
                 </Text>
               </View>
-
-              <View style={styles.flowAmountWrap}>
-                <CurrencyDisplayer
-                  amount={periodSummary.totalIncome}
-                  currency={settings.currency}
-                  isDark={isDark}
-                  privateMode={privateMode}
-                  size="lg"
-                  compact={periodSummary.totalIncome >= 1000000}
-                />
-              </View>
-
+              <CurrencyDisplayer
+                amount={periodSummary.totalIncome}
+                currency={settings.currency}
+                isDark={isDark}
+                privateMode={privateMode}
+                size="md"
+                compact={periodSummary.totalIncome >= 1000000}
+              />
               <TrendingValueChip
                 percentage={incomeTrendPct}
                 afterText={`vs prev ${selectedPeriod}`}
                 isDark={isDark}
               />
             </TouchableOpacity>
-          </View>
-
-          {/* 5. QUICK ACTIONS PILL BAR (5 VAULT Actions) */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.quickPillsScroll}
-          >
-            <TouchableOpacity
-              activeOpacity={0.75}
-              onPress={() => openQuickTxn('income')}
-              style={[
-                styles.quickPill,
-                {
-                  backgroundColor: isDark
-                    ? 'rgba(55, 161, 59, 0.18)'
-                    : '#E8F5E9',
-                  borderColor: isDark
-                    ? 'rgba(55, 161, 59, 0.4)'
-                    : '#BBF7D0',
-                },
-              ]}
-            >
-              <Plus
-                size={14}
-                color={isDark ? '#4ADE80' : '#37A13B'}
-                strokeWidth={2.6}
-              />
-              <Text
-                style={[
-                  styles.quickPillText,
-                  { color: isDark ? '#86EFAC' : '#14532D' },
-                ]}
-              >
-                Add Money
-              </Text>
-            </TouchableOpacity>
 
             <TouchableOpacity
-              activeOpacity={0.75}
+              activeOpacity={0.8}
               onPress={() => openQuickTxn('expense')}
               style={[
-                styles.quickPill,
+                styles.heroFlowTile,
                 {
                   backgroundColor: isDark
-                    ? 'rgba(239, 68, 68, 0.18)'
-                    : '#FEE2E2',
-                  borderColor: isDark
-                    ? 'rgba(239, 68, 68, 0.4)'
-                    : '#FECACA',
+                    ? 'rgba(239, 68, 68, 0.12)'
+                    : '#FEF2F2',
                 },
               ]}
             >
-              <Plus
-                size={14}
-                color={isDark ? '#F87171' : '#EF4444'}
-                strokeWidth={2.6}
+              <View style={styles.flowCardTop}>
+                <View
+                  style={[
+                    styles.flowIconBadge,
+                    { backgroundColor: theme.expenseBg },
+                  ]}
+                >
+                  <ArrowUpRight size={14} color={theme.expense} />
+                </View>
+                <Text
+                  style={[styles.flowLabelText, { color: theme.expense }]}
+                  numberOfLines={1}
+                >
+                  EXPENSES ({selectedPeriod})
+                </Text>
+              </View>
+              <CurrencyDisplayer
+                amount={periodSummary.totalExpense}
+                currency={settings.currency}
+                isDark={isDark}
+                privateMode={privateMode}
+                size="md"
+                compact={periodSummary.totalExpense >= 1000000}
               />
-              <Text
-                style={[
-                  styles.quickPillText,
-                  { color: isDark ? '#FCA5A5' : '#7F1D1D' },
-                ]}
-              >
-                Add Expense
-              </Text>
+              <TrendingValueChip
+                percentage={expenseTrendPct}
+                afterText={`vs prev ${selectedPeriod}`}
+                inverse
+                isDark={isDark}
+              />
             </TouchableOpacity>
+          </View>
+        </View>
 
-            <TouchableOpacity
-              activeOpacity={0.75}
-              onPress={() => setItemModalVisible(true)}
+        {/* 4. 5-TILE QUICK LAUNCH DOCK (No horizontal scrolling required) */}
+        <View style={styles.quickDockRow}>
+          <TouchableOpacity
+            activeOpacity={0.78}
+            onPress={() => openQuickTxn('income')}
+            style={[
+              styles.quickDockBtn,
+              { backgroundColor: theme.card, borderColor: theme.border },
+            ]}
+          >
+            <View
               style={[
-                styles.quickPill,
+                styles.quickDockIcon,
                 {
                   backgroundColor: isDark
-                    ? 'rgba(37, 99, 235, 0.18)'
-                    : '#E8F1FC',
-                  borderColor: isDark
-                    ? 'rgba(37, 99, 235, 0.4)'
-                    : '#BFDBFE',
+                    ? 'rgba(55, 161, 59, 0.2)'
+                    : '#DCFCE7',
+                },
+              ]}
+            >
+              <ArrowDownLeft
+                size={16}
+                color={isDark ? '#4ADE80' : '#16A34A'}
+                strokeWidth={2.5}
+              />
+            </View>
+            <Text
+              style={[styles.quickDockLabel, { color: theme.textPrimary }]}
+              numberOfLines={1}
+            >
+              Income
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            activeOpacity={0.78}
+            onPress={() => openQuickTxn('expense')}
+            style={[
+              styles.quickDockBtn,
+              { backgroundColor: theme.card, borderColor: theme.border },
+            ]}
+          >
+            <View
+              style={[
+                styles.quickDockIcon,
+                {
+                  backgroundColor: isDark
+                    ? 'rgba(239, 68, 68, 0.2)'
+                    : '#FEE2E2',
+                },
+              ]}
+            >
+              <ArrowUpRight
+                size={16}
+                color={isDark ? '#F87171' : '#DC2626'}
+                strokeWidth={2.5}
+              />
+            </View>
+            <Text
+              style={[styles.quickDockLabel, { color: theme.textPrimary }]}
+              numberOfLines={1}
+            >
+              Expense
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            activeOpacity={0.78}
+            onPress={() => setItemModalVisible(true)}
+            style={[
+              styles.quickDockBtn,
+              { backgroundColor: theme.card, borderColor: theme.border },
+            ]}
+          >
+            <View
+              style={[
+                styles.quickDockIcon,
+                {
+                  backgroundColor: isDark
+                    ? 'rgba(37, 99, 235, 0.2)'
+                    : '#DBEAFE',
                 },
               ]}
             >
               <Package
-                size={14}
-                color={isDark ? '#60A5FA' : '#1D4ED8'}
+                size={16}
+                color={isDark ? '#60A5FA' : '#2563EB'}
                 strokeWidth={2.3}
               />
-              <Text
-                style={[
-                  styles.quickPillText,
-                  { color: isDark ? '#93C5FD' : '#1E3A8A' },
-                ]}
-              >
-                Add Item
-              </Text>
-            </TouchableOpacity>
+            </View>
+            <Text
+              style={[styles.quickDockLabel, { color: theme.textPrimary }]}
+              numberOfLines={1}
+            >
+              Item
+            </Text>
+          </TouchableOpacity>
 
-            <TouchableOpacity
-              activeOpacity={0.75}
-              onPress={() => setActivityModalVisible(true)}
+          <TouchableOpacity
+            activeOpacity={0.78}
+            onPress={() => setActivityModalVisible(true)}
+            style={[
+              styles.quickDockBtn,
+              { backgroundColor: theme.card, borderColor: theme.border },
+            ]}
+          >
+            <View
               style={[
-                styles.quickPill,
+                styles.quickDockIcon,
                 {
                   backgroundColor: isDark
-                    ? 'rgba(109, 40, 217, 0.18)'
-                    : '#F0EBFA',
-                  borderColor: isDark
-                    ? 'rgba(109, 40, 217, 0.4)'
-                    : '#DDD6FE',
+                    ? 'rgba(109, 40, 217, 0.2)'
+                    : '#EDE9FE',
                 },
               ]}
             >
               <Activity
-                size={14}
-                color={isDark ? '#A78BFA' : '#6D28D9'}
+                size={16}
+                color={isDark ? '#A78BFA' : '#7C3AED'}
                 strokeWidth={2.3}
               />
-              <Text
-                style={[
-                  styles.quickPillText,
-                  { color: isDark ? '#C4B5FD' : '#4C1D95' },
-                ]}
-              >
-                Add Activity
-              </Text>
-            </TouchableOpacity>
+            </View>
+            <Text
+              style={[styles.quickDockLabel, { color: theme.textPrimary }]}
+              numberOfLines={1}
+            >
+              Habit
+            </Text>
+          </TouchableOpacity>
 
-            <TouchableOpacity
-              activeOpacity={0.75}
-              onPress={() => setReminderModalVisible(true)}
+          <TouchableOpacity
+            activeOpacity={0.78}
+            onPress={() => setReminderModalVisible(true)}
+            style={[
+              styles.quickDockBtn,
+              { backgroundColor: theme.card, borderColor: theme.border },
+            ]}
+          >
+            <View
               style={[
-                styles.quickPill,
+                styles.quickDockIcon,
                 {
                   backgroundColor: isDark
-                    ? 'rgba(234, 88, 12, 0.18)'
-                    : '#FFF0E6',
-                  borderColor: isDark
-                    ? 'rgba(234, 88, 12, 0.4)'
-                    : '#FED7AA',
+                    ? 'rgba(234, 88, 12, 0.2)'
+                    : '#FFEDD5',
                 },
               ]}
             >
               <Bell
-                size={14}
+                size={16}
                 color={isDark ? '#FB923C' : '#EA580C'}
                 strokeWidth={2.3}
               />
-              <Text
-                style={[
-                  styles.quickPillText,
-                  { color: isDark ? '#FDBA74' : '#7C2D12' },
-                ]}
-              >
-                Create Reminder
-              </Text>
-            </TouchableOpacity>
-          </ScrollView>
+            </View>
+            <Text
+              style={[styles.quickDockLabel, { color: theme.textPrimary }]}
+              numberOfLines={1}
+            >
+              Alert
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-          {/* Quick Action NLP Message Box (Replacing simple New button) */}
-          <QuickActionMessageBox
-            isDark={isDark}
-            onOpenManualForm={() => openQuickTxn('income')}
-          />
+        {/* 5. SMART NLP QUICK COMMAND BAR */}
+        <QuickActionMessageBox isDark={isDark} />
 
-          {/* 6. MONEKIN `FinanceHealthCard` (270° Circular SVG Gauge + Score Badge) */}
-          <CardWithHeader
-            title="Financial & Life Health"
-            subtitle="Savings ratio, cash flow & habit consistency"
-            isDark={isDark}
-            onHeaderActionPress={() => router.push('/(tabs)/money')}
-            accentColor={palette.accent}
-          >
-            <View style={styles.healthCardRow}>
-              <FinanceHealthGauge
-                score={financeHealthScore}
-                size={96}
-                isDark={isDark}
-              />
-              <View style={styles.healthTextCol}>
-                <View style={styles.healthBadgesWrap}>
-                  <View
-                    style={[
-                      styles.healthBadgePill,
-                      { backgroundColor: `${healthMeta.color}26` },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.healthBadgeText,
-                        { color: healthMeta.color },
-                      ]}
-                    >
-                      {healthMeta.label}
-                    </Text>
-                  </View>
-                </View>
-                <Text
+        {/* 6. 2x2 INTERACTIVE VAULT PULSE BENTO GRID */}
+        <View style={styles.bentoGrid}>
+          <View style={styles.bentoRow}>
+            {/* Tile 1: Vault Health Score */}
+            <TouchableOpacity
+              activeOpacity={0.82}
+              onPress={() => router.push('/(tabs)/money')}
+              style={[
+                styles.bentoCard,
+                { backgroundColor: theme.card, borderColor: theme.border },
+              ]}
+            >
+              <View style={styles.bentoTopRow}>
+                <View
                   style={[
-                    styles.healthDescrText,
-                    { color: theme.textSecondary },
+                    styles.bentoIconWrap,
+                    { backgroundColor: `${healthMeta.color}1F` },
                   ]}
                 >
-                  {healthMeta.description}
-                </Text>
+                  <ShieldCheck size={16} color={healthMeta.color} />
+                </View>
+                <View
+                  style={[
+                    styles.bentoTagPill,
+                    { backgroundColor: `${healthMeta.color}1F` },
+                  ]}
+                >
+                  <Text
+                    style={[styles.bentoTagText, { color: healthMeta.color }]}
+                  >
+                    {healthMeta.label}
+                  </Text>
+                </View>
               </View>
-            </View>
-          </CardWithHeader>
+              <Text style={[styles.bentoValue, { color: theme.textPrimary }]}>
+                {financeHealthScore}
+                <Text style={[styles.bentoValueSub, { color: theme.textMuted }]}>
+                  /100
+                </Text>
+              </Text>
+              <Text style={[styles.bentoLabel, { color: theme.textMuted }]}>
+                Financial & Life Health
+              </Text>
+            </TouchableOpacity>
 
-          {/* 8. MONEKIN `PieChartByCategories` ("By Categories" Distribution Card) */}
-          <CardWithHeader
-            title="By Categories"
-            subtitle={`Expense distribution (${selectedPeriod})`}
-            isDark={isDark}
-            onHeaderActionPress={() => router.push('/(tabs)/money')}
-            accentColor={palette.accent}
-          >
-            <CategoryDonutChart
-              items={expenseCategories}
-              currency={settings.currency}
-              isDark={isDark}
-              privateMode={privateMode}
-              emptyText="No expenses recorded in this period."
-            />
-          </CardWithHeader>
+            {/* Tile 2: Asset Portfolio */}
+            <TouchableOpacity
+              activeOpacity={0.82}
+              onPress={() => router.push('/(tabs)/items')}
+              style={[
+                styles.bentoCard,
+                { backgroundColor: theme.card, borderColor: theme.border },
+              ]}
+            >
+              <View style={styles.bentoTopRow}>
+                <View
+                  style={[
+                    styles.bentoIconWrap,
+                    {
+                      backgroundColor: isDark
+                        ? 'rgba(37, 99, 235, 0.2)'
+                        : '#DBEAFE',
+                    },
+                  ]}
+                >
+                  <Package
+                    size={16}
+                    color={isDark ? '#60A5FA' : '#2563EB'}
+                  />
+                </View>
+                <ChevronRight size={15} color={theme.textMuted} />
+              </View>
+              <Text
+                style={[styles.bentoValue, { color: theme.textPrimary }]}
+                numberOfLines={1}
+              >
+                {formatCurrency(
+                  itemSummary.totalValue,
+                  settings.currency,
+                  true,
+                  privateMode
+                )}
+              </Text>
+              <Text
+                style={[styles.bentoLabel, { color: theme.textMuted }]}
+                numberOfLines={1}
+              >
+                {itemSummary.totalCount} items
+                {itemSummary.lentOrBorrowed > 0
+                  ? ` • ${itemSummary.lentOrBorrowed} lent`
+                  : ' tracked'}
+              </Text>
+            </TouchableOpacity>
+          </View>
 
-          {/* 9. RECENT TRANSACTIONS CARD (Synchronized with Overview Scope) */}
-          <CardWithHeader
-            title="Recent Movements"
-            subtitle={overviewScope === 'All' ? 'All Portfolios' : `${overviewScope} Portfolio`}
-            isDark={isDark}
-            headerActionText="View All"
-            onHeaderActionPress={() => router.push('/(tabs)/money')}
-            accentColor="#37A13B"
-          >
-            {/* Quick Sorting Controls */}
+          <View style={styles.bentoRow}>
+            {/* Tile 3: Habits & Activities */}
+            <TouchableOpacity
+              activeOpacity={0.82}
+              onPress={() => router.push('/(tabs)/tracker')}
+              style={[
+                styles.bentoCard,
+                { backgroundColor: theme.card, borderColor: theme.border },
+              ]}
+            >
+              <View style={styles.bentoTopRow}>
+                <View
+                  style={[
+                    styles.bentoIconWrap,
+                    {
+                      backgroundColor: isDark
+                        ? 'rgba(109, 40, 217, 0.2)'
+                        : '#EDE9FE',
+                    },
+                  ]}
+                >
+                  <Activity
+                    size={16}
+                    color={isDark ? '#A78BFA' : '#7C3AED'}
+                  />
+                </View>
+                <ChevronRight size={15} color={theme.textMuted} />
+              </View>
+              <Text style={[styles.bentoValue, { color: theme.textPrimary }]}>
+                {completedActivitiesCount}
+                <Text style={[styles.bentoValueSub, { color: theme.textMuted }]}>
+                  /{activities.length}
+                </Text>
+              </Text>
+              <Text style={[styles.bentoLabel, { color: theme.textMuted }]}>
+                Habits Completed
+              </Text>
+            </TouchableOpacity>
+
+            {/* Tile 4: Active Reminders */}
+            <TouchableOpacity
+              activeOpacity={0.82}
+              onPress={() => router.push('/(tabs)/reminders')}
+              style={[
+                styles.bentoCard,
+                { backgroundColor: theme.card, borderColor: theme.border },
+              ]}
+            >
+              <View style={styles.bentoTopRow}>
+                <View
+                  style={[
+                    styles.bentoIconWrap,
+                    {
+                      backgroundColor: isDark
+                        ? 'rgba(234, 88, 12, 0.2)'
+                        : '#FFEDD5',
+                    },
+                  ]}
+                >
+                  <Bell size={16} color={isDark ? '#FB923C' : '#EA580C'} />
+                </View>
+                <ChevronRight size={15} color={theme.textMuted} />
+              </View>
+              <Text style={[styles.bentoValue, { color: theme.textPrimary }]}>
+                {pendingReminders.length}
+              </Text>
+              <Text style={[styles.bentoLabel, { color: theme.textMuted }]}>
+                Active Reminders
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* 7. RECENT MOVEMENTS CARD */}
+        <CardWithHeader
+          title="Recent Movements"
+          subtitle={
+            overviewScope === 'All'
+              ? 'Latest income & expenses'
+              : `${overviewScope} portfolio`
+          }
+          isDark={isDark}
+          headerActionText="Ledger"
+          onHeaderActionPress={() => router.push('/(tabs)/money')}
+          accentColor="#37A13B"
+        >
+          {recentTransactions.length > 1 && (
             <View style={styles.recentControlsRow}>
               <Text style={[styles.recentSubtitle, { color: theme.textMuted }]}>
-                Showing latest 5 movements
+                Latest {recentTransactions.length} entries
               </Text>
-
-              {/* Sort pills */}
               <View style={styles.recentSortPills}>
-                {[
-                  { key: 'date_desc', label: 'Newest' },
-                  { key: 'amount_desc', label: 'Highest' },
-                ].map((s) => {
+                {(
+                  [
+                    { key: 'date_desc', label: 'Newest' },
+                    { key: 'amount_desc', label: 'Highest' },
+                  ] as const
+                ).map((s) => {
                   const isSel = recentSort === s.key;
                   return (
                     <TouchableOpacity
                       key={s.key}
-                      onPress={() =>
-                        setRecentSort(
-                          s.key as
-                          | 'date_desc'
-                          | 'date_asc'
-                          | 'amount_desc'
-                          | 'amount_asc'
-                        )
-                      }
+                      onPress={() => setRecentSort(s.key)}
                       style={[
                         styles.sortMiniPill,
                         isSel && {
@@ -912,148 +986,143 @@ export default function DashboardScreen() {
                 })}
               </View>
             </View>
+          )}
 
-            {recentTransactions.length === 0 ? (
-              <Text style={[styles.emptyText, { color: theme.textMuted }]}>
-                No transactions recorded for this filter.
-              </Text>
-            ) : (
-              recentTransactions.map((t, idx) => {
-                const isIncome = t.type === 'income';
-                const scope = t.accountScope || 'Personal';
-                return (
+          {recentTransactions.length === 0 ? (
+            <Text style={[styles.emptyText, { color: theme.textMuted }]}>
+              No transactions yet. Tap Income or Expense above to record your
+              first movement.
+            </Text>
+          ) : (
+            recentTransactions.map((t, idx) => {
+              const isIncome = t.type === 'income';
+              const scope = t.accountScope || 'Personal';
+              return (
+                <View
+                  key={t.id}
+                  style={[
+                    styles.listItemRow,
+                    idx < recentTransactions.length - 1 && {
+                      borderBottomWidth: 1,
+                      borderBottomColor: theme.divider,
+                    },
+                  ]}
+                >
                   <View
-                    key={t.id}
                     style={[
-                      styles.listItemRow,
-                      idx < recentTransactions.length - 1 && {
-                        borderBottomWidth: 1,
-                        borderBottomColor: theme.divider,
+                      styles.txnIconWrap,
+                      {
+                        backgroundColor: isIncome
+                          ? theme.incomeBg
+                          : theme.expenseBg,
                       },
                     ]}
                   >
-                    <View
-                      style={[
-                        styles.txnIconWrap,
-                        {
-                          backgroundColor: isIncome
-                            ? theme.incomeBg
-                            : theme.expenseBg,
-                        },
-                      ]}
-                    >
-                      {isIncome ? (
-                        <ArrowDownLeft size={16} color={theme.income} />
-                      ) : (
-                        <ArrowUpRight size={16} color={theme.expense} />
-                      )}
-                    </View>
+                    {isIncome ? (
+                      <ArrowDownLeft size={16} color={theme.income} />
+                    ) : (
+                      <ArrowUpRight size={16} color={theme.expense} />
+                    )}
+                  </View>
 
-                    <View style={{ flex: 1 }}>
+                  <View style={{ flex: 1 }}>
+                    <View style={styles.titleScopeRow}>
+                      <Text
+                        style={[
+                          styles.itemTitle,
+                          { color: theme.textPrimary, flexShrink: 1 },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {t.title}
+                      </Text>
                       <View
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 6,
-                        }}
+                        style={[
+                          styles.scopeBadge,
+                          {
+                            backgroundColor:
+                              scope === 'Personal'
+                                ? isDark
+                                  ? '#1E3A8A'
+                                  : '#DBEAFE'
+                                : isDark
+                                  ? '#4C1D95'
+                                  : '#EDE9FE',
+                          },
+                        ]}
                       >
                         <Text
                           style={[
-                            styles.itemTitle,
-                            { color: theme.textPrimary, flexShrink: 1 },
-                          ]}
-                          numberOfLines={1}
-                        >
-                          {t.title}
-                        </Text>
-                        <View
-                          style={[
-                            styles.scopeBadge,
+                            styles.scopeBadgeText,
                             {
-                              backgroundColor:
+                              color:
                                 scope === 'Personal'
                                   ? isDark
-                                    ? '#1E3A8A'
-                                    : '#DBEAFE'
+                                    ? '#60A5FA'
+                                    : '#2563EB'
                                   : isDark
-                                    ? '#4C1D95'
-                                    : '#EDE9FE',
+                                    ? '#A78BFA'
+                                    : '#7C3AED',
                             },
                           ]}
                         >
-                          <Text
-                            style={[
-                              styles.scopeBadgeText,
-                              {
-                                color:
-                                  scope === 'Personal'
-                                    ? isDark
-                                      ? '#60A5FA'
-                                      : '#2563EB'
-                                    : isDark
-                                      ? '#A78BFA'
-                                      : '#7C3AED',
-                              },
-                            ]}
-                          >
-                            {scope}
-                          </Text>
-                        </View>
+                          {scope}
+                        </Text>
                       </View>
-
-                      <Text
-                        style={[
-                          styles.itemSubtitle,
-                          { color: theme.textMuted },
-                        ]}
-                      >
-                        {t.category} • {t.paymentMethod} •{' '}
-                        {formatDisplayDate(
-                          t.dateISO,
-                          settings.preferredCalendar,
-                          settings.language
-                        )}
-                      </Text>
                     </View>
 
                     <Text
                       style={[
-                        styles.amountBadgeText,
-                        { color: isIncome ? theme.income : theme.expense },
+                        styles.itemSubtitle,
+                        { color: theme.textMuted },
                       ]}
                     >
-                      {isIncome ? '+' : '−'}
-                      {formatCurrency(
-                        t.amount,
-                        settings.currency,
-                        false,
-                        privateMode
+                      {t.category} • {t.paymentMethod} •{' '}
+                      {formatDisplayDate(
+                        t.dateISO,
+                        settings.preferredCalendar,
+                        settings.language
                       )}
                     </Text>
                   </View>
-                );
-              })
-            )}
-          </CardWithHeader>
 
-          {/* 10. UPCOMING REMINDERS CARD */}
-          <CardWithHeader
-            title="Upcoming Reminders"
-            subtitle="Scheduled Nepal Standard Time alerts"
-            isDark={isDark}
-            headerActionIcon={<Plus size={14} color="#EA580C" />}
-            headerActionText="Add"
-            onHeaderActionPress={() => setReminderModalVisible(true)}
-            footerText="Manage all reminders"
-            onFooterPress={() => router.push('/(tabs)/reminders')}
-            accentColor="#EA580C"
-          >
-            {upcomingReminders.length === 0 ? (
-              <Text style={[styles.emptyText, { color: theme.textMuted }]}>
-                All caught up! No pending reminders.
-              </Text>
-            ) : (
-              upcomingReminders.map((rem, idx) => {
+                  <Text
+                    style={[
+                      styles.amountBadgeText,
+                      { color: isIncome ? theme.income : theme.expense },
+                    ]}
+                  >
+                    {isIncome ? '+' : '−'}
+                    {formatCurrency(
+                      t.amount,
+                      settings.currency,
+                      false,
+                      privateMode
+                    )}
+                  </Text>
+                </View>
+              );
+            })
+          )}
+        </CardWithHeader>
+
+        {/* 8. UNIFIED UPCOMING REMINDERS & DAILY HABITS AGENDA CARD */}
+        <CardWithHeader
+          title="Schedule & Daily Habits"
+          subtitle="Upcoming alerts and tracked routines"
+          isDark={isDark}
+          headerActionIcon={<Plus size={13} color={palette.accent} />}
+          headerActionText="Reminder"
+          onHeaderActionPress={() => setReminderModalVisible(true)}
+          accentColor={palette.accent}
+        >
+          {upcomingReminders.length === 0 && recentActivities.length === 0 ? (
+            <Text style={[styles.emptyText, { color: theme.textMuted }]}>
+              No active reminders or habits scheduled yet.
+            </Text>
+          ) : (
+            <>
+              {upcomingReminders.map((rem, idx) => {
                 const priorityColor =
                   rem.priority === 'High'
                     ? '#EF4444'
@@ -1069,7 +1138,8 @@ export default function DashboardScreen() {
                     accessibilityLabel={`Mark ${rem.title} as completed`}
                     style={[
                       styles.listItemRow,
-                      idx < upcomingReminders.length - 1 && {
+                      (idx < upcomingReminders.length - 1 ||
+                        recentActivities.length > 0) && {
                         borderBottomWidth: 1,
                         borderBottomColor: theme.divider,
                       },
@@ -1089,6 +1159,7 @@ export default function DashboardScreen() {
                           { color: theme.textMuted },
                         ]}
                       >
+                        Alert •{' '}
                         {formatDisplayDate(
                           rem.dateISO,
                           settings.preferredCalendar,
@@ -1116,27 +1187,9 @@ export default function DashboardScreen() {
                     </View>
                   </TouchableOpacity>
                 );
-              })
-            )}
-          </CardWithHeader>
+              })}
 
-          {/* 11. RECENT DAILY ACTIVITIES CARD */}
-          <CardWithHeader
-            title="Daily Activities & Habits"
-            isDark={isDark}
-            headerActionIcon={<Plus size={14} color="#6D28D9" />}
-            headerActionText="Log"
-            onHeaderActionPress={() => setActivityModalVisible(true)}
-            footerText="Open Activity Tracker"
-            onFooterPress={() => router.push('/(tabs)/tracker')}
-            accentColor="#6D28D9"
-          >
-            {recentActivities.length === 0 ? (
-              <Text style={[styles.emptyText, { color: theme.textMuted }]}>
-                No daily activities logged yet.
-              </Text>
-            ) : (
-              recentActivities.map((act, idx) => {
+              {recentActivities.map((act, idx) => {
                 const isDone = act.status === 'completed';
                 return (
                   <TouchableOpacity
@@ -1181,7 +1234,7 @@ export default function DashboardScreen() {
                           { color: theme.textMuted },
                         ]}
                       >
-                        {act.category} •{' '}
+                        Habit • {act.category} •{' '}
                         {formatDisplayDate(
                           act.dateISO,
                           settings.preferredCalendar,
@@ -1200,103 +1253,20 @@ export default function DashboardScreen() {
                       ]}
                     >
                       <Text
-                        style={[styles.metricPillText, { color: '#6D28D9' }]}
+                        style={[
+                          styles.metricPillText,
+                          { color: isDark ? '#A78BFA' : '#6D28D9' },
+                        ]}
                       >
                         {act.numericValue} {act.unit}
                       </Text>
                     </View>
                   </TouchableOpacity>
                 );
-              })
-            )}
-          </CardWithHeader>
-
-          {/* 12. NET WORTH & PERSONAL ITEMS INVENTORY CARD */}
-          <CardWithHeader
-            title="Assets & Personal Items"
-            subtitle="Inventory valuation & lending status"
-            isDark={isDark}
-            headerActionIcon={<Plus size={14} color="#1D4ED8" />}
-            headerActionText="Add Item"
-            onHeaderActionPress={() => setItemModalVisible(true)}
-            footerText="Open Item Inventory"
-            onFooterPress={() => router.push('/(tabs)/items')}
-            accentColor="#1D4ED8"
-          >
-            <View style={styles.itemStatsGrid}>
-              <View
-                style={[
-                  styles.itemStatBox,
-                  { backgroundColor: isDark ? '#132034' : '#E8F1FC' },
-                ]}
-              >
-                <Text style={[styles.itemStatVal, { color: '#1D4ED8' }]}>
-                  {itemSummary.totalCount}
-                </Text>
-                <Text
-                  style={[styles.itemStatLabel, { color: theme.textMuted }]}
-                >
-                  Total Units
-                </Text>
-              </View>
-
-              <View
-                style={[
-                  styles.itemStatBox,
-                  { backgroundColor: isDark ? '#12241A' : '#E8F5E9' },
-                ]}
-              >
-                <Text style={[styles.itemStatVal, { color: '#37A13B' }]}>
-                  {itemSummary.owned}
-                </Text>
-                <Text
-                  style={[styles.itemStatLabel, { color: theme.textMuted }]}
-                >
-                  Owned
-                </Text>
-              </View>
-
-              <View
-                style={[
-                  styles.itemStatBox,
-                  { backgroundColor: isDark ? '#291910' : '#FFF0E6' },
-                ]}
-              >
-                <Text style={[styles.itemStatVal, { color: '#EA580C' }]}>
-                  {itemSummary.lent + itemSummary.borrowed}
-                </Text>
-                <Text
-                  style={[styles.itemStatLabel, { color: theme.textMuted }]}
-                >
-                  Lent / Borrowed
-                </Text>
-              </View>
-            </View>
-
-            <View
-              style={[
-                styles.assetValueBanner,
-                {
-                  backgroundColor: theme.inputBg,
-                  borderColor: theme.border,
-                },
-              ]}
-            >
-              <Text
-                style={[styles.assetValueLabel, { color: theme.textMuted }]}
-              >
-                Estimated Asset Portfolio
-              </Text>
-              <CurrencyDisplayer
-                amount={itemSummary.totalValue}
-                currency={settings.currency}
-                isDark={isDark}
-                privateMode={privateMode}
-                size="md"
-              />
-            </View>
-          </CardWithHeader>
-        </View>
+              })}
+            </>
+          )}
+        </CardWithHeader>
       </ScrollView>
 
       {/* Modals */}
@@ -1341,52 +1311,44 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: LAYOUT.maxContentWidth,
     alignSelf: 'center',
-    paddingTop: 8,
-    paddingBottom: 90,
-  },
-  headerGutter: {
     paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 40,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 14,
+    marginBottom: 12,
     gap: 10,
   },
-  welcomeTouch: {
+  welcomeLeft: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingVertical: 4,
+    gap: 11,
   },
   userAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 42,
+    height: 42,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
   userAvatarText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
   },
   welcomeHint: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '600',
   },
-  userNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 1,
-  },
   userNameText: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '800',
+    marginTop: 1,
   },
   headerBtnsGroup: {
     flexDirection: 'row',
@@ -1394,119 +1356,164 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   circleIconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  evolutionBlock: {
-    marginBottom: 16,
+  heroCard: {
+    borderRadius: 22,
+    borderWidth: 1,
+    paddingTop: 16,
+    paddingBottom: 14,
+    marginBottom: 12,
+    overflow: 'hidden',
+    elevation: 2,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1.5 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
   },
-  evolutionHeaderInset: {
+  heroHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
+    marginBottom: 6,
+    gap: 8,
   },
   evolutionLabel: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '800',
-    letterSpacing: 0.8,
-    marginBottom: 4,
+    letterSpacing: 0.6,
+    flexShrink: 1,
   },
   evolutionValueRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     justifyContent: 'space-between',
     flexWrap: 'wrap',
+    paddingHorizontal: 16,
     gap: 8,
   },
   chartWrapper: {
-    marginTop: 8,
-    marginBottom: 10,
+    marginTop: 6,
+    marginBottom: 6,
   },
-  contentGutter: {
-    paddingHorizontal: 16,
-  },
-  flowCardsRow: {
+  heroFlowsRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 14,
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    marginTop: 10,
+    borderTopWidth: 1,
   },
-  flowCard: {
+  heroFlowTile: {
     flex: 1,
-    borderRadius: 20,
-    padding: 15,
-    borderWidth: 1,
+    borderRadius: 16,
+    padding: 12,
+    gap: 4,
   },
   flowCardTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 10,
+    gap: 6,
+    marginBottom: 2,
   },
   flowIconBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 9,
+    width: 24,
+    height: 24,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   flowLabelText: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.6,
-  },
-  flowAmountWrap: {
-    marginBottom: 8,
-  },
-  quickPillsScroll: {
-    gap: 8,
-    paddingBottom: 16,
-  },
-  quickPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 13,
-    paddingVertical: 9,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  quickPillText: {
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  healthCardRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 18,
-    paddingTop: 4,
-  },
-  healthTextCol: {
-    flex: 1,
-  },
-  healthBadgesWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 6,
-  },
-  healthBadgePill: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-  },
-  healthBadgeText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.5,
   },
-  healthDescrText: {
-    fontSize: 12,
-    lineHeight: 17,
+  quickDockRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  quickDockBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 6,
+  },
+  quickDockIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quickDockLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  bentoGrid: {
+    gap: 10,
+    marginBottom: 16,
+  },
+  bentoRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  bentoCard: {
+    flex: 1,
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 14,
+  },
+  bentoTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  bentoIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bentoTagPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  bentoTagText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+  },
+  bentoValue: {
+    fontSize: 20,
+    fontWeight: '900',
+    letterSpacing: -0.3,
+  },
+  bentoValueSub: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  bentoLabel: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    marginTop: 2,
   },
   emptyText: {
-    fontSize: 13,
-    paddingVertical: 12,
+    fontSize: 12.5,
+    paddingVertical: 10,
     textAlign: 'center',
   },
   listItemRow: {
@@ -1516,11 +1523,16 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   txnIconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 36,
+    height: 36,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  titleScopeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   itemTitle: {
     fontSize: 14,
@@ -1552,40 +1564,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
   },
-  itemStatsGrid: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 12,
-    marginTop: 4,
-  },
-  itemStatBox: {
-    flex: 1,
-    paddingVertical: 11,
-    borderRadius: 14,
-    alignItems: 'center',
-  },
-  itemStatVal: {
-    fontSize: 18,
-    fontWeight: '900',
-  },
-  itemStatLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  assetValueBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 14,
-    borderWidth: 1,
-  },
-  assetValueLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
   scopeBadge: {
     paddingHorizontal: 7,
     paddingVertical: 2,
@@ -1597,15 +1575,15 @@ const styles = StyleSheet.create({
   },
   scopeMiniTabs: {
     flexDirection: 'row',
-    borderRadius: 8,
+    borderRadius: 9,
     borderWidth: 1,
     padding: 2,
-    gap: 3,
+    gap: 2,
   },
   scopeMiniTab: {
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
+    paddingVertical: 3.5,
+    borderRadius: 7,
   },
   scopeMiniTabText: {
     fontSize: 10,
@@ -1614,12 +1592,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingBottom: 10,
-    marginBottom: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(150, 150, 150, 0.12)',
-    flexWrap: 'wrap',
-    gap: 8,
+    marginBottom: 8,
+    paddingBottom: 6,
   },
   recentSubtitle: {
     fontSize: 11,
@@ -1627,7 +1601,7 @@ const styles = StyleSheet.create({
   },
   recentSortPills: {
     flexDirection: 'row',
-    gap: 5,
+    gap: 6,
   },
   sortMiniPill: {
     paddingHorizontal: 8,
@@ -1637,6 +1611,6 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   sortMiniPillText: {
-    fontSize: 10,
+    fontSize: 10.5,
   },
 });

@@ -158,7 +158,7 @@ export default function ActivityTrackerScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Daily / Monthly Switcher + Date Selector Bar */}
+        {/* Unified Daily/Monthly Switcher + Date Selector + Completion Gauge Hero Card */}
         <View
           style={[
             styles.dateControlCard,
@@ -245,19 +245,21 @@ export default function ActivityTrackerScreen() {
               Change
             </Text>
           </TouchableOpacity>
-        </View>
 
-        {/* Monekin 270° Circular Completion Gauge Card */}
-        <View
-          style={[
-            styles.statsCard,
-            { backgroundColor: theme.card, borderColor: theme.border },
-          ]}
-        >
-          <View style={styles.gaugeSummaryRow}>
+          <View
+            style={[
+              styles.gaugeSummaryRow,
+              {
+                borderTopColor: theme.divider,
+                borderTopWidth: 1,
+                marginTop: 12,
+                paddingTop: 12,
+              },
+            ]}
+          >
             <FinanceHealthGauge
               score={summary.completionRate}
-              size={88}
+              size={84}
               isDark={isDark}
             />
             <View style={styles.statsGridRight}>

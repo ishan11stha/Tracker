@@ -230,21 +230,23 @@ export default function ItemTrackerScreen() {
           </View>
         </View>
 
-        {/* Monekin Asset Valuation Contribution Donut Card */}
-        <CardWithHeader
-          title="Valuation by Category"
-          subtitle="Portfolio share across personal item categories"
-          isDark={isDark}
-          accentColor={palette.accent}
-        >
-          <CategoryDonutChart
-            items={assetCategoryDistribution}
-            currency={settings.currency}
+        {/* Monekin Asset Valuation Contribution Donut Card (Only shown when valued items exist) */}
+        {assetCategoryDistribution.length > 0 && (
+          <CardWithHeader
+            title="Valuation by Category"
+            subtitle="Portfolio share across personal item categories"
             isDark={isDark}
-            privateMode={privateMode}
-            emptyText="Add item valuations to view portfolio breakdown."
-          />
-        </CardWithHeader>
+            accentColor={palette.accent}
+          >
+            <CategoryDonutChart
+              items={assetCategoryDistribution}
+              currency={settings.currency}
+              isDark={isDark}
+              privateMode={privateMode}
+              emptyText="Add item valuations to view portfolio breakdown."
+            />
+          </CardWithHeader>
+        )}
 
         {/* Search Input */}
         <View
