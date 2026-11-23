@@ -590,12 +590,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  statsCard: {
-    borderRadius: 20,
-    padding: 16,
-    borderWidth: 1,
-    marginBottom: 14,
-  },
   gaugeSummaryRow: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -67,6 +67,15 @@ interface ReminderFormValues {
   alertMode?: ReminderAlertMode;
 }
 
+function getUpcomingNPTTimeString(): string {
+  const now = getNowInNPT();
+  const totalMins = now.hours * 60 + now.minutes + 5;
+  const rounded = (Math.ceil(totalMins / 5) * 5) % 1440;
+  const h = Math.floor(rounded / 60);
+  const m = rounded % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
 export const ReminderFormModal: React.FC<ReminderFormModalProps> = ({
   visible,
   editingReminder = null,
@@ -97,7 +106,7 @@ export const ReminderFormModal: React.FC<ReminderFormModalProps> = ({
       title: '',
       description: '',
       dateISO: initialDateISO || npt.isoDate,
-      timeString: '09:00',
+      timeString: getUpcomingNPTTimeString(),
       priority: 'Medium',
       category: REMINDER_CATEGORIES[0],
       recurrence: 'none',
@@ -130,7 +139,7 @@ export const ReminderFormModal: React.FC<ReminderFormModalProps> = ({
           title: '',
           description: '',
           dateISO: initialDateISO || getNowInNPT().isoDate,
-          timeString: '09:00',
+          timeString: getUpcomingNPTTimeString(),
           priority: 'Medium',
           category: REMINDER_CATEGORIES[0],
           recurrence: 'none',
@@ -353,7 +362,7 @@ export const ReminderFormModal: React.FC<ReminderFormModalProps> = ({
                           Platform.OS !== 'web'
                         ) {
                           try {
-                            Vibration.vibrate(70);
+                            Vibration.vibrate([0, 200, 100, 300]);
                           } catch {
                             // Ignore on devices without vibrator
                           }

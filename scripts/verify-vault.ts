@@ -587,6 +587,19 @@ assert(
     nextSundayTrigger.getTime() > new Date('2026-11-20T10:00:00Z').getTime(),
   'Weekday recurrence should schedule for the next matching weekday'
 );
+
+// Same-minute ("Now" preset) trigger test: 09:00 NPT = 03:15:00 UTC, checked at 03:15:25 UTC
+const sameMinuteNowTrigger = computeNextOccurrenceDate(
+  '2026-11-20',
+  '09:00',
+  'none',
+  new Date('2026-11-20T03:15:25Z')
+);
+assert(
+  sameMinuteNowTrigger !== null &&
+    sameMinuteNowTrigger.getTime() > new Date('2026-11-20T03:15:25Z').getTime(),
+  'Same-minute ("Now" preset) reminder must schedule 2s ahead instead of returning null'
+);
 console.log('15. Notification Recurrence & Scheduling Engine (including Weekday Names): PASSED');
 
 // 16. Full Backup Payload & Restoration Roundtrip Schema Check

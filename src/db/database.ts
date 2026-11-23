@@ -203,7 +203,7 @@ async function initializeSchema(db: SQLite.SQLiteDatabase): Promise<void> {
     // Column already exists
   }
 
-  // Ensure the four foundational wallets exist at zero balance.
+  // Ensure the four foundational wallets exist at zero balance on first run.
   const existingAccounts = await db.getFirstAsync<{ count: number }>(
     `SELECT COUNT(*) as count FROM accounts`
   );
@@ -211,43 +211,15 @@ async function initializeSchema(db: SQLite.SQLiteDatabase): Promise<void> {
     await seedDefaultAccounts(db);
   }
 
-  // One-time automatic cleanup of old mock / seed data for a fresh start with user's own details
-  const cleanedSeeds = await db.getFirstAsync<{ value: string }>(
-    `SELECT value FROM settings WHERE key = 'has_fresh_cleaned_seeds'`
+  // Ensure default app_settings exist on first run without overwriting user preferences.
+  const existingSettingsRow = await db.getFirstAsync<{ value: string }>(
+    `SELECT value FROM settings WHERE key = 'app_settings'`
   );
-  if (!cleanedSeeds) {
-    await db.withTransactionAsync(async () => {
-      await db.runAsync(`DELETE FROM item_history`);
-      await db.runAsync(`DELETE FROM items`);
-      await db.runAsync(`DELETE FROM transactions`);
-      await db.runAsync(`DELETE FROM activities`);
-      await db.runAsync(`DELETE FROM reminders`);
-      await db.runAsync(
-        `INSERT OR REPLACE INTO settings (key, value) VALUES ('has_fresh_cleaned_seeds', 'true')`
-      );
-    });
-  }
-
-  // One-time automatic reset of initial balances for all 4 default wallets to 0
-  const zeroedWallets = await db.getFirstAsync<{ value: string }>(
-    `SELECT value FROM settings WHERE key = 'has_zeroed_default_wallets_v2'`
-  );
-  if (!zeroedWallets) {
-    await db.withTransactionAsync(async () => {
-      await db.runAsync(`UPDATE accounts SET initialBalance = 0;`);
-      await db.runAsync(
-        `INSERT OR REPLACE INTO settings (key, value) VALUES ('has_zeroed_default_wallets_v2', 'true')`
-      );
-    });
-  }
-
-  // Check if initial seed / first-run setup has occurred
-  const seeded = await db.getFirstAsync<{ value: string }>(
-    `SELECT value FROM settings WHERE key = 'is_seeded'`
-  );
-
-  if (!seeded) {
-    await seedInitialData(db);
+  if (!existingSettingsRow?.value) {
+    await db.runAsync(
+      `INSERT OR REPLACE INTO settings (key, value) VALUES ('app_settings', ?)`,
+      [JSON.stringify(DEFAULT_SETTINGS)]
+    );
   }
 }
 
@@ -270,36 +242,6 @@ export async function seedDefaultAccounts(db: SQLite.SQLiteDatabase): Promise<vo
       ]
     );
   }
-}
-
-async function seedInitialData(db: SQLite.SQLiteDatabase): Promise<void> {
-  await db.withTransactionAsync(async () => {
-    // Check existing settings: if theme is light or not set, default to dark
-    const existingSettingsRow = await db.getFirstAsync<{ value: string }>(
-      `SELECT value FROM settings WHERE key = 'app_settings'`
-    );
-    if (existingSettingsRow?.value) {
-      try {
-        const parsed = JSON.parse(existingSettingsRow.value);
-        if (parsed.theme === 'light') {
-          parsed.theme = 'dark';
-          await db.runAsync(
-            `UPDATE settings SET value = ? WHERE key = 'app_settings'`,
-            [JSON.stringify(parsed)]
-          );
-        }
-      } catch {
-        // ignore JSON parse error
-      }
-    } else {
-      await db.runAsync(
-        `INSERT OR REPLACE INTO settings (key, value) VALUES ('app_settings', ?), ('is_seeded', 'true'), ('has_fresh_cleaned_seeds', 'true'), ('has_zeroed_default_wallets_v2', 'true')`,
-        [JSON.stringify(DEFAULT_SETTINGS)]
-      );
-    }
-
-    await seedDefaultAccounts(db);
-  });
 }
 
 /**

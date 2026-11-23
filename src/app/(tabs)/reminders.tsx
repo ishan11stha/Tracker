@@ -40,6 +40,7 @@ import {
 import { useCurrentNPT } from '../../hooks/useCurrentNPT';
 import { ReminderItem, formatRecurrenceLabel } from '../../types';
 import { ReminderFormModal } from '../../components/ReminderFormModal';
+import { triggerImmediateReminderAlert } from '../../utils/notifications';
 
 type ReminderTabKey = 'upcoming' | 'overdue' | 'completed' | 'calendar';
 
@@ -550,7 +551,20 @@ export default function RemindersScreen() {
                           </Text>
                         </View>
                       )}
-                      <View style={styles.recurBadge}>
+                      <TouchableOpacity
+                        onPress={() => {
+                          void triggerImmediateReminderAlert(rem);
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Test ${
+                          rem.alertMode === 'alarm'
+                            ? 'Alarm'
+                            : rem.alertMode === 'vibrate'
+                              ? 'Vibrate'
+                              : 'Alarm and Vibrate'
+                        } alert for ${rem.title}`}
+                        style={styles.recurBadge}
+                      >
                         {rem.alertMode === 'alarm' ? (
                           <Volume2 size={11} color={palette.accent} />
                         ) : rem.alertMode === 'vibrate' ? (
@@ -570,7 +584,7 @@ export default function RemindersScreen() {
                               ? 'Vibrate'
                               : 'Alarm & Vibrate'}
                         </Text>
-                      </View>
+                      </TouchableOpacity>
                     </View>
 
                     {overdue && (

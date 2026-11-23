@@ -353,7 +353,6 @@ export interface ScopeDistributionChartProps {
   currency: 'NPR' | 'USD' | 'INR';
   isDark: boolean;
   privateMode?: boolean;
-  metricLabel?: string;
 }
 
 export const ScopeDistributionChart: React.FC<ScopeDistributionChartProps> = ({
@@ -362,7 +361,6 @@ export const ScopeDistributionChart: React.FC<ScopeDistributionChartProps> = ({
   currency,
   isDark,
   privateMode = false,
-  metricLabel = 'Net Balance',
 }) => {
   const theme = getThemeColors(isDark);
   const pSafe = Math.max(0, personalAmount);
@@ -411,12 +409,15 @@ export const ScopeDistributionChart: React.FC<ScopeDistributionChartProps> = ({
         />
       </View>
 
-      {/* Compact Proportional Legend Row (amounts shown in detail cards below) */}
+      {/* Proportional Legend Row with Totals */}
       <View style={styles.scopeDistLegend}>
         <View style={styles.scopeLegendItem}>
           <View style={[styles.scopeColorDot, { backgroundColor: '#2563EB' }]} />
           <Text style={[styles.scopeLegendTitle, { color: theme.textPrimary }]}>
-            Personal (Own)
+            Personal:{' '}
+            <Text style={{ color: isDark ? '#60A5FA' : '#2563EB' }}>
+              {formatCurrency(personalAmount, currency, true, privateMode)}
+            </Text>
           </Text>
           <View
             style={[
@@ -438,7 +439,10 @@ export const ScopeDistributionChart: React.FC<ScopeDistributionChartProps> = ({
         <View style={styles.scopeLegendItem}>
           <View style={[styles.scopeColorDot, { backgroundColor: '#7C3AED' }]} />
           <Text style={[styles.scopeLegendTitle, { color: theme.textPrimary }]}>
-            Family
+            Family:{' '}
+            <Text style={{ color: isDark ? '#A78BFA' : '#7C3AED' }}>
+              {formatCurrency(familyAmount, currency, true, privateMode)}
+            </Text>
           </Text>
           <View
             style={[

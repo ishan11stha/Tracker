@@ -48,7 +48,8 @@ export function getNPTTargetDate(dateISO: string, timeString: string): Date {
  * Computes the next future trigger Date for a reminder according to its recurrence rule.
  * Supports specific weekday names ('sunday'..'saturday' or comma-separated weekdays)
  * as well as legacy interval keys ('none', 'daily', 'weekly', 'monthly', 'yearly').
- * Pure business logic with zero native module dependencies.
+ * If a reminder is set for the current minute (within 60s of `now`), schedules 2s ahead
+ * so "Now" reminders fire immediately instead of being dropped.
  */
 export function computeNextOccurrenceDate(
   dateISO: string,
@@ -58,6 +59,7 @@ export function computeNextOccurrenceDate(
 ): Date | null {
   const baseDate = getNPTTargetDate(dateISO, timeString);
   const normalizedRecurrence = (recurrence || 'none').trim().toLowerCase();
+  const nowMs = now.getTime();
 
   // Check if recurrence specifies one or more weekday names (e.g. 'sunday', 'monday,wednesday')
   const selectedWeekdayKeys = extractWeekdays(normalizedRecurrence);
@@ -67,8 +69,7 @@ export function computeNextOccurrenceDate(
       selectedWeekdayKeys.map((k) => WEEKDAY_INDEX_MAP[k])
     );
     const [hours, minutes] = timeString.split(':').map(Number);
-    // Start searching from the later of baseDate's calendar day or current NPT calendar day
-    const startReferenceMs = Math.max(baseDate.getTime(), now.getTime());
+    const startReferenceMs = Math.max(baseDate.getTime(), nowMs);
     const nptRef = new Date(startReferenceMs + 345 * 60 * 1000);
     const refYear = nptRef.getUTCFullYear();
     const refMonth = nptRef.getUTCMonth();
@@ -82,22 +83,42 @@ export function computeNextOccurrenceDate(
       const candidateTriggerUTC =
         Date.UTC(refYear, refMonth, refDay + offset, hours || 0, minutes || 0, 0) -
         345 * 60 * 1000;
-      if (candidateTriggerUTC > now.getTime()) {
+      if (candidateTriggerUTC > nowMs) {
         return new Date(candidateTriggerUTC);
+      }
+      // If set for the current minute on a matching weekday, fire 2 seconds from now
+      if (nowMs - candidateTriggerUTC >= 0 && nowMs - candidateTriggerUTC < 60000) {
+        return new Date(nowMs + 2000);
       }
     }
     return null;
   }
 
-  if (baseDate.getTime() > now.getTime()) {
+  if (baseDate.getTime() > nowMs) {
     return baseDate;
   }
-  if (normalizedRecurrence === 'none') {
-    return null;
+
+  // If the user selected the current minute (e.g. via "Now" preset), trigger 2 seconds from now
+  if (nowMs - baseDate.getTime() >= 0 && nowMs - baseDate.getTime() < 60000) {
+    return new Date(nowMs + 2000);
   }
 
   const dayMs = 86400000;
-  const elapsedMs = now.getTime() - baseDate.getTime();
+
+  if (normalizedRecurrence === 'none') {
+    // If the user picked today's date in NPT but an earlier hour, roll to tomorrow at that time
+    // so a newly created reminder on today's date never silently fails to schedule.
+    const nptNow = new Date(nowMs + 345 * 60 * 1000);
+    const todayNPTISO = `${nptNow.getUTCFullYear()}-${String(
+      nptNow.getUTCMonth() + 1
+    ).padStart(2, '0')}-${String(nptNow.getUTCDate()).padStart(2, '0')}`;
+    if (dateISO === todayNPTISO && baseDate.getTime() + dayMs > nowMs) {
+      return new Date(baseDate.getTime() + dayMs);
+    }
+    return null;
+  }
+
+  const elapsedMs = nowMs - baseDate.getTime();
 
   if (normalizedRecurrence === 'daily') {
     const daysToAdd = Math.floor(elapsedMs / dayMs) + 1;
@@ -136,7 +157,7 @@ export function computeNextOccurrenceDate(
           0
         ) -
         345 * 60 * 1000;
-      if (candidateUTC > now.getTime()) {
+      if (candidateUTC > nowMs) {
         return new Date(candidateUTC);
       }
     }
@@ -160,7 +181,7 @@ export function computeNextOccurrenceDate(
           0
         ) -
         345 * 60 * 1000;
-      if (candidateUTC > now.getTime()) {
+      if (candidateUTC > nowMs) {
         return new Date(candidateUTC);
       }
     }

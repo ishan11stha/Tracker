@@ -195,6 +195,21 @@ export const useVaultStore = create<VaultState>((set, get) => ({
         reminders,
         error: null,
       });
+
+      // Ensure active recurring/upcoming reminders have up-to-date Android notifications queued
+      if (settings.notificationsEnabled && reminders.some((r) => !r.isCompleted)) {
+        void (async () => {
+          for (const rem of reminders) {
+            if (!rem.isCompleted && (rem.recurrence !== 'none' || !rem.notificationId)) {
+              const newNotifId = await scheduleReminderNotification(rem, true);
+              if (newNotifId && newNotifId !== rem.notificationId) {
+                const updated = { ...rem, notificationId: newNotifId };
+                await dbUpdateReminder(updated);
+              }
+            }
+          }
+        })();
+      }
     } catch (err) {
       set({
         isHydrated: true,
@@ -753,6 +768,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
           priority: 'Medium',
           category: parsed.category || 'Bills & Finance',
           recurrence: 'none',
+          alertMode: 'both',
         });
         if (!created) {
           throw new Error('Could not save the reminder. Please try again.');
