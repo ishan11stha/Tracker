@@ -554,8 +554,27 @@ const weekdayReminderParse = reminderSchema.safeParse({
   priority: 'Medium',
   category: 'Work & Deadlines',
   recurrence: 'sunday,monday',
+  alertMode: 'vibrate',
 });
-assert(weekdayReminderParse.success, 'Weekday recurrence must pass reminderSchema validation');
+assert(
+  weekdayReminderParse.success &&
+    weekdayReminderParse.data.alertMode === 'vibrate',
+  'Weekday recurrence and vibrate alertMode must pass reminderSchema validation'
+);
+const alarmReminderParse = reminderSchema.safeParse({
+  title: 'Morning Wakeup',
+  description: 'Alarm ring',
+  dateISO: '2026-11-20',
+  timeString: '06:00',
+  priority: 'High',
+  category: 'Personal & Family',
+  recurrence: 'monday,tuesday,wednesday,thursday,friday',
+  alertMode: 'alarm',
+});
+assert(
+  alarmReminderParse.success && alarmReminderParse.data.alertMode === 'alarm',
+  'Alarm alertMode must pass reminderSchema validation'
+);
 
 const nextSundayTrigger = computeNextOccurrenceDate(
   '2026-11-20', // Friday

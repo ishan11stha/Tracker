@@ -241,6 +241,7 @@ async function initializeSchema(db: SQLite.SQLiteDatabase): Promise<void> {
       priority TEXT NOT NULL CHECK(priority IN ('Low', 'Medium', 'High')),
       category TEXT NOT NULL,
       recurrence TEXT NOT NULL DEFAULT 'none',
+      alertMode TEXT NOT NULL DEFAULT 'both',
       isCompleted INTEGER NOT NULL DEFAULT 0,
       notificationId TEXT DEFAULT '',
       createdAt TEXT NOT NULL,
@@ -269,6 +270,11 @@ async function initializeSchema(db: SQLite.SQLiteDatabase): Promise<void> {
   }
   try {
     await db.execAsync(`ALTER TABLE transactions ADD COLUMN accountScope TEXT DEFAULT 'Personal';`);
+  } catch {
+    // Column already exists
+  }
+  try {
+    await db.execAsync(`ALTER TABLE reminders ADD COLUMN alertMode TEXT DEFAULT 'both';`);
   } catch {
     // Column already exists
   }
@@ -896,11 +902,13 @@ interface ReminderRow extends Omit<ReminderItem, 'isCompleted'> {
 
 export async function dbGetAllReminders(): Promise<ReminderItem[]> {
   if (isWeb) {
-    return [...readWebStore().reminders].sort(
-      (a, b) =>
-        a.dateISO.localeCompare(b.dateISO) ||
-        a.timeString.localeCompare(b.timeString)
-    );
+    return [...readWebStore().reminders]
+      .map((r) => ({ ...r, alertMode: r.alertMode || 'both' }))
+      .sort(
+        (a, b) =>
+          a.dateISO.localeCompare(b.dateISO) ||
+          a.timeString.localeCompare(b.timeString)
+      );
   }
   const db = await getDatabase();
   const rows = await db.getAllAsync<ReminderRow>(
@@ -908,6 +916,7 @@ export async function dbGetAllReminders(): Promise<ReminderItem[]> {
   );
   return rows.map((r) => ({
     ...r,
+    alertMode: r.alertMode || 'both',
     isCompleted: Boolean(r.isCompleted),
   }));
 }
@@ -917,15 +926,15 @@ export async function dbInsertReminder(reminder: ReminderItem): Promise<void> {
     const store = readWebStore();
     writeWebStore({
       ...store,
-      reminders: [...store.reminders, reminder],
+      reminders: [...store.reminders, { ...reminder, alertMode: reminder.alertMode || 'both' }],
     });
     return;
   }
   const db = await getDatabase();
   await db.withTransactionAsync(async () => {
     await db.runAsync(
-      `INSERT INTO reminders (id, title, description, dateISO, timeString, priority, category, recurrence, isCompleted, notificationId, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO reminders (id, title, description, dateISO, timeString, priority, category, recurrence, alertMode, isCompleted, notificationId, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         reminder.id,
         reminder.title,
@@ -935,6 +944,7 @@ export async function dbInsertReminder(reminder: ReminderItem): Promise<void> {
         reminder.priority,
         reminder.category,
         reminder.recurrence,
+        reminder.alertMode || 'both',
         reminder.isCompleted ? 1 : 0,
         reminder.notificationId || '',
         reminder.createdAt,
@@ -950,7 +960,7 @@ export async function dbUpdateReminder(reminder: ReminderItem): Promise<void> {
     writeWebStore({
       ...store,
       reminders: store.reminders.map((r) =>
-        r.id === reminder.id ? reminder : r
+        r.id === reminder.id ? { ...reminder, alertMode: reminder.alertMode || 'both' } : r
       ),
     });
     return;
@@ -959,7 +969,7 @@ export async function dbUpdateReminder(reminder: ReminderItem): Promise<void> {
   await db.withTransactionAsync(async () => {
     await db.runAsync(
       `UPDATE reminders
-       SET title = ?, description = ?, dateISO = ?, timeString = ?, priority = ?, category = ?, recurrence = ?, isCompleted = ?, notificationId = ?, updatedAt = ?
+       SET title = ?, description = ?, dateISO = ?, timeString = ?, priority = ?, category = ?, recurrence = ?, alertMode = ?, isCompleted = ?, notificationId = ?, updatedAt = ?
        WHERE id = ?`,
       [
         reminder.title,
@@ -969,6 +979,7 @@ export async function dbUpdateReminder(reminder: ReminderItem): Promise<void> {
         reminder.priority,
         reminder.category,
         reminder.recurrence,
+        reminder.alertMode || 'both',
         reminder.isCompleted ? 1 : 0,
         reminder.notificationId || '',
         reminder.updatedAt,
@@ -1143,8 +1154,8 @@ export async function dbRestoreBackup(payload: VaultBackupPayload): Promise<void
 
     for (const rem of payload.reminders || []) {
       await db.runAsync(
-        `INSERT INTO reminders (id, title, description, dateISO, timeString, priority, category, recurrence, isCompleted, notificationId, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO reminders (id, title, description, dateISO, timeString, priority, category, recurrence, alertMode, isCompleted, notificationId, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           rem.id,
           rem.title,
@@ -1154,6 +1165,7 @@ export async function dbRestoreBackup(payload: VaultBackupPayload): Promise<void
           rem.priority,
           rem.category,
           rem.recurrence || 'none',
+          rem.alertMode || 'both',
           rem.isCompleted ? 1 : 0,
           rem.notificationId || '',
           rem.createdAt,

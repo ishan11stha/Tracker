@@ -190,6 +190,8 @@ export const activitySchema = z.object({
 
 export type ReminderPriority = 'Low' | 'Medium' | 'High';
 
+export type ReminderAlertMode = 'alarm' | 'vibrate' | 'both';
+
 export type WeekdayRecurrenceKey =
   | 'sunday'
   | 'monday'
@@ -254,6 +256,7 @@ export interface ReminderItem {
   priority: ReminderPriority;
   category: string;
   recurrence: ReminderRecurrence;
+  alertMode?: ReminderAlertMode;
   isCompleted: boolean;
   notificationId?: string;
   createdAt: string;
@@ -271,6 +274,7 @@ export const reminderSchema = z.object({
     .string()
     .trim()
     .refine(isValidReminderRecurrence, 'Invalid recurrence value'),
+  alertMode: z.enum(['alarm', 'vibrate', 'both']).optional().default('both'),
 });
 
 export interface AppSettings {
@@ -483,6 +487,16 @@ export const REMINDER_PRIORITIES: { label: ReminderPriority; color: string }[] =
   { label: 'Low', color: '#2563EB' },
   { label: 'Medium', color: '#D97706' },
   { label: 'High', color: '#DC2626' },
+];
+
+export const REMINDER_ALERT_MODES: {
+  key: ReminderAlertMode;
+  label: string;
+  sublabel: string;
+}[] = [
+  { key: 'alarm', label: 'Alarm', sublabel: 'Sound ring' },
+  { key: 'vibrate', label: 'Vibrate', sublabel: 'Vibrate mode' },
+  { key: 'both', label: 'Alarm & Vibrate', sublabel: 'Sound + vibrate' },
 ];
 
 export const REMINDER_WEEKDAYS: {

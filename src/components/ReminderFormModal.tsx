@@ -9,15 +9,27 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  Vibration,
   View,
 } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Bell, Calendar, Check, Clock, Repeat, X } from 'lucide-react-native';
 import {
+  Bell,
+  Calendar,
+  Check,
+  Clock,
+  Repeat,
+  Vibrate,
+  Volume2,
+  X,
+} from 'lucide-react-native';
+import {
+  REMINDER_ALERT_MODES,
   REMINDER_CATEGORIES,
   REMINDER_PRIORITIES,
   REMINDER_WEEKDAYS,
+  ReminderAlertMode,
   ReminderItem,
   ReminderPriority,
   ReminderRecurrence,
@@ -52,6 +64,7 @@ interface ReminderFormValues {
   priority: ReminderPriority;
   category: string;
   recurrence: ReminderRecurrence;
+  alertMode?: ReminderAlertMode;
 }
 
 export const ReminderFormModal: React.FC<ReminderFormModalProps> = ({
@@ -88,6 +101,7 @@ export const ReminderFormModal: React.FC<ReminderFormModalProps> = ({
       priority: 'Medium',
       category: REMINDER_CATEGORIES[0],
       recurrence: 'none',
+      alertMode: 'both',
     },
   });
 
@@ -96,6 +110,7 @@ export const ReminderFormModal: React.FC<ReminderFormModalProps> = ({
   const currentPriority = watch('priority');
   const currentCategory = watch('category');
   const currentRecurrence = watch('recurrence');
+  const currentAlertMode = watch('alertMode') || 'both';
 
   useEffect(() => {
     if (visible) {
@@ -108,6 +123,7 @@ export const ReminderFormModal: React.FC<ReminderFormModalProps> = ({
           priority: editingReminder.priority,
           category: editingReminder.category,
           recurrence: editingReminder.recurrence,
+          alertMode: editingReminder.alertMode || 'both',
         });
       } else {
         reset({
@@ -118,6 +134,7 @@ export const ReminderFormModal: React.FC<ReminderFormModalProps> = ({
           priority: 'Medium',
           category: REMINDER_CATEGORIES[0],
           recurrence: 'none',
+          alertMode: 'both',
         });
       }
     }
@@ -300,6 +317,102 @@ export const ReminderFormModal: React.FC<ReminderFormModalProps> = ({
                         ]}
                       >
                         {p.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Alert Mode: Alarm & Vibrate */}
+            <View style={styles.fieldGroup}>
+              <View style={styles.labelRow}>
+                <Volume2 size={13} color={theme.textSecondary} />
+                <Text
+                  style={[
+                    styles.label,
+                    { color: theme.textSecondary, marginBottom: 0 },
+                  ]}
+                >
+                  Alert Mode (Alarm & Vibrate) *
+                </Text>
+              </View>
+              <View style={styles.priorityRow}>
+                {REMINDER_ALERT_MODES.map((mode) => {
+                  const selected = currentAlertMode === mode.key;
+                  const iconColor = selected ? '#FFFFFF' : palette.accent;
+                  return (
+                    <TouchableOpacity
+                      key={mode.key}
+                      onPress={() => {
+                        setValue('alertMode', mode.key, {
+                          shouldValidate: true,
+                        });
+                        if (
+                          (mode.key === 'vibrate' || mode.key === 'both') &&
+                          Platform.OS !== 'web'
+                        ) {
+                          try {
+                            Vibration.vibrate(70);
+                          } catch {
+                            // Ignore on devices without vibrator
+                          }
+                        }
+                      }}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected }}
+                      accessibilityLabel={`${mode.label} (${mode.sublabel})`}
+                      style={[
+                        styles.priorityBtn,
+                        {
+                          backgroundColor: selected
+                            ? palette.accent
+                            : theme.inputBg,
+                          borderColor: selected ? palette.accent : theme.border,
+                          paddingHorizontal: 6,
+                          paddingVertical: 9,
+                          gap: 3,
+                        },
+                      ]}
+                    >
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 5,
+                        }}
+                      >
+                        {mode.key === 'alarm' ? (
+                          <Volume2 size={14} color={iconColor} />
+                        ) : mode.key === 'vibrate' ? (
+                          <Vibrate size={14} color={iconColor} />
+                        ) : (
+                          <Bell size={14} color={iconColor} />
+                        )}
+                        <Text
+                          style={[
+                            styles.priorityBtnText,
+                            {
+                              fontSize: 12,
+                              color: selected ? '#FFFFFF' : theme.textPrimary,
+                            },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {mode.label}
+                        </Text>
+                      </View>
+                      <Text
+                        style={{
+                          fontSize: 10,
+                          fontWeight: '600',
+                          color: selected
+                            ? 'rgba(255,255,255,0.86)'
+                            : theme.textMuted,
+                        }}
+                        numberOfLines={1}
+                      >
+                        {mode.sublabel}
                       </Text>
                     </TouchableOpacity>
                   );

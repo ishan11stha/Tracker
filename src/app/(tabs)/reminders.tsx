@@ -21,6 +21,8 @@ import {
   Plus,
   Repeat,
   Trash2,
+  Vibrate,
+  Volume2,
 } from 'lucide-react-native';
 import { useVaultStore } from '../../store/useVaultStore';
 import { getSectionPalette, getThemeColors } from '../../theme/colors';
@@ -548,6 +550,27 @@ export default function RemindersScreen() {
                           </Text>
                         </View>
                       )}
+                      <View style={styles.recurBadge}>
+                        {rem.alertMode === 'alarm' ? (
+                          <Volume2 size={11} color={palette.accent} />
+                        ) : rem.alertMode === 'vibrate' ? (
+                          <Vibrate size={11} color={palette.accent} />
+                        ) : (
+                          <Bell size={11} color={palette.accent} />
+                        )}
+                        <Text
+                          style={[
+                            styles.recurText,
+                            { color: palette.accent },
+                          ]}
+                        >
+                          {rem.alertMode === 'alarm'
+                            ? 'Alarm'
+                            : rem.alertMode === 'vibrate'
+                              ? 'Vibrate'
+                              : 'Alarm & Vibrate'}
+                        </Text>
+                      </View>
                     </View>
 
                     {overdue && (
