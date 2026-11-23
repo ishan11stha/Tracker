@@ -1,17 +1,16 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Clock, Check, X } from 'lucide-react-native';
+import { Check, Clock, Minus, Plus, X } from 'lucide-react-native';
 import { getThemeColors } from '../theme/colors';
 import { useVaultStore } from '../store/useVaultStore';
-import { formatTimeString } from '../utils/nepaliDate';
+import { formatTimeString, getNowInNPT } from '../utils/nepaliDate';
 
 interface TimePickerModalProps {
   visible: boolean;
@@ -21,12 +20,23 @@ interface TimePickerModalProps {
   accentColor?: string;
 }
 
+const HOURS_12 = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+const MINUTES_5 = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55];
+
+const QUICK_PRESETS: { label: string; h: number; m: number }[] = [
+  { label: '7 AM', h: 7, m: 0 },
+  { label: '9 AM', h: 9, m: 0 },
+  { label: '12 PM', h: 12, m: 0 },
+  { label: '6 PM', h: 18, m: 0 },
+  { label: '9 PM', h: 21, m: 0 },
+];
+
 export const TimePickerModal: React.FC<TimePickerModalProps> = ({
   visible,
   value24,
   onSelectTime,
   onClose,
-  accentColor = '#0F172A',
+  accentColor = '#0F3375',
 }) => {
   const { settings } = useVaultStore();
   const isDark = settings.theme === 'dark';
@@ -34,10 +44,10 @@ export const TimePickerModal: React.FC<TimePickerModalProps> = ({
 
   const [initH, initM] = (value24 || '09:00').split(':').map(Number);
   const [selectedHour, setSelectedHour] = useState<number>(
-    Number.isFinite(initH) ? initH : 9
+    Number.isFinite(initH) && initH >= 0 && initH < 24 ? initH : 9
   );
   const [selectedMinute, setSelectedMinute] = useState<number>(
-    Number.isFinite(initM) ? initM : 0
+    Number.isFinite(initM) && initM >= 0 && initM < 60 ? initM : 0
   );
 
   useEffect(() => {
@@ -48,15 +58,25 @@ export const TimePickerModal: React.FC<TimePickerModalProps> = ({
     }
   }, [visible, value24]);
 
-  const hours = useMemo(() => Array.from({ length: 24 }, (_, i) => i), []);
-  const minutes = useMemo(() => {
-    const base = Array.from({ length: 12 }, (_, i) => i * 5);
-    if (!base.includes(selectedMinute)) {
-      base.push(selectedMinute);
-      base.sort((a, b) => a - b);
-    }
-    return base;
-  }, [selectedMinute]);
+  const isPM = selectedHour >= 12;
+  const displayHour12 = selectedHour % 12 === 0 ? 12 : selectedHour % 12;
+
+  const setHour12 = (h12: number, pm: boolean) => {
+    const normalized = h12 % 12;
+    setSelectedHour(pm ? normalized + 12 : normalized);
+  };
+
+  const stepMinute = (delta: number) => {
+    const total = (selectedHour * 60 + selectedMinute + delta + 1440) % 1440;
+    setSelectedHour(Math.floor(total / 60));
+    setSelectedMinute(total % 60);
+  };
+
+  const setNowNPT = () => {
+    const now = getNowInNPT();
+    setSelectedHour(now.hours);
+    setSelectedMinute(now.minutes);
+  };
 
   const current24 = `${String(selectedHour).padStart(2, '0')}:${String(
     selectedMinute
@@ -80,11 +100,12 @@ export const TimePickerModal: React.FC<TimePickerModalProps> = ({
           ]}
           onPress={(e) => e.stopPropagation()}
         >
+          {/* Header */}
           <View style={styles.headerRow}>
             <View style={styles.titleRow}>
               <Clock size={18} color={accentColor} />
               <Text style={[styles.title, { color: theme.textPrimary }]}>
-                Select Nepal Time (NPT)
+                Set Time
               </Text>
             </View>
             <TouchableOpacity
@@ -97,119 +118,214 @@ export const TimePickerModal: React.FC<TimePickerModalProps> = ({
             </TouchableOpacity>
           </View>
 
+          {/* Big Digital Display + AM/PM Switch + +/-1m Fine Stepper */}
           <View
             style={[
-              styles.previewBox,
+              styles.digitalBox,
               {
                 backgroundColor: isDark ? '#0F172A' : '#F8FAFC',
                 borderColor: theme.border,
               },
             ]}
           >
-            <Text style={[styles.previewMain, { color: theme.textPrimary }]}>
-              {formatTimeString(current24, settings.timeFormat)} NPT
-            </Text>
-            <Text style={[styles.previewSub, { color: theme.textSecondary }]}>
-              Asia/Kathmandu (UTC+05:45) • 24h: {current24}
-            </Text>
-          </View>
-
-          <View style={styles.columnsWrap}>
-            {/* Hour Column */}
-            <View style={styles.column}>
-              <Text style={[styles.colLabel, { color: theme.textSecondary }]}>
-                Hour (घण्टा)
-              </Text>
-              <ScrollView
-                style={styles.colScroll}
-                showsVerticalScrollIndicator={false}
+            <View style={styles.digitalTimeRow}>
+              <TouchableOpacity
+                onPress={() => stepMinute(-1)}
+                style={[
+                  styles.stepBtn,
+                  { backgroundColor: theme.surfaceContainerHigh },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Minus 1 minute"
               >
-                <View style={styles.chipGrid}>
-                  {hours.map((h) => {
-                    const active = h === selectedHour;
-                    const label =
-                      settings.timeFormat === '24h'
-                        ? String(h).padStart(2, '0')
-                        : `${h % 12 === 0 ? 12 : h % 12} ${
-                            h >= 12 ? 'PM' : 'AM'
-                          }`;
-                    return (
-                      <TouchableOpacity
-                        key={h}
-                        onPress={() => setSelectedHour(h)}
-                        style={[
-                          styles.timeChip,
-                          {
-                            backgroundColor: active
-                              ? accentColor
-                              : isDark
-                              ? '#0F172A'
-                              : '#F1F5F9',
-                          },
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.timeChipText,
-                            {
-                              color: active ? '#FFFFFF' : theme.textPrimary,
-                            },
-                          ]}
-                        >
-                          {label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </ScrollView>
+                <Minus size={15} color={theme.textPrimary} />
+              </TouchableOpacity>
+
+              <Text style={[styles.digitalText, { color: theme.textPrimary }]}>
+                {String(displayHour12).padStart(2, '0')}:
+                {String(selectedMinute).padStart(2, '0')}
+              </Text>
+
+              <TouchableOpacity
+                onPress={() => stepMinute(1)}
+                style={[
+                  styles.stepBtn,
+                  { backgroundColor: theme.surfaceContainerHigh },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Plus 1 minute"
+              >
+                <Plus size={15} color={theme.textPrimary} />
+              </TouchableOpacity>
             </View>
 
-            {/* Minute Column */}
-            <View style={styles.column}>
-              <Text style={[styles.colLabel, { color: theme.textSecondary }]}>
-                Minute (मिनेट)
-              </Text>
-              <ScrollView
-                style={styles.colScroll}
-                showsVerticalScrollIndicator={false}
+            {/* AM / PM Pill Toggle */}
+            <View
+              style={[
+                styles.ampmToggle,
+                { backgroundColor: theme.surfaceContainerHigh },
+              ]}
+            >
+              <TouchableOpacity
+                onPress={() => setHour12(displayHour12, false)}
+                style={[
+                  styles.ampmBtn,
+                  !isPM && { backgroundColor: accentColor },
+                ]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: !isPM }}
               >
-                <View style={styles.chipGrid}>
-                  {minutes.map((m) => {
-                    const active = m === selectedMinute;
-                    return (
-                      <TouchableOpacity
-                        key={m}
-                        onPress={() => setSelectedMinute(m)}
-                        style={[
-                          styles.timeChip,
-                          {
-                            backgroundColor: active
-                              ? accentColor
-                              : isDark
-                              ? '#0F172A'
-                              : '#F1F5F9',
-                          },
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.timeChipText,
-                            {
-                              color: active ? '#FFFFFF' : theme.textPrimary,
-                            },
-                          ]}
-                        >
-                          :{String(m).padStart(2, '0')}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </ScrollView>
+                <Text
+                  style={[
+                    styles.ampmText,
+                    { color: !isPM ? '#FFFFFF' : theme.textMuted },
+                  ]}
+                >
+                  AM
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setHour12(displayHour12, true)}
+                style={[
+                  styles.ampmBtn,
+                  isPM && { backgroundColor: accentColor },
+                ]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isPM }}
+              >
+                <Text
+                  style={[
+                    styles.ampmText,
+                    { color: isPM ? '#FFFFFF' : theme.textMuted },
+                  ]}
+                >
+                  PM
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
 
+          {/* 1-Tap Quick Presets Row */}
+          <View style={styles.presetsRow}>
+            <TouchableOpacity
+              onPress={setNowNPT}
+              style={[
+                styles.presetChip,
+                {
+                  backgroundColor: `${accentColor}18`,
+                  borderColor: accentColor,
+                },
+              ]}
+            >
+              <Text style={[styles.presetText, { color: accentColor }]}>
+                Now
+              </Text>
+            </TouchableOpacity>
+
+            {QUICK_PRESETS.map((p) => {
+              const isSel = selectedHour === p.h && selectedMinute === p.m;
+              return (
+                <TouchableOpacity
+                  key={p.label}
+                  onPress={() => {
+                    setSelectedHour(p.h);
+                    setSelectedMinute(p.m);
+                  }}
+                  style={[
+                    styles.presetChip,
+                    {
+                      backgroundColor: isSel
+                        ? accentColor
+                        : theme.surfaceContainerHigh,
+                      borderColor: isSel ? accentColor : 'transparent',
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.presetText,
+                      { color: isSel ? '#FFFFFF' : theme.textSecondary },
+                    ]}
+                  >
+                    {p.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Zero-Scroll 6x2 Hour Grid (1..12) */}
+          <Text style={[styles.sectionLabel, { color: theme.textMuted }]}>
+            HOUR
+          </Text>
+          <View style={styles.grid6}>
+            {HOURS_12.map((h12) => {
+              const active = displayHour12 === h12;
+              return (
+                <TouchableOpacity
+                  key={h12}
+                  onPress={() => setHour12(h12, isPM)}
+                  style={[
+                    styles.gridCell,
+                    {
+                      backgroundColor: active
+                        ? accentColor
+                        : isDark
+                          ? '#0F172A'
+                          : '#F1F5F9',
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.gridCellText,
+                      { color: active ? '#FFFFFF' : theme.textPrimary },
+                    ]}
+                  >
+                    {h12}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Zero-Scroll 6x2 Minute Grid (:00 .. :55) */}
+          <Text style={[styles.sectionLabel, { color: theme.textMuted }]}>
+            MINUTE
+          </Text>
+          <View style={styles.grid6}>
+            {MINUTES_5.map((m) => {
+              const active = selectedMinute === m;
+              return (
+                <TouchableOpacity
+                  key={m}
+                  onPress={() => setSelectedMinute(m)}
+                  style={[
+                    styles.gridCell,
+                    {
+                      backgroundColor: active
+                        ? accentColor
+                        : isDark
+                          ? '#0F172A'
+                          : '#F1F5F9',
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.gridCellText,
+                      { color: active ? '#FFFFFF' : theme.textPrimary },
+                    ]}
+                  >
+                    :{String(m).padStart(2, '0')}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Confirm Button */}
           <TouchableOpacity
             onPress={() => {
               onSelectTime(current24);
@@ -219,7 +335,7 @@ export const TimePickerModal: React.FC<TimePickerModalProps> = ({
           >
             <Check size={16} color="#FFFFFF" />
             <Text style={styles.confirmBtnText}>
-              Set Time ({formatTimeString(current24, settings.timeFormat)} NPT)
+              Set {formatTimeString(current24, settings.timeFormat)}
             </Text>
           </TouchableOpacity>
         </Pressable>
@@ -237,7 +353,7 @@ const styles = StyleSheet.create({
   },
   card: {
     width: '100%',
-    maxWidth: 380,
+    maxWidth: 370,
     borderRadius: 24,
     padding: 16,
     borderWidth: 1,
@@ -256,66 +372,102 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 16,
-    fontWeight: '700',
-  },
-  previewBox: {
-    padding: 12,
-    borderRadius: 14,
-    borderWidth: 1,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  previewMain: {
-    fontSize: 20,
     fontWeight: '800',
   },
-  previewSub: {
-    fontSize: 11,
-    marginTop: 2,
-  },
-  columnsWrap: {
+  digitalBox: {
     flexDirection: 'row',
-    gap: 12,
-    height: 210,
-    marginBottom: 14,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 10,
   },
-  column: {
-    flex: 1,
+  digitalTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
-  colLabel: {
+  stepBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  digitalText: {
+    fontSize: 26,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  ampmToggle: {
+    flexDirection: 'row',
+    borderRadius: 12,
+    padding: 3,
+    gap: 2,
+  },
+  ampmBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 9,
+  },
+  ampmText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '800',
+  },
+  presetsRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 12,
+  },
+  presetChip: {
+    flex: 1,
+    paddingVertical: 6.5,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  presetText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  sectionLabel: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    letterSpacing: 0.6,
     marginBottom: 6,
   },
-  colScroll: {
-    flex: 1,
-  },
-  chipGrid: {
+  grid6: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
+    marginBottom: 12,
   },
-  timeChip: {
-    width: '47%',
-    paddingVertical: 8,
+  gridCell: {
+    width: '15.2%',
+    paddingVertical: 9,
     borderRadius: 10,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  timeChipText: {
-    fontSize: 12,
-    fontWeight: '700',
+  gridCellText: {
+    fontSize: 12.5,
+    fontWeight: '800',
   },
   confirmBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 12,
+    paddingVertical: 13,
     borderRadius: 14,
+    marginTop: 2,
   },
   confirmBtnText: {
     color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '800',
   },
 });
