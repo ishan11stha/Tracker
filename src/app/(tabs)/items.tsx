@@ -606,7 +606,7 @@ const styles = StyleSheet.create({
     maxWidth: LAYOUT.maxContentWidth,
     alignSelf: 'center',
     paddingHorizontal: LAYOUT.horizontalPadding,
-    paddingTop: 10,
+    paddingTop: 16,
     paddingBottom: 32,
   },
   headerRow: {

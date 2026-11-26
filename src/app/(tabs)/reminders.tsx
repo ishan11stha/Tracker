@@ -660,7 +660,7 @@ const styles = StyleSheet.create({
     maxWidth: LAYOUT.maxContentWidth,
     alignSelf: 'center',
     paddingHorizontal: 18,
-    paddingTop: 12,
+    paddingTop: 16,
     paddingBottom: 32,
   },
   headerRow: {

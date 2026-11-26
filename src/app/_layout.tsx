@@ -2,10 +2,16 @@ import React, { useEffect } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import * as SplashScreen from 'expo-splash-screen';
+import {
+  SafeAreaProvider,
+  initialWindowMetrics,
+} from 'react-native-safe-area-context';
 import { useVaultStore } from '../store/useVaultStore';
 import { getThemeColors } from '../theme/colors';
 import { AppErrorBoundary } from '../components/AppErrorBoundary';
+
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
   const { isHydrated, hydrateFromDB, settings, error, clearError } =
@@ -18,16 +24,22 @@ export default function RootLayout() {
   }, [hydrateFromDB]);
 
   useEffect(() => {
+    if (isHydrated) {
+      SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [isHydrated]);
+
+  useEffect(() => {
     if (!error) return;
     Alert.alert('VAULT could not complete that action', error, [
       { text: 'Dismiss', onPress: clearError },
     ]);
   }, [error, clearError]);
 
-  const statusBarBackground = isDark ? '#0F172A' : '#F5F6F8';
+  const statusBarBackground = isDark ? '#0B0F19' : '#F8FAFC';
 
   return (
-    <SafeAreaProvider>
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
       <AppErrorBoundary>
         <StatusBar
           style={isDark ? 'light' : 'dark'}

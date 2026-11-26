@@ -1,6 +1,7 @@
 import React from 'react';
-import { Platform, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Tabs } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Activity,
   Bell,
@@ -18,8 +19,10 @@ import { getSectionPalette, getThemeColors } from '../../theme/colors';
  */
 export default function TabsLayout() {
   const { settings } = useVaultStore();
+  const insets = useSafeAreaInsets();
   const isDark = settings.theme === 'dark';
   const theme = getThemeColors(isDark);
+  const bottomPad = Math.max(10, insets.bottom);
 
   const dashboardPalette = getSectionPalette('dashboard', isDark);
   const moneyPalette = getSectionPalette('money', isDark);
@@ -36,9 +39,9 @@ export default function TabsLayout() {
           backgroundColor: theme.tabBar,
           borderTopColor: theme.tabBarBorder,
           borderTopWidth: 1,
-          height: Platform.OS === 'android' ? 70 : 68,
+          height: 60 + bottomPad,
           paddingTop: 6,
-          paddingBottom: Platform.OS === 'android' ? 10 : 10,
+          paddingBottom: bottomPad,
           elevation: 8,
         },
         tabBarLabelStyle: {
