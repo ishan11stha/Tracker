@@ -134,13 +134,13 @@ export default function ItemTrackerScreen() {
         <View style={styles.headerRow}>
           <View style={{ flex: 1, marginRight: 10 }}>
             <Text style={[styles.screenTitle, { color: theme.textPrimary }]}>
-              Assets & Items
+              Items
             </Text>
             <Text
               style={[styles.screenSubtitle, { color: theme.textMuted }]}
               numberOfLines={1}
             >
-              सामान तथा सम्पत्ति अभिलेख • Inventory & Lending
+              Personal assets & lending
             </Text>
           </View>
           <TouchableOpacity
@@ -151,81 +151,57 @@ export default function ItemTrackerScreen() {
             style={[styles.addBtn, { backgroundColor: palette.accent }]}
           >
             <Plus size={15} color="#FFFFFF" strokeWidth={2.5} />
-            <Text style={styles.addBtnText}>Add Item</Text>
+            <Text style={styles.addBtnText}>Add</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Monekin Net Asset Portfolio Card */}
+        {/* Signature Obsidian Asset Portfolio Hero Card */}
         <View
           style={[
             styles.summaryCard,
-            { backgroundColor: theme.card, borderColor: theme.border },
+            {
+              backgroundColor: isDark ? '#151F32' : '#0F172A',
+              borderColor: isDark ? '#26344E' : '#1E293B',
+            },
           ]}
         >
           <View style={styles.summaryTopRow}>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.summaryLabel, { color: theme.textMuted }]}>
-                TOTAL ASSET PORTFOLIO VALUATION
-              </Text>
+              <Text style={styles.summaryLabel}>ASSET VALUATION</Text>
               <CurrencyDisplayer
                 amount={stats.totalValue}
                 currency={settings.currency}
-                isDark={isDark}
+                isDark={true}
                 privateMode={privateMode}
                 size="xl"
+                color="#FFFFFF"
               />
             </View>
-            <View
-              style={[
-                styles.iconBadge,
-                { backgroundColor: palette.accentSoft },
-              ]}
-            >
-              <Package size={22} color={palette.accent} />
+            <View style={styles.iconBadge}>
+              <Package size={20} color="#60A5FA" />
             </View>
           </View>
 
           <View style={styles.metricsRow}>
-            <View
-              style={[
-                styles.metricBox,
-                { backgroundColor: theme.surfaceContainerHigh },
-              ]}
-            >
-              <Text style={[styles.metricNum, { color: palette.accent }]}>
+            <View style={styles.metricBox}>
+              <Text style={[styles.metricNum, { color: '#60A5FA' }]}>
                 {stats.totalUnits}
               </Text>
-              <Text style={[styles.metricText, { color: theme.textMuted }]}>
-                Total Units
-              </Text>
+              <Text style={styles.metricText}>Units</Text>
             </View>
 
-            <View
-              style={[
-                styles.metricBox,
-                { backgroundColor: theme.surfaceContainerHigh },
-              ]}
-            >
-              <Text style={[styles.metricNum, { color: '#EA580C' }]}>
+            <View style={styles.metricBox}>
+              <Text style={[styles.metricNum, { color: '#FB923C' }]}>
                 {stats.lentCount}
               </Text>
-              <Text style={[styles.metricText, { color: theme.textMuted }]}>
-                Lent Out
-              </Text>
+              <Text style={styles.metricText}>Lent</Text>
             </View>
 
-            <View
-              style={[
-                styles.metricBox,
-                { backgroundColor: theme.surfaceContainerHigh },
-              ]}
-            >
-              <Text style={[styles.metricNum, { color: '#D97706' }]}>
+            <View style={styles.metricBox}>
+              <Text style={[styles.metricNum, { color: '#FBBF24' }]}>
                 {stats.borrowedCount}
               </Text>
-              <Text style={[styles.metricText, { color: theme.textMuted }]}>
-                Borrowed
-              </Text>
+              <Text style={styles.metricText}>Borrowed</Text>
             </View>
           </View>
         </View>
@@ -662,10 +638,15 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   summaryCard: {
-    borderRadius: 20,
-    padding: 16,
+    borderRadius: 24,
+    padding: 18,
     borderWidth: 1,
     marginBottom: 14,
+    elevation: 4,
+    shadowColor: '#020617',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.16,
+    shadowRadius: 14,
   },
   summaryTopRow: {
     flexDirection: 'row',
@@ -674,15 +655,17 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   summaryLabel: {
-    fontSize: 10,
+    fontSize: 10.5,
     fontWeight: '800',
-    letterSpacing: 0.6,
+    letterSpacing: 0.9,
     marginBottom: 6,
+    color: 'rgba(248, 250, 252, 0.65)',
   },
   iconBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: 'rgba(96, 165, 250, 0.16)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -694,6 +677,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
     borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.07)',
     alignItems: 'center',
   },
   metricNum: {
@@ -704,6 +688,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     marginTop: 2,
+    color: 'rgba(248, 250, 252, 0.7)',
   },
   searchBar: {
     flexDirection: 'row',

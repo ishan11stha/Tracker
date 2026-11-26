@@ -161,13 +161,13 @@ export default function RemindersScreen() {
         <View style={styles.headerRow}>
           <View style={{ flex: 1, marginRight: 10 }}>
             <Text style={[styles.screenTitle, { color: theme.textPrimary }]}>
-              Reminder Manager
+              Reminders
             </Text>
             <Text
-              style={[styles.screenSubtitle, { color: theme.textSecondary }]}
+              style={[styles.screenSubtitle, { color: theme.textMuted }]}
               numberOfLines={1}
             >
-              नेपाली मिति र समय अनुसार अलर्ट • Asia/Kathmandu
+              Alarms & schedules (NPT)
             </Text>
           </View>
           <TouchableOpacity
@@ -177,93 +177,79 @@ export default function RemindersScreen() {
             }}
             style={[styles.addBtn, { backgroundColor: palette.accent }]}
           >
-            <Plus size={16} color="#FFFFFF" />
-            <Text style={styles.addBtnText}>New Reminder</Text>
+            <Plus size={15} color="#FFFFFF" strokeWidth={2.5} />
+            <Text style={styles.addBtnText}>Add</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Tab Bar: Upcoming, Overdue, Completed, Calendar View */}
+        {/* Signature Obsidian Alert Summary + Tab Bar */}
         <View
           style={[
-            styles.tabsContainer,
-            { backgroundColor: theme.card, borderColor: theme.border },
+            styles.heroTabsCard,
+            {
+              backgroundColor: isDark ? '#151F32' : '#0F172A',
+              borderColor: isDark ? '#26344E' : '#1E293B',
+            },
           ]}
         >
-          {(
-            [
-              {
-                key: 'upcoming',
-                label: 'Upcoming',
-                count: categorized.upcoming.length,
-              },
-              {
-                key: 'overdue',
-                label: 'Overdue',
-                count: categorized.overdue.length,
-              },
-              {
-                key: 'completed',
-                label: 'Done',
-                count: categorized.completed.length,
-              },
-              { key: 'calendar', label: 'Calendar', count: 0 },
-            ] as { key: ReminderTabKey; label: string; count: number }[]
-          ).map((t) => {
-            const active = activeTab === t.key;
-            return (
-              <TouchableOpacity
-                key={t.key}
-                onPress={() => setActiveTab(t.key)}
-                activeOpacity={0.75}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: active }}
-                style={[
-                  styles.tabButton,
-                  active && {
-                    backgroundColor: palette.accent,
-                    shadowColor: palette.accent,
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.3,
-                    shadowRadius: 3,
-                    elevation: 2,
-                  },
-                ]}
-              >
-                <Text
+          <View style={styles.heroStatsRow}>
+            <View style={styles.heroStatGlass}>
+              <Text style={[styles.heroStatNum, { color: '#FB923C' }]}>
+                {categorized.upcoming.length}
+              </Text>
+              <Text style={styles.heroStatLabel}>Upcoming</Text>
+            </View>
+            <View style={styles.heroStatGlass}>
+              <Text style={[styles.heroStatNum, { color: '#FB7185' }]}>
+                {categorized.overdue.length}
+              </Text>
+              <Text style={styles.heroStatLabel}>Overdue</Text>
+            </View>
+            <View style={styles.heroStatGlass}>
+              <Text style={[styles.heroStatNum, { color: '#34D399' }]}>
+                {categorized.completed.length}
+              </Text>
+              <Text style={styles.heroStatLabel}>Done</Text>
+            </View>
+          </View>
+
+          <View style={styles.tabsContainer}>
+            {(
+              [
+                { key: 'upcoming', label: 'Upcoming' },
+                { key: 'overdue', label: 'Overdue' },
+                { key: 'completed', label: 'Done' },
+                { key: 'calendar', label: 'Calendar' },
+              ] as { key: ReminderTabKey; label: string }[]
+            ).map((t) => {
+              const active = activeTab === t.key;
+              return (
+                <TouchableOpacity
+                  key={t.key}
+                  onPress={() => setActiveTab(t.key)}
+                  activeOpacity={0.75}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: active }}
                   style={[
-                    styles.tabButtonText,
-                    { color: active ? '#FFFFFF' : theme.textSecondary },
+                    styles.tabButton,
+                    active && styles.tabButtonActive,
                   ]}
-                  numberOfLines={1}
                 >
-                  {t.label}
-                </Text>
-                {t.count > 0 && (
-                  <View
+                  <Text
                     style={[
-                      styles.tabBadge,
+                      styles.tabButtonText,
                       {
-                        backgroundColor: active
-                          ? 'rgba(255, 255, 255, 0.28)'
-                          : isDark
-                          ? 'rgba(255, 255, 255, 0.1)'
-                          : 'rgba(0, 0, 0, 0.08)',
+                        color: active ? '#0F172A' : 'rgba(248,250,252,0.7)',
                       },
                     ]}
+                    numberOfLines={1}
                   >
-                    <Text
-                      style={[
-                        styles.tabBadgeText,
-                        { color: active ? '#FFFFFF' : theme.textPrimary },
-                      ]}
-                    >
-                      {t.count}
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            );
-          })}
+                    {t.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
 
         {/* Interactive Embedded Nepali Calendar View when "Calendar" tab is active */}
@@ -695,45 +681,69 @@ const styles = StyleSheet.create({
   addBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 4,
     paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 12,
+    paddingVertical: 9,
+    borderRadius: 999,
   },
   addBtnText: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '800',
+  },
+  heroTabsCard: {
+    borderRadius: 24,
+    padding: 16,
+    borderWidth: 1,
+    marginBottom: 14,
+    elevation: 4,
+    shadowColor: '#020617',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.16,
+    shadowRadius: 14,
+  },
+  heroStatsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 14,
+  },
+  heroStatGlass: {
+    flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+    borderRadius: 14,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  heroStatNum: {
+    fontSize: 19,
+    fontWeight: '900',
+  },
+  heroStatLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
+    color: 'rgba(248, 250, 252, 0.7)',
   },
   tabsContainer: {
     flexDirection: 'row',
-    borderRadius: 14,
-    padding: 4,
-    borderWidth: 1,
-    marginBottom: 14,
-    gap: 4,
+    borderRadius: 999,
+    padding: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.09)',
+    gap: 2,
   },
   tabButton: {
     flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    paddingVertical: 8,
+    paddingVertical: 7,
     paddingHorizontal: 4,
-    borderRadius: 10,
+    borderRadius: 999,
     alignItems: 'center',
-    gap: 4,
+    justifyContent: 'center',
+  },
+  tabButtonActive: {
+    backgroundColor: '#FFFFFF',
   },
   tabButtonText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  tabBadge: {
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 999,
-  },
-  tabBadgeText: {
-    fontSize: 9,
+    fontSize: 11.5,
     fontWeight: '800',
   },
   calendarCard: {

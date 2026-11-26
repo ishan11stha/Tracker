@@ -175,19 +175,17 @@ export default function ActivityTrackerScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Simple Overview Card: Daily/Weekly/Monthly + Date + Progress Bar */}
+        {/* Signature Obsidian Overview Card: Daily/Weekly/Monthly + Date + Progress Bar */}
         <View
           style={[
             styles.overviewCard,
-            { backgroundColor: theme.card, borderColor: theme.border },
+            {
+              backgroundColor: isDark ? '#151F32' : '#0F172A',
+              borderColor: isDark ? '#26344E' : '#1E293B',
+            },
           ]}
         >
-          <View
-            style={[
-              styles.viewModeToggle,
-              { backgroundColor: theme.surfaceContainerHigh },
-            ]}
-          >
+          <View style={styles.viewModeToggle}>
             {(
               [
                 { key: 'daily', label: 'Daily' },
@@ -204,13 +202,15 @@ export default function ActivityTrackerScreen() {
                   accessibilityState={{ selected: active }}
                   style={[
                     styles.viewModeBtn,
-                    active && { backgroundColor: palette.accent },
+                    active && styles.viewModeBtnActive,
                   ]}
                 >
                   <Text
                     style={[
                       styles.viewModeText,
-                      { color: active ? '#FFFFFF' : theme.textMuted },
+                      {
+                        color: active ? '#0F172A' : 'rgba(248,250,252,0.68)',
+                      },
                     ]}
                   >
                     {tab.label}
@@ -226,12 +226,9 @@ export default function ActivityTrackerScreen() {
             accessibilityRole="button"
             accessibilityLabel="Select date"
           >
-            <Calendar size={16} color={palette.accent} />
+            <Calendar size={16} color="#A78BFA" />
             <View style={{ flex: 1 }}>
-              <Text
-                style={[styles.activeDateMain, { color: theme.textPrimary }]}
-                numberOfLines={1}
-              >
+              <Text style={styles.activeDateMain} numberOfLines={1}>
                 {viewMode === 'daily'
                   ? formatBSDateNepali(selectedBS, false)
                   : viewMode === 'weekly'
@@ -243,10 +240,7 @@ export default function ActivityTrackerScreen() {
                         selectedBS.year
                       )}`}
               </Text>
-              <Text
-                style={[styles.activeDateSub, { color: theme.textMuted }]}
-                numberOfLines={1}
-              >
+              <Text style={styles.activeDateSub} numberOfLines={1}>
                 {viewMode === 'weekly'
                   ? `${weekBounds.startISO} to ${weekBounds.endISO}`
                   : formatADDateFull(selectedDateISO)}
@@ -254,27 +248,20 @@ export default function ActivityTrackerScreen() {
             </View>
           </TouchableOpacity>
 
-          {/* Clean Progress Bar */}
+          {/* Luminous Progress Bar */}
           <View style={styles.progressSection}>
             <View style={styles.progressHeader}>
-              <Text style={[styles.progressLabel, { color: theme.textMuted }]}>
+              <Text style={styles.progressLabel}>
                 {summary.completed} of {summary.total} completed
               </Text>
-              <Text style={[styles.progressPct, { color: palette.accent }]}>
-                {summary.rate}%
-              </Text>
+              <Text style={styles.progressPct}>{summary.rate}%</Text>
             </View>
-            <View
-              style={[
-                styles.progressTrack,
-                { backgroundColor: theme.surfaceContainerHigh },
-              ]}
-            >
+            <View style={styles.progressTrack}>
               <View
                 style={[
                   styles.progressFill,
                   {
-                    backgroundColor: palette.accent,
+                    backgroundColor: '#A78BFA',
                     width: `${summary.rate}%`,
                   },
                 ]}
@@ -472,10 +459,15 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   overviewCard: {
-    borderRadius: 20,
-    padding: 15,
+    borderRadius: 24,
+    padding: 18,
     borderWidth: 1,
-    marginBottom: 12,
+    marginBottom: 14,
+    elevation: 4,
+    shadowColor: '#020617',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.16,
+    shadowRadius: 14,
   },
   dateTapArea: {
     flexDirection: 'row',
@@ -484,18 +476,21 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   activeDateMain: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '800',
+    color: '#FFFFFF',
   },
   activeDateSub: {
-    fontSize: 11,
+    fontSize: 11.5,
     marginTop: 1,
+    color: 'rgba(248, 250, 252, 0.65)',
   },
   viewModeToggle: {
     flexDirection: 'row',
     padding: 3,
     borderRadius: 999,
-    marginBottom: 12,
+    marginBottom: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.09)',
   },
   viewModeBtn: {
     flex: 1,
@@ -503,12 +498,15 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     alignItems: 'center',
   },
+  viewModeBtnActive: {
+    backgroundColor: '#FFFFFF',
+  },
   viewModeText: {
     fontSize: 11.5,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   progressSection: {
-    gap: 6,
+    gap: 7,
   },
   progressHeader: {
     flexDirection: 'row',
@@ -518,15 +516,18 @@ const styles = StyleSheet.create({
   progressLabel: {
     fontSize: 12,
     fontWeight: '600',
+    color: 'rgba(248, 250, 252, 0.72)',
   },
   progressPct: {
-    fontSize: 13,
-    fontWeight: '800',
+    fontSize: 13.5,
+    fontWeight: '900',
+    color: '#A78BFA',
   },
   progressTrack: {
     height: 8,
     borderRadius: 999,
     overflow: 'hidden',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
   },
   progressFill: {
     height: '100%',

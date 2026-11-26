@@ -304,19 +304,19 @@ export default function MoneyManagerScreen() {
               style={[styles.screenTitle, { color: theme.textPrimary }]}
               numberOfLines={1}
             >
-              Transactions & Stats
+              Money
             </Text>
             <Text
               style={[styles.screenSubtitle, { color: theme.textMuted }]}
               numberOfLines={1}
             >
-              आम्दानी र खर्च विवरण • {formatBSDateNepali(todayBS, false)}
+              {formatBSDateNepali(todayBS, false)}
             </Text>
           </View>
           <View style={styles.headerActions}>
             <TouchableOpacity
               onPress={() => handleOpenAdd('income')}
-              style={[styles.addBtn, { backgroundColor: '#37A13B' }]}
+              style={[styles.addBtn, { backgroundColor: '#10B981' }]}
             >
               <Plus size={15} color="#FFFFFF" strokeWidth={2.5} />
               <Text style={styles.addBtnText}>Income</Text>
@@ -331,103 +331,81 @@ export default function MoneyManagerScreen() {
           </View>
         </View>
 
-        {/* Unified Net Balance + Period Summary + Period Selector Card */}
+        {/* Signature Obsidian Balance + Period Summary Card */}
         <View
           style={[
             styles.balanceHeroCard,
-            { backgroundColor: theme.card, borderColor: theme.border },
+            {
+              backgroundColor: isDark ? '#151F32' : '#0F172A',
+              borderColor: isDark ? '#26344E' : '#1E293B',
+            },
           ]}
         >
           <View style={styles.heroTopRow}>
-            <Text style={[styles.heroLabel, { color: theme.textMuted }]}>
-              NET AVAILABLE BALANCE (कुल मौज्दात)
-            </Text>
+            <Text style={styles.heroLabel}>NET AVAILABLE BALANCE</Text>
             <View style={styles.heroValueLine}>
               <CurrencyDisplayer
                 amount={allTimeSummary.totalBalance}
                 currency={settings.currency}
-                isDark={isDark}
+                isDark={true}
                 privateMode={privateMode}
                 size="xl"
                 color={
-                  allTimeSummary.totalBalance >= 0
-                    ? theme.textPrimary
-                    : theme.expense
+                  allTimeSummary.totalBalance >= 0 ? '#FFFFFF' : '#FB7185'
                 }
               />
               <TrendingValueChip
                 percentage={savingsPct}
-                afterText="net ratio"
-                isDark={isDark}
+                afterText="saved"
+                isDark={true}
               />
             </View>
           </View>
 
           <View style={styles.heroStatsRow}>
-            <View
-              style={[
-                styles.heroStatPill,
-                { backgroundColor: theme.incomeBg },
-              ]}
-            >
-              <ArrowDownLeft size={16} color={theme.income} />
-              <View style={{ flex: 1 }}>
-                <Text
-                  style={[styles.heroStatTitle, { color: theme.textMuted }]}
-                >
+            <View style={styles.heroStatGlass}>
+              <View style={styles.heroStatTagRow}>
+                <View style={[styles.heroDot, { backgroundColor: '#34D399' }]} />
+                <Text style={styles.heroStatTitle}>
                   INCOME ({timeRange.toUpperCase()})
                 </Text>
-                <CurrencyDisplayer
-                  amount={periodSummary.totalIncome}
-                  currency={settings.currency}
-                  isDark={isDark}
-                  privateMode={privateMode}
-                  size="md"
-                  color={theme.income}
-                />
               </View>
+              <CurrencyDisplayer
+                amount={periodSummary.totalIncome}
+                currency={settings.currency}
+                isDark={true}
+                privateMode={privateMode}
+                size="md"
+                color="#34D399"
+              />
             </View>
 
-            <View
-              style={[
-                styles.heroStatPill,
-                { backgroundColor: theme.expenseBg },
-              ]}
-            >
-              <ArrowUpRight size={16} color={theme.expense} />
-              <View style={{ flex: 1 }}>
-                <Text
-                  style={[styles.heroStatTitle, { color: theme.textMuted }]}
-                >
+            <View style={styles.heroStatGlass}>
+              <View style={styles.heroStatTagRow}>
+                <View style={[styles.heroDot, { backgroundColor: '#FB7185' }]} />
+                <Text style={styles.heroStatTitle}>
                   EXPENSES ({timeRange.toUpperCase()})
                 </Text>
-                <CurrencyDisplayer
-                  amount={periodSummary.totalExpense}
-                  currency={settings.currency}
-                  isDark={isDark}
-                  privateMode={privateMode}
-                  size="md"
-                  color={theme.expense}
-                />
               </View>
+              <CurrencyDisplayer
+                amount={periodSummary.totalExpense}
+                currency={settings.currency}
+                isDark={true}
+                privateMode={privateMode}
+                size="md"
+                color="#FB7185"
+              />
             </View>
           </View>
 
-          {/* Integrated Period Selector Chips */}
-          <View
-            style={[
-              styles.periodTabsBar,
-              {
-                backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
-              },
-            ]}
-          >
+          {/* Translucent Period Selector */}
+          <View style={styles.periodTabsBar}>
             {(
               [
-                { key: 'daily', label: 'Daily' },
-                { key: 'weekly', label: 'Weekly' },
-                { key: 'monthly', label: 'Monthly' },
-                { key: 'yearly', label: 'Yearly' },
+                { key: 'daily', label: 'Day' },
+                { key: 'weekly', label: 'Week' },
+                { key: 'monthly', label: 'Month' },
+                { key: 'yearly', label: 'Year' },
                 { key: 'all', label: 'All' },
               ] as { key: TimeRangeKey; label: string }[]
             ).map((tab) => {
@@ -441,14 +419,14 @@ export default function MoneyManagerScreen() {
                   accessibilityLabel={`Show ${tab.label} transactions`}
                   style={[
                     styles.periodTabBtn,
-                    active && { backgroundColor: palette.accent },
+                    active && styles.periodTabBtnActive,
                   ]}
                 >
                   <Text
                     style={[
                       styles.periodTabText,
                       {
-                        color: active ? '#FFFFFF' : theme.textMuted,
+                        color: active ? '#0F172A' : 'rgba(248,250,252,0.68)',
                         fontWeight: active ? '800' : '600',
                       },
                     ]}
@@ -1074,19 +1052,25 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   balanceHeroCard: {
-    borderRadius: 20,
-    padding: 16,
+    borderRadius: 24,
+    padding: 18,
     borderWidth: 1,
     marginBottom: 14,
+    elevation: 4,
+    shadowColor: '#020617',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.16,
+    shadowRadius: 14,
   },
   heroTopRow: {
     marginBottom: 14,
   },
   heroLabel: {
-    fontSize: 10,
+    fontSize: 10.5,
     fontWeight: '800',
-    letterSpacing: 0.6,
+    letterSpacing: 0.9,
     marginBottom: 6,
+    color: 'rgba(248, 250, 252, 0.65)',
   },
   heroValueLine: {
     flexDirection: 'row',
@@ -1098,32 +1082,46 @@ const styles = StyleSheet.create({
   heroStatsRow: {
     flexDirection: 'row',
     gap: 10,
-    marginBottom: 12,
+    marginBottom: 14,
   },
-  heroStatPill: {
+  heroStatGlass: {
     flex: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+    paddingHorizontal: 13,
+    paddingVertical: 11,
+    borderRadius: 16,
+    gap: 4,
+  },
+  heroStatTagRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    padding: 11,
-    borderRadius: 14,
+    gap: 6,
+  },
+  heroDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
   },
   heroStatTitle: {
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.5,
-    marginBottom: 2,
+    color: 'rgba(248, 250, 252, 0.72)',
   },
   periodTabsBar: {
     flexDirection: 'row',
     borderRadius: 999,
-    padding: 4,
+    padding: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.09)',
   },
   periodTabBtn: {
     flex: 1,
     paddingVertical: 6.5,
     borderRadius: 999,
     alignItems: 'center',
+  },
+  periodTabBtnActive: {
+    backgroundColor: '#FFFFFF',
   },
   periodTabText: {
     fontSize: 11.5,
