@@ -225,7 +225,7 @@ assert(
   `Unexpected currency parts: ${JSON.stringify(parts)}`
 );
 const masked = formatCurrencyParts(107200.5, 'NPR', false, true);
-assert(masked.integerPart === '••••••', 'Private mode masking failed');
+assert(masked.integerPart === '••••', 'Private mode masking failed');
 const healthExcel = getFinanceHealthMeta(85);
 assert(healthExcel.label === 'EXCELLENT' && healthExcel.color === '#37A13B', 'FinanceHealthMeta failed');
 console.log('8. Monekin CurrencyDisplayer, Private Mode & Financial Health Score Engine: PASSED');

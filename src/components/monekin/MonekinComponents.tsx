@@ -151,10 +151,10 @@ export const CurrencyDisplayer: React.FC<CurrencyDisplayerProps> = ({
   const parts = formatCurrencyParts(amount, currency, compact, privateMode);
 
   const fontSizes = {
-    xl: { int: 32, sub: 18 },
-    lg: { int: 22, sub: 14 },
-    md: { int: 16, sub: 12 },
-    sm: { int: 14, sub: 11 },
+    xl: { int: 32, sub: 18, mask: 18 },
+    lg: { int: 22, sub: 14, mask: 14 },
+    md: { int: 16, sub: 12, mask: 12 },
+    sm: { int: 14, sub: 11, mask: 10 },
   }[size];
 
   const mainColor = color || theme.textPrimary;
@@ -183,12 +183,21 @@ export const CurrencyDisplayer: React.FC<CurrencyDisplayerProps> = ({
         {parts.symbol}{' '}
       </Text>
       <Text
-        style={{
-          fontSize: fontSizes.int,
-          fontWeight: '800',
-          color: mainColor,
-          letterSpacing: -0.4,
-        }}
+        style={
+          privateMode
+            ? {
+                fontSize: fontSizes.mask,
+                fontWeight: '600',
+                color: mainColor,
+                letterSpacing: 3,
+              }
+            : {
+                fontSize: fontSizes.int,
+                fontWeight: '800',
+                color: mainColor,
+                letterSpacing: -0.4,
+              }
+        }
       >
         {parts.integerPart}
       </Text>

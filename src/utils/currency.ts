@@ -26,7 +26,7 @@ export function formatCurrencyParts(
     return {
       sign: '',
       symbol,
-      integerPart: '••••••',
+      integerPart: '••••',
       decimalPart: '',
     };
   }
@@ -84,7 +84,7 @@ export function formatCurrency(
 ): string {
   const sym = getCurrencySymbol(currency);
   if (privateMode) {
-    return `${sym}••••••`;
+    return `${sym}••••`;
   }
 
   const isNegative = amount < 0;

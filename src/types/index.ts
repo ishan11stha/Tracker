@@ -304,15 +304,15 @@ export const SAVINGS_GOAL_PRESETS: {
   label: string;
   color: string;
 }[] = [
-  { icon: 'shield', label: 'Emergency', color: '#10B981' },
-  { icon: 'plane', label: 'Vacation', color: '#3B82F6' },
-  { icon: 'smartphone', label: 'Tech', color: '#8B5CF6' },
-  { icon: 'car', label: 'Vehicle', color: '#EF4444' },
-  { icon: 'home', label: 'Home', color: '#0EA5E9' },
-  { icon: 'heart', label: 'Wedding', color: '#EC4899' },
-  { icon: 'graduation', label: 'Study', color: '#F59E0B' },
-  { icon: 'target', label: 'Goal', color: '#0F172A' },
-];
+    { icon: 'shield', label: 'Emergency', color: '#10B981' },
+    { icon: 'plane', label: 'Vacation', color: '#3B82F6' },
+    { icon: 'smartphone', label: 'Tech', color: '#8B5CF6' },
+    { icon: 'car', label: 'Vehicle', color: '#EF4444' },
+    { icon: 'home', label: 'Home', color: '#0EA5E9' },
+    { icon: 'heart', label: 'Wedding', color: '#EC4899' },
+    { icon: 'graduation', label: 'Study', color: '#F59E0B' },
+    { icon: 'target', label: 'Goal', color: '#0F172A' },
+  ];
 
 export const savingsGoalSchema = z.object({
   title: z.string().trim().min(1, 'Goal name is required').max(100),
@@ -559,10 +559,10 @@ export const REMINDER_ALERT_MODES: {
   label: string;
   sublabel: string;
 }[] = [
-  { key: 'alarm', label: 'Alarm', sublabel: 'Sound ring' },
-  { key: 'vibrate', label: 'Vibrate', sublabel: 'Vibrate mode' },
-  { key: 'both', label: 'Alarm & Vibrate', sublabel: 'Sound + vibrate' },
-];
+    { key: 'alarm', label: 'Alarm', sublabel: 'Sound ring' },
+    { key: 'vibrate', label: 'Vibrate', sublabel: 'Vibrate mode' },
+    { key: 'both', label: 'Alarm & Vibrate', sublabel: 'Sound + vibrate' },
+  ];
 
 export const REMINDER_WEEKDAYS: {
   key: WeekdayRecurrenceKey;
@@ -570,14 +570,14 @@ export const REMINDER_WEEKDAYS: {
   shortLabel: string;
   weekdayIndex: number;
 }[] = [
-  { key: 'sunday', label: 'Sunday', shortLabel: 'Sun', weekdayIndex: 0 },
-  { key: 'monday', label: 'Monday', shortLabel: 'Mon', weekdayIndex: 1 },
-  { key: 'tuesday', label: 'Tuesday', shortLabel: 'Tue', weekdayIndex: 2 },
-  { key: 'wednesday', label: 'Wednesday', shortLabel: 'Wed', weekdayIndex: 3 },
-  { key: 'thursday', label: 'Thursday', shortLabel: 'Thu', weekdayIndex: 4 },
-  { key: 'friday', label: 'Friday', shortLabel: 'Fri', weekdayIndex: 5 },
-  { key: 'saturday', label: 'Saturday', shortLabel: 'Sat', weekdayIndex: 6 },
-];
+    { key: 'sunday', label: 'Sunday', shortLabel: 'Sun', weekdayIndex: 0 },
+    { key: 'monday', label: 'Monday', shortLabel: 'Mon', weekdayIndex: 1 },
+    { key: 'tuesday', label: 'Tuesday', shortLabel: 'Tue', weekdayIndex: 2 },
+    { key: 'wednesday', label: 'Wednesday', shortLabel: 'Wed', weekdayIndex: 3 },
+    { key: 'thursday', label: 'Thursday', shortLabel: 'Thu', weekdayIndex: 4 },
+    { key: 'friday', label: 'Friday', shortLabel: 'Fri', weekdayIndex: 5 },
+    { key: 'saturday', label: 'Saturday', shortLabel: 'Sat', weekdayIndex: 6 },
+  ];
 
 export function parseRecurrenceWeekdays(
   recurrence: ReminderRecurrence
