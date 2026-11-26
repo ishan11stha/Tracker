@@ -277,6 +277,70 @@ export const reminderSchema = z.object({
   alertMode: z.enum(['alarm', 'vibrate', 'both']).optional().default('both'),
 });
 
+export type SavingsGoalIcon =
+  | 'plane'
+  | 'shield'
+  | 'smartphone'
+  | 'car'
+  | 'home'
+  | 'heart'
+  | 'graduation'
+  | 'target';
+
+export interface SavingsGoal {
+  id: string;
+  title: string;
+  targetAmount: number;
+  savedAmount: number;
+  targetDateISO?: string; // Optional YYYY-MM-DD target date
+  icon: SavingsGoalIcon;
+  color: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const SAVINGS_GOAL_PRESETS: {
+  icon: SavingsGoalIcon;
+  label: string;
+  color: string;
+}[] = [
+  { icon: 'shield', label: 'Emergency', color: '#10B981' },
+  { icon: 'plane', label: 'Vacation', color: '#3B82F6' },
+  { icon: 'smartphone', label: 'Tech', color: '#8B5CF6' },
+  { icon: 'car', label: 'Vehicle', color: '#EF4444' },
+  { icon: 'home', label: 'Home', color: '#0EA5E9' },
+  { icon: 'heart', label: 'Wedding', color: '#EC4899' },
+  { icon: 'graduation', label: 'Study', color: '#F59E0B' },
+  { icon: 'target', label: 'Goal', color: '#0F172A' },
+];
+
+export const savingsGoalSchema = z.object({
+  title: z.string().trim().min(1, 'Goal name is required').max(100),
+  targetAmount: z
+    .number()
+    .positive('Target amount must be greater than 0')
+    .max(1000000000, 'Target amount exceeds maximum limit'),
+  savedAmount: z.number().min(0, 'Saved amount cannot be negative'),
+  targetDateISO: z
+    .string()
+    .optional()
+    .refine(
+      (val) => !val || isValidISODate(val),
+      'Invalid target calendar date'
+    ),
+  icon: z.enum([
+    'plane',
+    'shield',
+    'smartphone',
+    'car',
+    'home',
+    'heart',
+    'graduation',
+    'target',
+  ]),
+  color: z.string().min(4).max(20),
+});
+
 export interface AppSettings {
   userName: string;
   userTitle: string;
@@ -356,6 +420,15 @@ export const vaultBackupSchema = z.object({
   accounts: z
     .array(
       accountSchema.extend({
+        id: z.string().min(1),
+        createdAt: z.string(),
+        updatedAt: z.string(),
+      })
+    )
+    .optional(),
+  savingsGoals: z
+    .array(
+      savingsGoalSchema.extend({
         id: z.string().min(1),
         createdAt: z.string(),
         updatedAt: z.string(),

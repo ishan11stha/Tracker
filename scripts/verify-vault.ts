@@ -33,6 +33,7 @@ import {
   itemSchema,
   activitySchema,
   reminderSchema,
+  savingsGoalSchema,
   vaultBackupSchema,
   isValidISODate,
   isValidTime24,
@@ -652,6 +653,25 @@ const fullPayload = {
 };
 const parsedBackup = vaultBackupSchema.safeParse(fullPayload);
 assert(parsedBackup.success, 'Full backup payload must pass schema validation');
-console.log('16. Backup Payload Schema & Restoration Integrity: PASSED\n');
+
+const validGoal = savingsGoalSchema.safeParse({
+  title: 'Emergency Fund',
+  targetAmount: 50000,
+  savedAmount: 28000,
+  targetDateISO: '2026-12-31',
+  icon: 'shield',
+  color: '#10B981',
+});
+assert(validGoal.success, 'Valid savings goal must pass schema validation');
+
+const invalidGoal = savingsGoalSchema.safeParse({
+  title: 'Bad Goal',
+  targetAmount: 0,
+  savedAmount: -10,
+  icon: 'shield',
+  color: '#10B981',
+});
+assert(!invalidGoal.success, 'Zero target or negative saved amount must fail savingsGoalSchema');
+console.log('16. Backup Payload & Savings Goal Schema Integrity: PASSED\n');
 
 console.log('✅ ALL VAULT CORE & ARCHITECTURAL CHECKS PASSED!');

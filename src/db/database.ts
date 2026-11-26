@@ -6,6 +6,7 @@ import {
   ItemHistoryLog,
   PersonalItem,
   ReminderItem,
+  SavingsGoal,
   Transaction,
   appSettingsSchema,
 } from '../types';
@@ -184,6 +185,18 @@ async function initializeSchema(db: SQLite.SQLiteDatabase): Promise<void> {
       createdAt TEXT NOT NULL,
       updatedAt TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS savings_goals (
+      id TEXT PRIMARY KEY NOT NULL,
+      title TEXT NOT NULL,
+      targetAmount REAL NOT NULL CHECK(targetAmount > 0),
+      savedAmount REAL NOT NULL DEFAULT 0,
+      targetDateISO TEXT DEFAULT '',
+      icon TEXT NOT NULL DEFAULT 'target',
+      color TEXT NOT NULL DEFAULT '#10B981',
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
+    );
   `);
 
   // Run non-destructive column migrations for existing databases
@@ -257,6 +270,8 @@ export async function dbResetAllUserData(): Promise<void> {
     await db.runAsync(`DELETE FROM transactions`);
     await db.runAsync(`DELETE FROM activities`);
     await db.runAsync(`DELETE FROM reminders`);
+    await db.runAsync(`DELETE FROM savings_goals`);
+    await db.runAsync(`DELETE FROM savings_goals`);
     await db.runAsync(`DELETE FROM accounts`);
     await seedDefaultAccounts(db);
     await db.runAsync(
@@ -618,6 +633,67 @@ export async function dbDeleteReminder(id: string): Promise<void> {
   });
 }
 
+// Savings Goals CRUD
+export async function dbGetAllSavingsGoals(): Promise<SavingsGoal[]> {
+  const db = await getDatabase();
+  const rows = await db.getAllAsync<SavingsGoal>(
+    `SELECT * FROM savings_goals ORDER BY createdAt DESC`
+  );
+  return rows.map((r) => ({
+    ...r,
+    targetDateISO: r.targetDateISO || undefined,
+  }));
+}
+
+export async function dbInsertSavingsGoal(goal: SavingsGoal): Promise<void> {
+  const db = await getDatabase();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      `INSERT INTO savings_goals (id, title, targetAmount, savedAmount, targetDateISO, icon, color, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        goal.id,
+        goal.title,
+        goal.targetAmount,
+        goal.savedAmount,
+        goal.targetDateISO || '',
+        goal.icon,
+        goal.color,
+        goal.createdAt,
+        goal.updatedAt,
+      ]
+    );
+  });
+}
+
+export async function dbUpdateSavingsGoal(goal: SavingsGoal): Promise<void> {
+  const db = await getDatabase();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      `UPDATE savings_goals
+       SET title = ?, targetAmount = ?, savedAmount = ?, targetDateISO = ?, icon = ?, color = ?, updatedAt = ?
+       WHERE id = ?`,
+      [
+        goal.title,
+        goal.targetAmount,
+        goal.savedAmount,
+        goal.targetDateISO || '',
+        goal.icon,
+        goal.color,
+        goal.updatedAt,
+        goal.id,
+      ]
+    );
+  });
+}
+
+export async function dbDeleteSavingsGoal(id: string): Promise<void> {
+  const db = await getDatabase();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(`DELETE FROM savings_goals WHERE id = ?`, [id]);
+  });
+}
+
 // Full Backup & Restore
 export interface VaultBackupPayload {
   version: number;
@@ -629,6 +705,7 @@ export interface VaultBackupPayload {
   activities: ActivityRecord[];
   reminders: ReminderItem[];
   accounts?: Account[];
+  savingsGoals?: SavingsGoal[];
 }
 
 export async function dbRestoreBackup(payload: VaultBackupPayload): Promise<void> {
@@ -646,6 +723,7 @@ export async function dbRestoreBackup(payload: VaultBackupPayload): Promise<void
     await db.runAsync(`DELETE FROM transactions`);
     await db.runAsync(`DELETE FROM activities`);
     await db.runAsync(`DELETE FROM reminders`);
+    await db.runAsync(`DELETE FROM savings_goals`);
 
     // Accounts must always mirror the restored dataset. Older backups did not
     // include accounts, so reseed the four foundational wallets in that case
@@ -768,6 +846,24 @@ export async function dbRestoreBackup(payload: VaultBackupPayload): Promise<void
           rem.notificationId || '',
           rem.createdAt,
           rem.updatedAt,
+        ]
+      );
+    }
+
+    for (const g of payload.savingsGoals || []) {
+      await db.runAsync(
+        `INSERT INTO savings_goals (id, title, targetAmount, savedAmount, targetDateISO, icon, color, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          g.id,
+          g.title,
+          g.targetAmount,
+          g.savedAmount,
+          g.targetDateISO || '',
+          g.icon || 'target',
+          g.color || '#10B981',
+          g.createdAt,
+          g.updatedAt,
         ]
       );
     }

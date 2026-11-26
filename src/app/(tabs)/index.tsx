@@ -57,6 +57,7 @@ export default function DashboardScreen() {
     items,
     activities,
     reminders,
+    savingsGoals,
     toggleReminderCompleted,
     toggleActivityStatus,
   } = useVaultStore();
@@ -497,13 +498,30 @@ export default function DashboardScreen() {
         {/* 5. SINGLE-LINE SMART COMMAND INPUT */}
         <QuickActionMessageBox isDark={isDark} />
 
-        {/* 6. COMPACT 3-STAT OVERVIEW STRIP */}
+        {/* 6. COMPACT 4-STAT OVERVIEW STRIP */}
         <View
           style={[
             styles.statsStrip,
             { backgroundColor: theme.card, borderColor: theme.border },
           ]}
         >
+          <TouchableOpacity
+            activeOpacity={0.75}
+            onPress={() => router.push('/goals')}
+            style={styles.stripCell}
+          >
+            <Text style={[styles.stripNum, { color: '#10B981' }]}>
+              {savingsGoals.length}
+            </Text>
+            <Text style={[styles.stripLabel, { color: theme.textMuted }]}>
+              Goals
+            </Text>
+          </TouchableOpacity>
+
+          <View
+            style={[styles.stripDivider, { backgroundColor: theme.divider }]}
+          />
+
           <TouchableOpacity
             activeOpacity={0.75}
             onPress={() => router.push('/(tabs)/items')}

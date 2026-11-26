@@ -4,17 +4,20 @@ import {
   dbDeleteActivity,
   dbDeleteItem,
   dbDeleteReminder,
+  dbDeleteSavingsGoal,
   dbDeleteTransaction,
   dbGetAllAccounts,
   dbGetAllActivities,
   dbGetAllItems,
   dbGetAllReminders,
+  dbGetAllSavingsGoals,
   dbGetAllTransactions,
   dbGetItemHistory,
   dbGetSettings,
   dbInsertActivity,
   dbInsertItem,
   dbInsertReminder,
+  dbInsertSavingsGoal,
   dbInsertTransaction,
   dbResetAllUserData,
   dbRestoreBackup,
@@ -22,6 +25,7 @@ import {
   dbUpdateActivity,
   dbUpdateItem,
   dbUpdateReminder,
+  dbUpdateSavingsGoal,
   dbUpdateTransaction,
 } from '../db/database';
 import {
@@ -34,10 +38,12 @@ import {
   PaymentMethod,
   PersonalItem,
   ReminderItem,
+  SavingsGoal,
   Transaction,
   activitySchema,
   itemSchema,
   reminderSchema,
+  savingsGoalSchema,
   transactionSchema,
 } from '../types';
 import {
@@ -73,6 +79,7 @@ interface VaultState {
   itemHistory: ItemHistoryLog[];
   activities: ActivityRecord[];
   reminders: ReminderItem[];
+  savingsGoals: SavingsGoal[];
 
   // Actions
   hydrateFromDB: () => Promise<void>;
@@ -123,6 +130,17 @@ interface VaultState {
   toggleReminderCompleted: (id: string) => Promise<void>;
   removeReminder: (id: string) => Promise<void>;
 
+  // Savings Goals
+  addSavingsGoal: (
+    data: Omit<SavingsGoal, 'id' | 'createdAt' | 'updatedAt'>
+  ) => Promise<SavingsGoal | null>;
+  editSavingsGoal: (
+    id: string,
+    data: Omit<SavingsGoal, 'id' | 'createdAt' | 'updatedAt'>
+  ) => Promise<void>;
+  contributeToSavingsGoal: (id: string, deltaAmount: number) => Promise<void>;
+  removeSavingsGoal: (id: string) => Promise<void>;
+
   // Intelligent Quick Message Box Command Processor
   processQuickCommand: (rawText: string) => Promise<{
     success: boolean;
@@ -149,6 +167,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
   itemHistory: [],
   activities: [],
   reminders: [],
+  savingsGoals: [],
 
   hydrateFromDB: async () => {
     try {
@@ -160,6 +179,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
         itemHistory,
         activities,
         reminders,
+        savingsGoals,
       ] = await Promise.all([
         dbGetSettings(),
         dbGetAllAccounts(),
@@ -168,6 +188,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
         dbGetItemHistory(),
         dbGetAllActivities(),
         dbGetAllReminders(),
+        dbGetAllSavingsGoals(),
       ]);
 
       set({
@@ -179,6 +200,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
         itemHistory,
         activities,
         reminders,
+        savingsGoals,
         error: null,
       });
 
@@ -666,6 +688,101 @@ export const useVaultStore = create<VaultState>((set, get) => ({
     }
   },
 
+  // Savings Goals
+  addSavingsGoal: async (data) => {
+    if (get().isSubmitting) return null;
+    set({ isSubmitting: true, error: null });
+    try {
+      const validated = savingsGoalSchema.parse(data);
+      const now = new Date().toISOString();
+      const newGoal: SavingsGoal = {
+        ...validated,
+        id: `goal_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        createdAt: now,
+        updatedAt: now,
+      };
+      await dbInsertSavingsGoal(newGoal);
+      const savingsGoals = await dbGetAllSavingsGoals();
+      set({ savingsGoals, isSubmitting: false });
+      return newGoal;
+    } catch (err) {
+      set({
+        isSubmitting: false,
+        error:
+          err instanceof Error ? err.message : 'Failed to create savings goal',
+      });
+      throw err;
+    }
+  },
+
+  editSavingsGoal: async (id, data) => {
+    if (get().isSubmitting) return;
+    set({ isSubmitting: true, error: null });
+    try {
+      const existing = get().savingsGoals.find((g) => g.id === id);
+      if (!existing) {
+        set({ isSubmitting: false });
+        return;
+      }
+      const validated = savingsGoalSchema.parse(data);
+      const updated: SavingsGoal = {
+        ...existing,
+        ...validated,
+        updatedAt: new Date().toISOString(),
+      };
+      await dbUpdateSavingsGoal(updated);
+      const savingsGoals = await dbGetAllSavingsGoals();
+      set({ savingsGoals, isSubmitting: false });
+    } catch (err) {
+      set({
+        isSubmitting: false,
+        error:
+          err instanceof Error ? err.message : 'Failed to update savings goal',
+      });
+      throw err;
+    }
+  },
+
+  contributeToSavingsGoal: async (id, deltaAmount) => {
+    const existing = get().savingsGoals.find((g) => g.id === id);
+    if (!existing || !Number.isFinite(deltaAmount) || deltaAmount === 0) return;
+    const nextSaved = Math.max(0, existing.savedAmount + deltaAmount);
+    const updated: SavingsGoal = {
+      ...existing,
+      savedAmount: nextSaved,
+      updatedAt: new Date().toISOString(),
+    };
+    try {
+      await dbUpdateSavingsGoal(updated);
+      set((state) => ({
+        savingsGoals: state.savingsGoals.map((g) =>
+          g.id === id ? updated : g
+        ),
+        error: null,
+      }));
+    } catch (err) {
+      set({
+        error:
+          err instanceof Error ? err.message : 'Failed to update savings goal',
+      });
+    }
+  },
+
+  removeSavingsGoal: async (id) => {
+    try {
+      await dbDeleteSavingsGoal(id);
+      set((state) => ({
+        savingsGoals: state.savingsGoals.filter((g) => g.id !== id),
+        error: null,
+      }));
+    } catch (err) {
+      set({
+        error:
+          err instanceof Error ? err.message : 'Failed to delete savings goal',
+      });
+    }
+  },
+
   processQuickCommand: async (rawText: string) => {
     const parsed = parseQuickInput(rawText);
     const npt = getNowInNPT();
@@ -851,6 +968,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
       itemHistory: state.itemHistory,
       activities: state.activities,
       reminders: state.reminders,
+      savingsGoals: state.savingsGoals,
     };
   },
 

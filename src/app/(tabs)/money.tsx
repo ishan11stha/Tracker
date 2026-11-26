@@ -9,13 +9,16 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import {
   ArrowDownLeft,
   ArrowUpDown,
   ArrowUpRight,
+  ChevronRight,
   Edit3,
   Plus,
   Search,
+  Target,
   Trash2,
   X,
 } from 'lucide-react-native';
@@ -58,7 +61,9 @@ const SORT_OPTIONS: { key: SortOption; label: string }[] = [
 ];
 
 export default function MoneyManagerScreen() {
-  const { settings, accounts, transactions, removeTransaction } = useVaultStore();
+  const router = useRouter();
+  const { settings, accounts, transactions, savingsGoals, removeTransaction } =
+    useVaultStore();
   const isDark = settings.theme === 'dark';
   const privateMode = Boolean(settings.privateMode);
   const theme = getThemeColors(isDark);
@@ -275,6 +280,14 @@ export default function MoneyManagerScreen() {
         100
       : 0;
 
+  const savingsGoalsSummary = useMemo(() => {
+    const saved = savingsGoals.reduce((acc, g) => acc + g.savedAmount, 0);
+    const target = savingsGoals.reduce((acc, g) => acc + g.targetAmount, 0);
+    const pct =
+      target > 0 ? Math.min(100, Math.round((saved / target) * 100)) : 0;
+    return { count: savingsGoals.length, saved, target, pct };
+  }, [savingsGoals]);
+
   return (
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: palette.background }]}
@@ -447,6 +460,50 @@ export default function MoneyManagerScreen() {
             })}
           </View>
         </View>
+
+        {/* Savings Goals Quick Access Card */}
+        <TouchableOpacity
+          activeOpacity={0.82}
+          onPress={() => router.push('/goals')}
+          style={[
+            styles.goalsBannerCard,
+            { backgroundColor: theme.card, borderColor: theme.border },
+          ]}
+        >
+          <View
+            style={[
+              styles.goalsIconWrap,
+              {
+                backgroundColor: isDark
+                  ? 'rgba(16, 185, 129, 0.16)'
+                  : '#ECFDF5',
+              },
+            ]}
+          >
+            <Target size={19} color="#10B981" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.goalsBannerTitle, { color: theme.textPrimary }]}>
+              Savings Goals
+            </Text>
+            <Text style={[styles.goalsBannerSub, { color: theme.textMuted }]}>
+              {savingsGoalsSummary.count === 0
+                ? 'Set targets for trips, emergency fund & more'
+                : `${savingsGoalsSummary.count} goals • ${formatCurrency(
+                    savingsGoalsSummary.saved,
+                    settings.currency,
+                    true,
+                    privateMode
+                  )} / ${formatCurrency(
+                    savingsGoalsSummary.target,
+                    settings.currency,
+                    true,
+                    privateMode
+                  )} (${savingsGoalsSummary.pct}%)`}
+            </Text>
+          </View>
+          <ChevronRight size={18} color={theme.textMuted} />
+        </TouchableOpacity>
 
         {/* Deduplicated Personal vs Family Portfolio & Wallets Card */}
         <CardWithHeader
@@ -1249,5 +1306,31 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '700',
+  },
+  goalsBannerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    marginBottom: 14,
+    gap: 12,
+  },
+  goalsIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  goalsBannerTitle: {
+    fontSize: 14.5,
+    fontWeight: '800',
+  },
+  goalsBannerSub: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    marginTop: 2,
   },
 });
