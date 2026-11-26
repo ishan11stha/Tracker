@@ -59,14 +59,12 @@ export default function SettingsScreen() {
   const theme = getThemeColors(isDark);
 
   const [nameInput, setNameInput] = useState(settings.userName);
-  const [titleInput, setTitleInput] = useState(settings.userTitle);
   const [profileSaved, setProfileSaved] = useState(false);
   const [profileError, setProfileError] = useState('');
 
   useEffect(() => {
     setNameInput(settings.userName);
-    setTitleInput(settings.userTitle);
-  }, [settings.userName, settings.userTitle]);
+  }, [settings.userName]);
 
   const activeControlFill = isDark ? '#2563EB' : '#0F3375';
 
@@ -78,7 +76,6 @@ export default function SettingsScreen() {
     setProfileError('');
     const saved = await updateSettings({
       userName: nameInput.trim(),
-      userTitle: titleInput.trim() || 'Kathmandu, Nepal',
     });
     if (!saved) return;
     setProfileSaved(true);
@@ -148,7 +145,6 @@ export default function SettingsScreen() {
               try {
                 await restoreFromBackup(validatedPayload);
                 setNameInput(validatedPayload.settings.userName);
-                setTitleInput(validatedPayload.settings.userTitle);
                 Alert.alert(
                   'Restore Complete',
                   'All records restored to SQLite.'
@@ -273,25 +269,6 @@ export default function SettingsScreen() {
           {profileError ? (
             <Text style={styles.profileError}>{profileError}</Text>
           ) : null}
-
-          <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
-            Location / Subtitle
-          </Text>
-          <TextInput
-            value={titleInput}
-            onChangeText={setTitleInput}
-            placeholder="Kathmandu, Nepal"
-            placeholderTextColor={theme.textMuted}
-            accessibilityLabel="Location or profile subtitle"
-            style={[
-              styles.input,
-              {
-                backgroundColor: theme.inputBg,
-                color: theme.textPrimary,
-                borderColor: theme.border,
-              },
-            ]}
-          />
 
           <TouchableOpacity
             onPress={handleSaveProfile}
