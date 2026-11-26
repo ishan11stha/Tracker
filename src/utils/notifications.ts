@@ -6,20 +6,32 @@ import { computeNextOccurrenceDate, getNPTTargetDate } from './dateRecurrence';
 
 export { computeNextOccurrenceDate, getNPTTargetDate };
 
-const VIBRATE_PATTERN = [0, 500, 200, 500, 200, 700];
+/**
+ * Builds an Android vibration pattern with `count` strong pulses.
+ * Format: [initialDelay, vibrateMs, pauseMs, vibrateMs, ...]
+ */
+export function buildVibrationPattern(repeatCount = 3): number[] {
+  const count = Math.max(1, Math.min(10, Math.round(repeatCount)));
+  const pattern: number[] = [0];
+  for (let i = 0; i < count; i++) {
+    pattern.push(550);
+    if (i < count - 1) pattern.push(250);
+  }
+  return pattern;
+}
 
 try {
   Notifications.setNotificationHandler({
     handleNotification: async (notification) => {
+      const data = notification.request.content.data || {};
       const alertMode =
-        (notification.request.content.data?.alertMode as
-          | ReminderAlertMode
-          | undefined) || 'both';
+        (data.alertMode as ReminderAlertMode | undefined) || 'both';
+      const repeatCount = Number(data.repeatCount) || 3;
 
       // Physically vibrate on Android when notification fires in foreground
       if (Platform.OS === 'android' && alertMode !== 'alarm') {
         try {
-          Vibration.vibrate(VIBRATE_PATTERN);
+          Vibration.vibrate(buildVibrationPattern(repeatCount));
         } catch {
           // Ignore on devices without vibrator hardware
         }
@@ -39,16 +51,22 @@ try {
 }
 
 export function getNotificationChannelId(
-  alertMode: ReminderAlertMode = 'both'
+  alertMode: ReminderAlertMode = 'both',
+  repeatCount = 3
 ): string {
-  if (alertMode === 'alarm') return 'vault-alarm-v2';
-  if (alertMode === 'vibrate') return 'vault-vibrate-v2';
-  return 'vault-alarm-vibrate-v2';
+  const safeCount = Math.max(1, Math.min(10, Math.round(repeatCount)));
+  if (alertMode === 'alarm') return 'vault-alarm-v3';
+  if (alertMode === 'vibrate') return `vault-vibrate-v3-${safeCount}x`;
+  return `vault-alarm-vibrate-v3-${safeCount}x`;
 }
 
-export async function requestNotificationPermissions(): Promise<boolean> {
+export async function requestNotificationPermissions(
+  repeatCount = 3
+): Promise<boolean> {
   try {
     if (Platform.OS === 'android') {
+      const safeCount = Math.max(1, Math.min(10, Math.round(repeatCount)));
+      const vibPattern = buildVibrationPattern(safeCount);
       const alarmAudioAttributes = {
         usage: Notifications.AndroidAudioUsage.ALARM,
         contentType: Notifications.AndroidAudioContentType.SONIFICATION,
@@ -59,8 +77,8 @@ export async function requestNotificationPermissions(): Promise<boolean> {
       };
 
       await Promise.all([
-        Notifications.setNotificationChannelAsync('vault-alarm-v2', {
-          name: 'VAULT Alarm Reminders (Sound)',
+        Notifications.setNotificationChannelAsync('vault-alarm-v3', {
+          name: 'VAULT Alarm Sound',
           importance: Notifications.AndroidImportance.MAX,
           enableVibrate: false,
           lightColor: '#EA580C',
@@ -70,29 +88,35 @@ export async function requestNotificationPermissions(): Promise<boolean> {
             Notifications.AndroidNotificationVisibility.PUBLIC,
           audioAttributes: alarmAudioAttributes,
         }),
-        Notifications.setNotificationChannelAsync('vault-vibrate-v2', {
-          name: 'VAULT Vibrate Mode Reminders',
-          importance: Notifications.AndroidImportance.HIGH,
-          enableVibrate: true,
-          vibrationPattern: VIBRATE_PATTERN,
-          lightColor: '#EA580C',
-          sound: null,
-          bypassDnd: true,
-          lockscreenVisibility:
-            Notifications.AndroidNotificationVisibility.PUBLIC,
-        }),
-        Notifications.setNotificationChannelAsync('vault-alarm-vibrate-v2', {
-          name: 'VAULT Alarm & Vibrate Reminders',
-          importance: Notifications.AndroidImportance.MAX,
-          enableVibrate: true,
-          vibrationPattern: VIBRATE_PATTERN,
-          lightColor: '#EA580C',
-          sound: 'default',
-          bypassDnd: true,
-          lockscreenVisibility:
-            Notifications.AndroidNotificationVisibility.PUBLIC,
-          audioAttributes: alarmAudioAttributes,
-        }),
+        Notifications.setNotificationChannelAsync(
+          `vault-vibrate-v3-${safeCount}x`,
+          {
+            name: `VAULT Vibrate (${safeCount}x)`,
+            importance: Notifications.AndroidImportance.HIGH,
+            enableVibrate: true,
+            vibrationPattern: vibPattern,
+            lightColor: '#EA580C',
+            sound: null,
+            bypassDnd: true,
+            lockscreenVisibility:
+              Notifications.AndroidNotificationVisibility.PUBLIC,
+          }
+        ),
+        Notifications.setNotificationChannelAsync(
+          `vault-alarm-vibrate-v3-${safeCount}x`,
+          {
+            name: `VAULT Alarm & Vibrate (${safeCount}x)`,
+            importance: Notifications.AndroidImportance.MAX,
+            enableVibrate: true,
+            vibrationPattern: vibPattern,
+            lightColor: '#EA580C',
+            sound: 'default',
+            bypassDnd: true,
+            lockscreenVisibility:
+              Notifications.AndroidNotificationVisibility.PUBLIC,
+            audioAttributes: alarmAudioAttributes,
+          }
+        ),
       ]);
     }
 
@@ -109,16 +133,22 @@ export async function requestNotificationPermissions(): Promise<boolean> {
   }
 }
 
+/**
+ * Schedules `repeatCount` staggered Android alarm/vibrate alerts (spaced 5s apart)
+ * so the alarm rings & vibrates the configured number of times even when locked.
+ */
 export async function scheduleReminderNotification(
   reminder: ReminderItem,
-  enabled = true
+  enabled = true,
+  repeatCount = 3
 ): Promise<string> {
   if (!enabled || reminder.isCompleted) {
     return '';
   }
 
   try {
-    const hasPerm = await requestNotificationPermissions();
+    const safeCount = Math.max(1, Math.min(10, Math.round(repeatCount)));
+    const hasPerm = await requestNotificationPermissions(safeCount);
     if (!hasPerm) return '';
 
     if (reminder.notificationId) {
@@ -144,60 +174,73 @@ export async function scheduleReminderNotification(
         : alertMode === 'vibrate'
           ? '📳 VIBRATE'
           : '⏰ ALARM & VIBRATE';
+    const vibPattern = buildVibrationPattern(safeCount);
+    const channelId =
+      Platform.OS === 'android'
+        ? getNotificationChannelId(alertMode, safeCount)
+        : undefined;
 
-    const id = await Notifications.scheduleNotificationAsync({
-      content: {
-        title: `${modePrefix} • ${reminder.title}`,
-        body: `${
-          reminder.description ? reminder.description + ' • ' : ''
-        }${bsFormatted} (${reminder.timeString} NPT)`,
-        data: {
-          reminderId: reminder.id,
-          priority: reminder.priority,
-          alertMode,
+    const scheduledIds: string[] = [];
+    for (let i = 0; i < safeCount; i++) {
+      const burstDate = new Date(triggerDate.getTime() + i * 5000);
+      const id = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: `${modePrefix} • ${reminder.title}`,
+          body: `${
+            reminder.description ? reminder.description + ' • ' : ''
+          }${bsFormatted} (${reminder.timeString} NPT)${
+            safeCount > 1 ? ` [${i + 1}/${safeCount}]` : ''
+          }`,
+          data: {
+            reminderId: reminder.id,
+            priority: reminder.priority,
+            alertMode,
+            repeatCount: safeCount,
+          },
+          sound: alertMode === 'vibrate' ? false : 'default',
+          vibrate: alertMode === 'alarm' ? [] : vibPattern,
+          priority: Notifications.AndroidNotificationPriority.MAX,
         },
-        sound: alertMode === 'vibrate' ? false : 'default',
-        vibrate: alertMode === 'alarm' ? [] : VIBRATE_PATTERN,
-        priority: Notifications.AndroidNotificationPriority.MAX,
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date: triggerDate,
-        channelId:
-          Platform.OS === 'android'
-            ? getNotificationChannelId(alertMode)
-            : undefined,
-      },
-    });
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: burstDate,
+          channelId,
+        },
+      });
+      if (id) scheduledIds.push(id);
+    }
 
-    return id;
+    return scheduledIds.join(',');
   } catch {
     return '';
   }
 }
 
 /**
- * Fires an immediate test notification & hardware vibration for the given reminder
- * so the user can test and verify Alarm, Vibrate, or Alarm & Vibrate mode on Android.
+ * Fires an immediate test alert & hardware vibration matching `repeatCount`
+ * so the user can test Alarm & Vibrate right on their Android phone.
  */
 export async function triggerImmediateReminderAlert(
   reminder: Pick<
     ReminderItem,
     'id' | 'title' | 'description' | 'dateISO' | 'timeString' | 'priority' | 'alertMode'
-  >
+  >,
+  repeatCount = 3
 ): Promise<void> {
+  const safeCount = Math.max(1, Math.min(10, Math.round(repeatCount)));
   const alertMode: ReminderAlertMode = reminder.alertMode || 'both';
+  const vibPattern = buildVibrationPattern(safeCount);
 
   if (Platform.OS === 'android' && alertMode !== 'alarm') {
     try {
-      Vibration.vibrate(VIBRATE_PATTERN);
+      Vibration.vibrate(vibPattern);
     } catch {
       // Ignore if vibrator unavailable
     }
   }
 
   try {
-    const hasPerm = await requestNotificationPermissions();
+    const hasPerm = await requestNotificationPermissions(safeCount);
     if (!hasPerm) return;
 
     const bs = adToBs(reminder.dateISO);
@@ -208,31 +251,40 @@ export async function triggerImmediateReminderAlert(
         : alertMode === 'vibrate'
           ? '📳 VIBRATE'
           : '⏰ ALARM & VIBRATE';
+    const channelId =
+      Platform.OS === 'android'
+        ? getNotificationChannelId(alertMode, safeCount)
+        : undefined;
 
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: `${modePrefix} • ${reminder.title}`,
-        body: `${
-          reminder.description ? reminder.description + ' • ' : ''
-        }${bsFormatted} (${reminder.timeString} NPT)`,
-        data: {
-          reminderId: reminder.id,
-          priority: reminder.priority,
-          alertMode,
+    for (let i = 0; i < safeCount; i++) {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: `${modePrefix} • ${reminder.title}`,
+          body: `${
+            reminder.description ? reminder.description + ' • ' : ''
+          }${bsFormatted} (${reminder.timeString} NPT)${
+            safeCount > 1 ? ` [${i + 1}/${safeCount}]` : ''
+          }`,
+          data: {
+            reminderId: reminder.id,
+            priority: reminder.priority,
+            alertMode,
+            repeatCount: safeCount,
+          },
+          sound: alertMode === 'vibrate' ? false : 'default',
+          vibrate: alertMode === 'alarm' ? [] : vibPattern,
+          priority: Notifications.AndroidNotificationPriority.MAX,
         },
-        sound: alertMode === 'vibrate' ? false : 'default',
-        vibrate: alertMode === 'alarm' ? [] : VIBRATE_PATTERN,
-        priority: Notifications.AndroidNotificationPriority.MAX,
-      },
-      trigger:
-        Platform.OS === 'android'
-          ? {
-              type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-              seconds: 1,
-              channelId: getNotificationChannelId(alertMode),
-            }
-          : null,
-    });
+        trigger:
+          Platform.OS === 'android'
+            ? {
+                type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+                seconds: 1 + i * 4,
+                channelId,
+              }
+            : null,
+      });
+    }
   } catch {
     // Safe fallback
   }
@@ -242,9 +294,15 @@ export async function cancelReminderNotification(
   notificationId?: string
 ): Promise<void> {
   if (!notificationId) return;
-  try {
-    await Notifications.cancelScheduledNotificationAsync(notificationId);
-  } catch {
-    // Ignore if already dismissed or expired
+  const ids = notificationId
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  for (const id of ids) {
+    try {
+      await Notifications.cancelScheduledNotificationAsync(id);
+    } catch {
+      // Ignore if already dismissed or expired
+    }
   }
 }

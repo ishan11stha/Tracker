@@ -30,6 +30,7 @@ import {
   Trash2,
   Upload,
   User,
+  Volume2,
   Wallet,
 } from 'lucide-react-native';
 import { useVaultStore } from '../store/useVaultStore';
@@ -40,6 +41,8 @@ import {
   exportVaultDataToCSV,
   parseAndValidateBackupJSON,
 } from '../utils/exportBackup';
+import { triggerImmediateReminderAlert } from '../utils/notifications';
+import { getNowInNPT } from '../utils/nepaliDate';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -629,6 +632,96 @@ export default function SettingsScreen() {
               trackColor={{ false: '#CBD5E1', true: '#EA580C' }}
             />
           </View>
+
+          {/* Alarm Sound & Vibrate Repeat Count (How Many Times) */}
+          <View
+            style={[
+              styles.settingBlock,
+              {
+                borderTopWidth: 1,
+                borderTopColor: theme.divider,
+                paddingTop: 14,
+                marginTop: 12,
+                marginBottom: 0,
+              },
+            ]}
+          >
+            <View style={styles.inlineIconLabel}>
+              <Volume2 size={15} color="#EA580C" />
+              <Text style={[styles.settingLabel, { color: theme.textPrimary, marginBottom: 0 }]}>
+                Alarm Sound & Vibrate Repeat (How Many Times)
+              </Text>
+            </View>
+            <Text
+              style={[
+                styles.settingHint,
+                { color: theme.textSecondary, marginBottom: 10 },
+              ]}
+            >
+              Choose how many times the alarm rings & vibrates when a reminder fires
+            </Text>
+
+            <View style={styles.SegmentRow}>
+              {([1, 2, 3, 5] as const).map((cnt) => {
+                const active = (settings.alarmRepeatCount || 3) === cnt;
+                return (
+                  <TouchableOpacity
+                    key={cnt}
+                    onPress={() => updateSettings({ alarmRepeatCount: cnt })}
+                    style={[
+                      styles.segmentBtn,
+                      {
+                        backgroundColor: active ? '#EA580C' : theme.inputBg,
+                        borderColor: active ? '#EA580C' : theme.border,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.segmentBtnText,
+                        { color: active ? '#FFFFFF' : theme.textPrimary },
+                      ]}
+                    >
+                      {cnt}x
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <TouchableOpacity
+              onPress={() => {
+                const now = getNowInNPT();
+                const repeatCount = settings.alarmRepeatCount || 3;
+                void triggerImmediateReminderAlert(
+                  {
+                    id: 'test_alert',
+                    title: `Test Alarm (${repeatCount}x)`,
+                    description: 'Testing Android alarm sound & vibration',
+                    dateISO: now.isoDate,
+                    timeString: now.time24,
+                    priority: 'High',
+                    alertMode: 'both',
+                  },
+                  repeatCount
+                );
+              }}
+              style={[
+                styles.testAlertBtn,
+                {
+                  backgroundColor: isDark
+                    ? 'rgba(234, 88, 12, 0.16)'
+                    : '#FFF7ED',
+                  borderColor: isDark ? 'rgba(234, 88, 12, 0.4)' : '#FED7AA',
+                },
+              ]}
+            >
+              <Volume2 size={15} color="#EA580C" />
+              <Text style={styles.testAlertBtnText}>
+                Test Alarm & Vibrate ({settings.alarmRepeatCount || 3}x)
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* 4. Data Export (CSV) & SQLite Backup / Restore */}
@@ -952,5 +1045,20 @@ const styles = StyleSheet.create({
   dataActionSub: {
     fontSize: 11,
     marginTop: 2,
+  },
+  testAlertBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 12,
+    paddingVertical: 11,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  testAlertBtnText: {
+    color: '#EA580C',
+    fontSize: 12.5,
+    fontWeight: '800',
   },
 });

@@ -557,7 +557,10 @@ export default function RemindersScreen() {
                       )}
                       <TouchableOpacity
                         onPress={() => {
-                          void triggerImmediateReminderAlert(rem);
+                          void triggerImmediateReminderAlert(
+                            rem,
+                            settings.alarmRepeatCount || 3
+                          );
                         }}
                         accessibilityRole="button"
                         accessibilityLabel={`Test ${

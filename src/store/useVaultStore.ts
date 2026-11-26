@@ -206,10 +206,11 @@ export const useVaultStore = create<VaultState>((set, get) => ({
 
       // Ensure active recurring/upcoming reminders have up-to-date Android notifications queued
       if (settings.notificationsEnabled && reminders.some((r) => !r.isCompleted)) {
+        const repeatCount = settings.alarmRepeatCount || 3;
         void (async () => {
           for (const rem of reminders) {
             if (!rem.isCompleted && (rem.recurrence !== 'none' || !rem.notificationId)) {
-              const newNotifId = await scheduleReminderNotification(rem, true);
+              const newNotifId = await scheduleReminderNotification(rem, true, repeatCount);
               if (newNotifId && newNotifId !== rem.notificationId) {
                 const updated = { ...rem, notificationId: newNotifId };
                 await dbUpdateReminder(updated);
@@ -247,15 +248,19 @@ export const useVaultStore = create<VaultState>((set, get) => ({
       return false;
     }
 
-    // If notificationsEnabled changed, sync all pending reminder notifications.
-    // A notification scheduling failure must not roll back the saved setting.
-    if (
+    // If notificationsEnabled or alarmRepeatCount changed, sync all pending reminder notifications.
+    const notifToggled =
       partial.notificationsEnabled !== undefined &&
-      partial.notificationsEnabled !== prevSettings.notificationsEnabled
-    ) {
+      partial.notificationsEnabled !== prevSettings.notificationsEnabled;
+    const repeatChanged =
+      partial.alarmRepeatCount !== undefined &&
+      partial.alarmRepeatCount !== prevSettings.alarmRepeatCount;
+
+    if (notifToggled || (repeatChanged && nextSettings.notificationsEnabled)) {
       try {
+        const repeatCount = nextSettings.alarmRepeatCount || 3;
         if (nextSettings.notificationsEnabled) {
-          await requestNotificationPermissions();
+          await requestNotificationPermissions(repeatCount);
         }
         const currentReminders = get().reminders;
         const updatedReminders: ReminderItem[] = [];
@@ -273,7 +278,11 @@ export const useVaultStore = create<VaultState>((set, get) => ({
             await dbUpdateReminder(cleared);
             updatedReminders.push(cleared);
           } else {
-            const newNotifId = await scheduleReminderNotification(rem, true);
+            const newNotifId = await scheduleReminderNotification(
+              rem,
+              true,
+              repeatCount
+            );
             const scheduled = { ...rem, notificationId: newNotifId };
             await dbUpdateReminder(scheduled);
             updatedReminders.push(scheduled);
@@ -599,7 +608,8 @@ export const useVaultStore = create<VaultState>((set, get) => ({
       };
       const notifId = await scheduleReminderNotification(
         draft,
-        get().settings.notificationsEnabled
+        get().settings.notificationsEnabled,
+        get().settings.alarmRepeatCount || 3
       );
       const finalReminder: ReminderItem = {
         ...draft,
@@ -635,7 +645,8 @@ export const useVaultStore = create<VaultState>((set, get) => ({
       };
       const notifId = await scheduleReminderNotification(
         draft,
-        get().settings.notificationsEnabled
+        get().settings.notificationsEnabled,
+        get().settings.alarmRepeatCount || 3
       );
       const updated: ReminderItem = {
         ...draft,
@@ -667,7 +678,8 @@ export const useVaultStore = create<VaultState>((set, get) => ({
       } else if (!nextCompleted) {
         notifId = await scheduleReminderNotification(
           { ...existing, isCompleted: false },
-          get().settings.notificationsEnabled
+          get().settings.notificationsEnabled,
+          get().settings.alarmRepeatCount || 3
         );
       }
 
@@ -1006,9 +1018,10 @@ export const useVaultStore = create<VaultState>((set, get) => ({
     // Reschedule active reminders if notifications are enabled
     if (get().settings.notificationsEnabled) {
       const hydratedReminders = get().reminders;
+      const repeatCount = get().settings.alarmRepeatCount || 3;
       for (const rem of hydratedReminders) {
         if (!rem.isCompleted) {
-          const notifId = await scheduleReminderNotification(rem, true);
+          const notifId = await scheduleReminderNotification(rem, true, repeatCount);
           if (notifId !== (rem.notificationId || '')) {
             await dbUpdateReminder({ ...rem, notificationId: notifId });
           }
