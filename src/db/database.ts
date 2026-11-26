@@ -360,59 +360,12 @@ export async function dbDeleteTransaction(id: string): Promise<void> {
   });
 }
 
-// Accounts CRUD (Multi-wallet & Scope tracking)
+// Accounts read (Multi-wallet & Scope tracking)
 export async function dbGetAllAccounts(): Promise<Account[]> {
   const db = await getDatabase();
   return await db.getAllAsync<Account>(
     `SELECT * FROM accounts ORDER BY scope ASC, createdAt ASC`
   );
-}
-
-export async function dbInsertAccount(account: Account): Promise<void> {
-  const db = await getDatabase();
-  await db.withTransactionAsync(async () => {
-    await db.runAsync(
-      `INSERT INTO accounts (id, name, scope, initialBalance, paymentMethod, color, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        account.id,
-        account.name,
-        account.scope,
-        account.initialBalance,
-        account.paymentMethod,
-        account.color || '#1E40AF',
-        account.createdAt,
-        account.updatedAt,
-      ]
-    );
-  });
-}
-
-export async function dbUpdateAccount(account: Account): Promise<void> {
-  const db = await getDatabase();
-  await db.withTransactionAsync(async () => {
-    await db.runAsync(
-      `UPDATE accounts
-       SET name = ?, scope = ?, initialBalance = ?, paymentMethod = ?, color = ?, updatedAt = ?
-       WHERE id = ?`,
-      [
-        account.name,
-        account.scope,
-        account.initialBalance,
-        account.paymentMethod,
-        account.color || '#1E40AF',
-        account.updatedAt,
-        account.id,
-      ]
-    );
-  });
-}
-
-export async function dbDeleteAccount(id: string): Promise<void> {
-  const db = await getDatabase();
-  await db.withTransactionAsync(async () => {
-    await db.runAsync(`DELETE FROM accounts WHERE id = ?`, [id]);
-  });
 }
 
 // Items CRUD & History

@@ -452,25 +452,17 @@ export const ITEM_STATUSES: ItemStatus[] = [
 ];
 
 export const ACTIVITY_CATEGORIES = [
-  'Fitness & Health',
-  'Work & Deep Focus',
-  'Reading & Study',
-  'Hydration & Wellness',
-  'Meditation',
-  'Household',
-  'Hobby',
-  'Custom',
+  'Health',
+  'Work',
+  'Study',
+  'Personal',
 ];
 
 export const COMMON_ACTIVITY_UNITS = [
   'mins',
   'hrs',
   'km',
-  'steps',
-  'pages',
-  'glasses',
-  'kcal',
-  'sessions',
+  'count',
 ];
 
 export const REMINDER_CATEGORIES = [
@@ -513,12 +505,6 @@ export const REMINDER_WEEKDAYS: {
   { key: 'friday', label: 'Friday', shortLabel: 'Fri', weekdayIndex: 5 },
   { key: 'saturday', label: 'Saturday', shortLabel: 'Sat', weekdayIndex: 6 },
 ];
-
-export const REMINDER_RECURRENCES: {
-  key: WeekdayRecurrenceKey;
-  label: string;
-  shortLabel: string;
-}[] = REMINDER_WEEKDAYS;
 
 export function parseRecurrenceWeekdays(
   recurrence: ReminderRecurrence

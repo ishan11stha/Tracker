@@ -4,7 +4,6 @@ import {
   Alert,
   Keyboard,
   Platform,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -24,14 +23,6 @@ import { getThemeColors } from '../theme/colors';
 interface QuickActionMessageBoxProps {
   isDark?: boolean;
 }
-
-const EXAMPLE_PROMPTS = [
-  'get by mom 200, add to bank',
-  'drank coffee 150 cash',
-  'bought notebook, 5000',
-  '5km run 30 mins',
-  'remind me tomorrow 5pm to pay wifi',
-];
 
 export function QuickActionMessageBox({
   isDark = false,
@@ -106,16 +97,7 @@ export function QuickActionMessageBox({
   }, [feedback]);
 
   return (
-    <View
-      style={[
-        styles.container,
-        {
-          backgroundColor: theme.card,
-          borderColor: theme.border,
-        },
-      ]}
-    >
-      {/* Feedback / Confirmation Banner with Undo */}
+    <View style={styles.wrap}>
       {feedback && (
         <View
           style={[
@@ -149,9 +131,7 @@ export function QuickActionMessageBox({
                 onPress={handleUndo}
                 style={[
                   styles.undoBtn,
-                  {
-                    backgroundColor: isDark ? '#047857' : '#D1FAE5',
-                  },
+                  { backgroundColor: isDark ? '#047857' : '#D1FAE5' },
                 ]}
               >
                 <RotateCcw
@@ -179,13 +159,12 @@ export function QuickActionMessageBox({
         </View>
       )}
 
-      {/* Main Input Row */}
       <View
         style={[
           styles.inputRow,
           {
-            backgroundColor: isDark ? '#0F172A' : '#F8FAFC',
-            borderColor: isDark ? '#334155' : '#E2E8F0',
+            backgroundColor: theme.card,
+            borderColor: theme.border,
           },
         ]}
       >
@@ -194,19 +173,19 @@ export function QuickActionMessageBox({
             styles.sparkleBadge,
             {
               backgroundColor: isDark
-                ? 'rgba(99, 102, 241, 0.2)'
-                : 'rgba(79, 70, 229, 0.1)',
+                ? 'rgba(56, 189, 248, 0.16)'
+                : '#F1F5F9',
             },
           ]}
         >
-          <Sparkles size={15} color={isDark ? '#818CF8' : '#4F46E5'} />
+          <Sparkles size={15} color={isDark ? '#38BDF8' : '#0F172A'} />
         </View>
 
         <TextInput
           style={[styles.textInput, { color: theme.textPrimary }]}
           value={inputVal}
           onChangeText={setInputVal}
-          placeholder="Quick log: 'coffee 150 cash' or '5km run'..."
+          placeholder="Quick type: coffee 150, 5km run, remind 6pm..."
           placeholderTextColor={theme.textMuted}
           accessibilityLabel="Quick add command"
           returnKeyType="send"
@@ -238,9 +217,11 @@ export function QuickActionMessageBox({
             {
               backgroundColor:
                 inputVal.trim().length > 0
-                  ? '#4F46E5'
+                  ? isDark
+                    ? '#38BDF8'
+                    : '#0F172A'
                   : isDark
-                    ? '#334155'
+                    ? '#1E293B'
                     : '#CBD5E1',
             },
           ]}
@@ -248,50 +229,23 @@ export function QuickActionMessageBox({
           {isProcessing ? (
             <ActivityIndicator size="small" color="#FFFFFF" />
           ) : (
-            <ArrowUp size={15} color="#FFFFFF" strokeWidth={2.8} />
+            <ArrowUp
+              size={15}
+              color={
+                inputVal.trim().length > 0 && isDark ? '#0B0F19' : '#FFFFFF'
+              }
+              strokeWidth={2.8}
+            />
           )}
         </TouchableOpacity>
       </View>
-
-      {/* Clean Single-Line Prompt Suggestions */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.chipsScroll}
-      >
-        {EXAMPLE_PROMPTS.map((prompt) => (
-          <TouchableOpacity
-            key={prompt}
-            activeOpacity={0.75}
-            onPress={() => setInputVal(prompt)}
-            style={[
-              styles.chipPill,
-              {
-                backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.chipText,
-                { color: isDark ? '#CBD5E1' : '#475569' },
-              ]}
-            >
-              {prompt}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  wrap: {
     marginBottom: 14,
-    borderRadius: 20,
-    padding: 12,
-    borderWidth: 1,
   },
   feedbackBanner: {
     flexDirection: 'row',
@@ -301,7 +255,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 12,
     borderWidth: 1,
-    marginBottom: 10,
+    marginBottom: 8,
     gap: 8,
   },
   feedbackLeft: {
@@ -333,10 +287,10 @@ const styles = StyleSheet.create({
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1,
     paddingHorizontal: 8,
-    paddingVertical: 5,
+    paddingVertical: 6,
     gap: 8,
   },
   sparkleBadge: {
@@ -358,20 +312,5 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  chipsScroll: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingTop: 8,
-  },
-  chipPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 4.5,
-    borderRadius: 999,
-  },
-  chipText: {
-    fontSize: 11,
-    fontWeight: '600',
   },
 });

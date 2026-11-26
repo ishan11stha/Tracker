@@ -14,14 +14,12 @@ import {
   ArrowUpRight,
   Bell,
   CheckCircle2,
-  ChevronRight,
   Circle,
   Eye,
   EyeOff,
   Package,
   Plus,
   Settings,
-  ShieldCheck,
 } from 'lucide-react-native';
 import {
   calculateAccountBalances,
@@ -46,15 +44,7 @@ import { NepaliCalendarModal } from '../../components/NepaliCalendarModal';
 import {
   CardWithHeader,
   CurrencyDisplayer,
-  DateRangeChips,
-  MONEKIN_PERIODS,
-  MonekinPeriodKey,
-  TrendingValueChip,
 } from '../../components/monekin/MonekinComponents';
-import {
-  BalanceEvolutionChart,
-  getFinanceHealthMeta,
-} from '../../components/monekin/MonekinCharts';
 import { TransactionType } from '../../types';
 
 export default function DashboardScreen() {
@@ -76,16 +66,14 @@ export default function DashboardScreen() {
   const theme = getThemeColors(isDark);
   const palette = getSectionPalette('dashboard', isDark);
 
-  const [selectedPeriod, setSelectedPeriod] =
-    useState<MonekinPeriodKey>('1M');
   const initialNpt = useCurrentNPT();
 
   const welcomeGreeting = useMemo(() => {
     const h = initialNpt.hours;
     if (settings.language === 'ne') {
-      if (h >= 6 && h < 12) return 'शुभ प्रभात • Good morning';
-      if (h >= 12 && h < 18) return 'शुभ दिन • Good afternoon';
-      return 'शुभ सन्ध्या • Good evening';
+      if (h >= 6 && h < 12) return 'शुभ प्रभात';
+      if (h >= 12 && h < 18) return 'शुभ दिन';
+      return 'शुभ सन्ध्या';
     }
     if (h >= 6 && h < 12) return 'Good morning';
     if (h >= 12 && h < 18) return 'Good afternoon';
@@ -102,79 +90,10 @@ export default function DashboardScreen() {
     );
   }, [transactions, overviewScope]);
 
-  const allTimeSummary = useMemo(
+  const summary = useMemo(
     () => calculateFinancialSummary(scopedTransactions),
     [scopedTransactions]
   );
-
-  const {
-    periodSummary,
-    incomeTrendPct,
-    expenseTrendPct,
-    balanceDelta,
-    balanceTrendPct,
-    evolutionPoints,
-  } = useMemo(() => {
-    const periodDef =
-      MONEKIN_PERIODS.find((p) => p.key === selectedPeriod) ||
-      MONEKIN_PERIODS[1];
-    const todayParts = initialNpt.isoDate.split('-').map(Number);
-    const todayUTC = Date.UTC(todayParts[0], todayParts[1] - 1, todayParts[2]);
-
-    const currentList = scopedTransactions.filter((t) => {
-      if (!periodDef.days) return true;
-      const parts = t.dateISO.split('-').map(Number);
-      const tUTC = Date.UTC(parts[0], parts[1] - 1, parts[2]);
-      const diffDays = Math.floor((todayUTC - tUTC) / 86400000);
-      return diffDays >= 0 && diffDays <= periodDef.days;
-    });
-
-    const prevList = scopedTransactions.filter((t) => {
-      if (!periodDef.days) return false;
-      const parts = t.dateISO.split('-').map(Number);
-      const tUTC = Date.UTC(parts[0], parts[1] - 1, parts[2]);
-      const diffDays = Math.floor((todayUTC - tUTC) / 86400000);
-      return diffDays > periodDef.days && diffDays <= periodDef.days * 2;
-    });
-
-    const currSum = calculateFinancialSummary(currentList);
-    const prevSum = calculateFinancialSummary(prevList);
-
-    const calcPct = (curr: number, prev: number) => {
-      if (prev === 0) return curr > 0 ? 100 : 0;
-      return ((curr - prev) / prev) * 100;
-    };
-
-    const sortedAsc = [...scopedTransactions].sort((a, b) =>
-      a.dateISO.localeCompare(b.dateISO)
-    );
-    let running = 0;
-    const pts: number[] = [0];
-    for (const t of sortedAsc) {
-      running += t.type === 'income' ? t.amount : -t.amount;
-      pts.push(running);
-    }
-    if (pts.length < 4) {
-      pts.unshift(0);
-    }
-
-    return {
-      periodSummary: currSum,
-      incomeTrendPct: calcPct(currSum.totalIncome, prevSum.totalIncome),
-      expenseTrendPct: calcPct(currSum.totalExpense, prevSum.totalExpense),
-      balanceDelta: currSum.totalBalance,
-      balanceTrendPct:
-        allTimeSummary.totalIncome > 0
-          ? (currSum.totalBalance / allTimeSummary.totalIncome) * 100
-          : 0,
-      evolutionPoints: pts,
-    };
-  }, [
-    scopedTransactions,
-    selectedPeriod,
-    initialNpt.isoDate,
-    allTimeSummary.totalIncome,
-  ]);
 
   const accountSummary = useMemo(
     () => calculateAccountBalances(accounts, transactions),
@@ -187,71 +106,11 @@ export default function DashboardScreen() {
     return accountSummary.grandTotal;
   }, [overviewScope, accountSummary]);
 
-  const hasAnyRecords =
-    transactions.length > 0 || activities.length > 0 || reminders.length > 0;
-
-  const financeHealthScore = useMemo(() => {
-    if (!hasAnyRecords) return 0;
-
-    const savingsRatio =
-      allTimeSummary.totalIncome > 0
-        ? Math.max(
-            0,
-            (allTimeSummary.totalIncome - allTimeSummary.totalExpense) /
-              allTimeSummary.totalIncome
-          )
-        : allTimeSummary.totalExpense > 0
-          ? 0
-          : 0.5;
-    const savingsPoints = Math.min(60, Math.round(savingsRatio * 75));
-
-    const completedActs = activities.filter(
-      (a) => a.status === 'completed'
-    ).length;
-    const actRatio =
-      activities.length > 0 ? completedActs / activities.length : 1;
-    const actPoints = Math.round(actRatio * 20);
-
-    const overdueRems = reminders.filter(
-      (r) => !r.isCompleted && r.dateISO < initialNpt.isoDate
-    ).length;
-    const remPoints = Math.max(0, 20 - overdueRems * 7);
-
-    return Math.min(100, Math.max(10, savingsPoints + actPoints + remPoints));
-  }, [hasAnyRecords, allTimeSummary, activities, reminders, initialNpt.isoDate]);
-
-  const healthMeta = useMemo(() => {
-    if (!hasAnyRecords) {
-      return {
-        color: palette.accent,
-        label: 'NEW VAULT',
-      };
-    }
-    return getFinanceHealthMeta(financeHealthScore);
-  }, [hasAnyRecords, financeHealthScore, palette.accent]);
-
-  const [recentSort, setRecentSort] = useState<'date_desc' | 'amount_desc'>(
-    'date_desc'
-  );
-
   const recentTransactions = useMemo(() => {
-    const list = transactions.filter((t) => {
-      if (
-        overviewScope !== 'All' &&
-        (t.accountScope || 'Personal') !== overviewScope
-      ) {
-        return false;
-      }
-      return true;
-    });
-
-    return [...list]
-      .sort((a, b) => {
-        if (recentSort === 'amount_desc') return b.amount - a.amount;
-        return b.dateISO.localeCompare(a.dateISO);
-      })
-      .slice(0, 5);
-  }, [transactions, overviewScope, recentSort]);
+    return [...scopedTransactions]
+      .sort((a, b) => b.dateISO.localeCompare(a.dateISO))
+      .slice(0, 4);
+  }, [scopedTransactions]);
 
   const pendingReminders = useMemo(
     () =>
@@ -280,17 +139,10 @@ export default function DashboardScreen() {
     [activities]
   );
 
-  const itemSummary = useMemo(() => {
-    const totalCount = items.reduce((acc, i) => acc + (i.quantity || 1), 0);
-    const totalValue = items.reduce(
-      (acc, i) => acc + (i.purchasePrice || 0) * (i.quantity || 1),
-      0
-    );
-    const lentOrBorrowed = items.filter(
-      (i) => i.status === 'Lent' || i.status === 'Borrowed'
-    ).length;
-    return { totalCount, totalValue, lentOrBorrowed };
-  }, [items]);
+  const totalItemUnits = useMemo(
+    () => items.reduce((acc, i) => acc + (i.quantity || 1), 0),
+    [items]
+  );
 
   // Modal states
   const [txnModalVisible, setTxnModalVisible] = useState(false);
@@ -332,13 +184,13 @@ export default function DashboardScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* 1. EXECUTIVE HEADER */}
+        {/* 1. CLEAN MINIMAL HEADER */}
         <View style={styles.headerRow}>
           <View style={styles.welcomeLeft}>
             <View
               style={[
                 styles.userAvatar,
-                { backgroundColor: palette.accent },
+                { backgroundColor: isDark ? '#1E293B' : '#0F172A' },
               ]}
             >
               <Text style={styles.userAvatarText}>{userInitials}</Text>
@@ -364,10 +216,7 @@ export default function DashboardScreen() {
               onPress={togglePrivateMode}
               style={[
                 styles.circleIconBtn,
-                {
-                  backgroundColor: theme.card,
-                  borderColor: theme.border,
-                },
+                { backgroundColor: theme.card, borderColor: theme.border },
               ]}
               accessibilityRole="switch"
               accessibilityLabel="Hide balances in private mode"
@@ -384,10 +233,7 @@ export default function DashboardScreen() {
               onPress={() => router.push('/settings')}
               style={[
                 styles.circleIconBtn,
-                {
-                  backgroundColor: theme.card,
-                  borderColor: theme.border,
-                },
+                { backgroundColor: theme.card, borderColor: theme.border },
               ]}
               accessibilityRole="button"
               accessibilityLabel="Open settings"
@@ -397,14 +243,14 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {/* 2. COMPACT NEPALI BIKRAM SAMBAT & LIVE NPT CLOCK BANNER */}
+        {/* 2. COMPACT NEPALI DATE & LIVE NPT CLOCK */}
         <NepaliDateClockBanner
           timeFormat={settings.timeFormat}
           isDark={isDark}
           onPressCalendar={handleOpenCalendar}
         />
 
-        {/* 3. UNIFIED FLAGSHIP FINANCIAL HERO CARD */}
+        {/* 3. SIMPLIFIED NET WORTH HERO CARD */}
         <View
           style={[
             styles.heroCard,
@@ -412,20 +258,19 @@ export default function DashboardScreen() {
           ]}
         >
           <View style={styles.heroHeaderRow}>
-            <Text style={[styles.evolutionLabel, { color: theme.textMuted }]}>
+            <Text style={[styles.heroLabel, { color: theme.textMuted }]}>
               {overviewScope === 'Personal'
-                ? 'PERSONAL BALANCE (आफ्नो)'
+                ? 'PERSONAL BALANCE'
                 : overviewScope === 'Family'
-                  ? 'FAMILY BALANCE (परिवार)'
-                  : 'TOTAL NET WORTH (कुल मौज्दात)'}
+                  ? 'FAMILY BALANCE'
+                  : 'NET BALANCE'}
             </Text>
 
             <View
               style={[
                 styles.scopeMiniTabs,
                 {
-                  backgroundColor: isDark ? '#1F2937' : '#F1F5F9',
-                  borderColor: theme.border,
+                  backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
                 },
               ]}
             >
@@ -437,16 +282,10 @@ export default function DashboardScreen() {
                     onPress={() => setOverviewScope(sc)}
                     accessibilityRole="tab"
                     accessibilityState={{ selected: isSel }}
-                    accessibilityLabel={`Show ${sc} accounts`}
                     style={[
                       styles.scopeMiniTab,
                       isSel && {
-                        backgroundColor:
-                          sc === 'Personal'
-                            ? '#2563EB'
-                            : sc === 'Family'
-                              ? '#7C3AED'
-                              : palette.accent,
+                        backgroundColor: isDark ? '#38BDF8' : '#0F172A',
                       },
                     ]}
                   >
@@ -454,7 +293,11 @@ export default function DashboardScreen() {
                       style={[
                         styles.scopeMiniTabText,
                         {
-                          color: isSel ? '#FFFFFF' : theme.textMuted,
+                          color: isSel
+                            ? isDark
+                              ? '#0B0F19'
+                              : '#FFFFFF'
+                            : theme.textMuted,
                           fontWeight: isSel ? '800' : '600',
                         },
                       ]}
@@ -467,7 +310,7 @@ export default function DashboardScreen() {
             </View>
           </View>
 
-          <View style={styles.evolutionValueRow}>
+          <View style={styles.heroBalanceWrap}>
             <CurrencyDisplayer
               amount={displayedHeroBalance}
               currency={settings.currency}
@@ -475,130 +318,60 @@ export default function DashboardScreen() {
               privateMode={privateMode}
               size="xl"
             />
-            <TrendingValueChip
-              percentage={balanceTrendPct}
-              deltaText={formatCurrency(
-                Math.abs(balanceDelta),
-                settings.currency,
-                true,
-                privateMode
-              )}
-              isDark={isDark}
-            />
           </View>
 
-          <View style={styles.chartWrapper}>
-            <BalanceEvolutionChart
-              dataPoints={evolutionPoints}
-              lineColor={palette.accent}
-              height={92}
-            />
-          </View>
-
-          <DateRangeChips
-            selected={selectedPeriod}
-            onSelect={setSelectedPeriod}
-            accentColor={palette.accent}
-            isDark={isDark}
-          />
-
-          {/* Integrated Period Income & Expense Flow Tiles */}
-          <View
-            style={[
-              styles.heroFlowsRow,
-              { borderTopColor: theme.divider },
-            ]}
-          >
+          <View style={[styles.heroFlowsRow, { borderTopColor: theme.divider }]}>
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => openQuickTxn('income')}
-              style={[
-                styles.heroFlowTile,
-                {
-                  backgroundColor: isDark
-                    ? 'rgba(55, 161, 59, 0.12)'
-                    : '#F0FDF4',
-                },
-              ]}
+              style={styles.heroFlowCol}
             >
-              <View style={styles.flowCardTop}>
-                <View
-                  style={[
-                    styles.flowIconBadge,
-                    { backgroundColor: theme.incomeBg },
-                  ]}
-                >
-                  <ArrowDownLeft size={14} color={theme.income} />
-                </View>
-                <Text
-                  style={[styles.flowLabelText, { color: theme.income }]}
-                  numberOfLines={1}
-                >
-                  INCOME ({selectedPeriod})
+              <View style={styles.flowLabelRow}>
+                <ArrowDownLeft size={14} color={theme.income} />
+                <Text style={[styles.flowLabelText, { color: theme.textMuted }]}>
+                  Income
                 </Text>
               </View>
               <CurrencyDisplayer
-                amount={periodSummary.totalIncome}
+                amount={summary.totalIncome}
                 currency={settings.currency}
                 isDark={isDark}
                 privateMode={privateMode}
                 size="md"
-                compact={periodSummary.totalIncome >= 1000000}
-              />
-              <TrendingValueChip
-                percentage={incomeTrendPct}
-                afterText={`vs prev ${selectedPeriod}`}
-                isDark={isDark}
+                color={theme.income}
+                compact={summary.totalIncome >= 1000000}
               />
             </TouchableOpacity>
+
+            <View
+              style={[styles.flowDivider, { backgroundColor: theme.divider }]}
+            />
 
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => openQuickTxn('expense')}
-              style={[
-                styles.heroFlowTile,
-                {
-                  backgroundColor: isDark
-                    ? 'rgba(239, 68, 68, 0.12)'
-                    : '#FEF2F2',
-                },
-              ]}
+              style={styles.heroFlowCol}
             >
-              <View style={styles.flowCardTop}>
-                <View
-                  style={[
-                    styles.flowIconBadge,
-                    { backgroundColor: theme.expenseBg },
-                  ]}
-                >
-                  <ArrowUpRight size={14} color={theme.expense} />
-                </View>
-                <Text
-                  style={[styles.flowLabelText, { color: theme.expense }]}
-                  numberOfLines={1}
-                >
-                  EXPENSES ({selectedPeriod})
+              <View style={styles.flowLabelRow}>
+                <ArrowUpRight size={14} color={theme.expense} />
+                <Text style={[styles.flowLabelText, { color: theme.textMuted }]}>
+                  Expenses
                 </Text>
               </View>
               <CurrencyDisplayer
-                amount={periodSummary.totalExpense}
+                amount={summary.totalExpense}
                 currency={settings.currency}
                 isDark={isDark}
                 privateMode={privateMode}
                 size="md"
-                compact={periodSummary.totalExpense >= 1000000}
-              />
-              <TrendingValueChip
-                percentage={expenseTrendPct}
-                afterText={`vs prev ${selectedPeriod}`}
-                inverse
-                isDark={isDark}
+                color={theme.expense}
+                compact={summary.totalExpense >= 1000000}
               />
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* 4. 5-ICON QUICK LAUNCH DOCK (Icons only, no text labels) */}
+        {/* 4. 5-ICON QUICK LAUNCH DOCK (Icons only) */}
         <View style={styles.quickDockRow}>
           <TouchableOpacity
             activeOpacity={0.78}
@@ -609,17 +382,17 @@ export default function DashboardScreen() {
               styles.quickDockBtn,
               {
                 backgroundColor: isDark
-                  ? 'rgba(55, 161, 59, 0.16)'
-                  : '#E8F5E9',
+                  ? 'rgba(16, 185, 129, 0.14)'
+                  : '#ECFDF5',
                 borderColor: isDark
-                  ? 'rgba(55, 161, 59, 0.35)'
-                  : '#BBF7D0',
+                  ? 'rgba(16, 185, 129, 0.3)'
+                  : '#A7F3D0',
               },
             ]}
           >
             <ArrowDownLeft
               size={20}
-              color={isDark ? '#4ADE80' : '#16A34A'}
+              color={isDark ? '#34D399' : '#059669'}
               strokeWidth={2.5}
             />
           </TouchableOpacity>
@@ -633,10 +406,10 @@ export default function DashboardScreen() {
               styles.quickDockBtn,
               {
                 backgroundColor: isDark
-                  ? 'rgba(239, 68, 68, 0.16)'
-                  : '#FEE2E2',
+                  ? 'rgba(239, 68, 68, 0.14)'
+                  : '#FEF2F2',
                 borderColor: isDark
-                  ? 'rgba(239, 68, 68, 0.35)'
+                  ? 'rgba(239, 68, 68, 0.3)'
                   : '#FECACA',
               },
             ]}
@@ -657,10 +430,10 @@ export default function DashboardScreen() {
               styles.quickDockBtn,
               {
                 backgroundColor: isDark
-                  ? 'rgba(37, 99, 235, 0.16)'
-                  : '#E8F1FC',
+                  ? 'rgba(37, 99, 235, 0.14)'
+                  : '#EFF6FF',
                 borderColor: isDark
-                  ? 'rgba(37, 99, 235, 0.35)'
+                  ? 'rgba(37, 99, 235, 0.3)'
                   : '#BFDBFE',
               },
             ]}
@@ -681,10 +454,10 @@ export default function DashboardScreen() {
               styles.quickDockBtn,
               {
                 backgroundColor: isDark
-                  ? 'rgba(109, 40, 217, 0.16)'
-                  : '#F0EBFA',
+                  ? 'rgba(124, 58, 237, 0.14)'
+                  : '#F5F3FF',
                 borderColor: isDark
-                  ? 'rgba(109, 40, 217, 0.35)'
+                  ? 'rgba(124, 58, 237, 0.3)'
                   : '#DDD6FE',
               },
             ]}
@@ -705,10 +478,10 @@ export default function DashboardScreen() {
               styles.quickDockBtn,
               {
                 backgroundColor: isDark
-                  ? 'rgba(234, 88, 12, 0.16)'
-                  : '#FFF0E6',
+                  ? 'rgba(234, 88, 12, 0.14)'
+                  : '#FFF7ED',
                 borderColor: isDark
-                  ? 'rgba(234, 88, 12, 0.35)'
+                  ? 'rgba(234, 88, 12, 0.3)'
                   : '#FED7AA',
               },
             ]}
@@ -721,242 +494,79 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* 5. SMART NLP QUICK COMMAND BAR */}
+        {/* 5. SINGLE-LINE SMART COMMAND INPUT */}
         <QuickActionMessageBox isDark={isDark} />
 
-        {/* 6. 2x2 INTERACTIVE VAULT PULSE BENTO GRID */}
-        <View style={styles.bentoGrid}>
-          <View style={styles.bentoRow}>
-            {/* Tile 1: Vault Health Score */}
-            <TouchableOpacity
-              activeOpacity={0.82}
-              onPress={() => router.push('/(tabs)/money')}
-              style={[
-                styles.bentoCard,
-                { backgroundColor: theme.card, borderColor: theme.border },
-              ]}
-            >
-              <View style={styles.bentoTopRow}>
-                <View
-                  style={[
-                    styles.bentoIconWrap,
-                    { backgroundColor: `${healthMeta.color}1F` },
-                  ]}
-                >
-                  <ShieldCheck size={16} color={healthMeta.color} />
-                </View>
-                <View
-                  style={[
-                    styles.bentoTagPill,
-                    { backgroundColor: `${healthMeta.color}1F` },
-                  ]}
-                >
-                  <Text
-                    style={[styles.bentoTagText, { color: healthMeta.color }]}
-                  >
-                    {healthMeta.label}
-                  </Text>
-                </View>
-              </View>
-              <Text style={[styles.bentoValue, { color: theme.textPrimary }]}>
-                {financeHealthScore}
-                <Text style={[styles.bentoValueSub, { color: theme.textMuted }]}>
-                  /100
-                </Text>
-              </Text>
-              <Text style={[styles.bentoLabel, { color: theme.textMuted }]}>
-                Financial & Life Health
-              </Text>
-            </TouchableOpacity>
+        {/* 6. COMPACT 3-STAT OVERVIEW STRIP */}
+        <View
+          style={[
+            styles.statsStrip,
+            { backgroundColor: theme.card, borderColor: theme.border },
+          ]}
+        >
+          <TouchableOpacity
+            activeOpacity={0.75}
+            onPress={() => router.push('/(tabs)/items')}
+            style={styles.stripCell}
+          >
+            <Text style={[styles.stripNum, { color: '#2563EB' }]}>
+              {totalItemUnits}
+            </Text>
+            <Text style={[styles.stripLabel, { color: theme.textMuted }]}>
+              Items
+            </Text>
+          </TouchableOpacity>
 
-            {/* Tile 2: Asset Portfolio */}
-            <TouchableOpacity
-              activeOpacity={0.82}
-              onPress={() => router.push('/(tabs)/items')}
-              style={[
-                styles.bentoCard,
-                { backgroundColor: theme.card, borderColor: theme.border },
-              ]}
-            >
-              <View style={styles.bentoTopRow}>
-                <View
-                  style={[
-                    styles.bentoIconWrap,
-                    {
-                      backgroundColor: isDark
-                        ? 'rgba(37, 99, 235, 0.2)'
-                        : '#DBEAFE',
-                    },
-                  ]}
-                >
-                  <Package
-                    size={16}
-                    color={isDark ? '#60A5FA' : '#2563EB'}
-                  />
-                </View>
-                <ChevronRight size={15} color={theme.textMuted} />
-              </View>
-              <Text
-                style={[styles.bentoValue, { color: theme.textPrimary }]}
-                numberOfLines={1}
-              >
-                {formatCurrency(
-                  itemSummary.totalValue,
-                  settings.currency,
-                  true,
-                  privateMode
-                )}
-              </Text>
-              <Text
-                style={[styles.bentoLabel, { color: theme.textMuted }]}
-                numberOfLines={1}
-              >
-                {itemSummary.totalCount} items
-                {itemSummary.lentOrBorrowed > 0
-                  ? ` • ${itemSummary.lentOrBorrowed} lent`
-                  : ' tracked'}
-              </Text>
-            </TouchableOpacity>
-          </View>
+          <View
+            style={[styles.stripDivider, { backgroundColor: theme.divider }]}
+          />
 
-          <View style={styles.bentoRow}>
-            {/* Tile 3: Habits & Activities */}
-            <TouchableOpacity
-              activeOpacity={0.82}
-              onPress={() => router.push('/(tabs)/tracker')}
-              style={[
-                styles.bentoCard,
-                { backgroundColor: theme.card, borderColor: theme.border },
-              ]}
-            >
-              <View style={styles.bentoTopRow}>
-                <View
-                  style={[
-                    styles.bentoIconWrap,
-                    {
-                      backgroundColor: isDark
-                        ? 'rgba(109, 40, 217, 0.2)'
-                        : '#EDE9FE',
-                    },
-                  ]}
-                >
-                  <Activity
-                    size={16}
-                    color={isDark ? '#A78BFA' : '#7C3AED'}
-                  />
-                </View>
-                <ChevronRight size={15} color={theme.textMuted} />
-              </View>
-              <Text style={[styles.bentoValue, { color: theme.textPrimary }]}>
-                {completedActivitiesCount}
-                <Text style={[styles.bentoValueSub, { color: theme.textMuted }]}>
-                  /{activities.length}
-                </Text>
-              </Text>
-              <Text style={[styles.bentoLabel, { color: theme.textMuted }]}>
-                Habits Completed
-              </Text>
-            </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.75}
+            onPress={() => router.push('/(tabs)/tracker')}
+            style={styles.stripCell}
+          >
+            <Text style={[styles.stripNum, { color: '#7C3AED' }]}>
+              {completedActivitiesCount}/{activities.length}
+            </Text>
+            <Text style={[styles.stripLabel, { color: theme.textMuted }]}>
+              Habits
+            </Text>
+          </TouchableOpacity>
 
-            {/* Tile 4: Active Reminders */}
-            <TouchableOpacity
-              activeOpacity={0.82}
-              onPress={() => router.push('/(tabs)/reminders')}
-              style={[
-                styles.bentoCard,
-                { backgroundColor: theme.card, borderColor: theme.border },
-              ]}
-            >
-              <View style={styles.bentoTopRow}>
-                <View
-                  style={[
-                    styles.bentoIconWrap,
-                    {
-                      backgroundColor: isDark
-                        ? 'rgba(234, 88, 12, 0.2)'
-                        : '#FFEDD5',
-                    },
-                  ]}
-                >
-                  <Bell size={16} color={isDark ? '#FB923C' : '#EA580C'} />
-                </View>
-                <ChevronRight size={15} color={theme.textMuted} />
-              </View>
-              <Text style={[styles.bentoValue, { color: theme.textPrimary }]}>
-                {pendingReminders.length}
-              </Text>
-              <Text style={[styles.bentoLabel, { color: theme.textMuted }]}>
-                Active Reminders
-              </Text>
-            </TouchableOpacity>
-          </View>
+          <View
+            style={[styles.stripDivider, { backgroundColor: theme.divider }]}
+          />
+
+          <TouchableOpacity
+            activeOpacity={0.75}
+            onPress={() => router.push('/(tabs)/reminders')}
+            style={styles.stripCell}
+          >
+            <Text style={[styles.stripNum, { color: '#EA580C' }]}>
+              {pendingReminders.length}
+            </Text>
+            <Text style={[styles.stripLabel, { color: theme.textMuted }]}>
+              Alerts
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        {/* 7. RECENT MOVEMENTS CARD */}
+        {/* 7. RECENT MOVEMENTS */}
         <CardWithHeader
           title="Recent Movements"
-          subtitle={
-            overviewScope === 'All'
-              ? 'Latest income & expenses'
-              : `${overviewScope} portfolio`
-          }
           isDark={isDark}
-          headerActionText="Ledger"
+          headerActionText="All"
           onHeaderActionPress={() => router.push('/(tabs)/money')}
-          accentColor="#37A13B"
+          accentColor="#10B981"
         >
-          {recentTransactions.length > 1 && (
-            <View style={styles.recentControlsRow}>
-              <Text style={[styles.recentSubtitle, { color: theme.textMuted }]}>
-                Latest {recentTransactions.length} entries
-              </Text>
-              <View style={styles.recentSortPills}>
-                {(
-                  [
-                    { key: 'date_desc', label: 'Newest' },
-                    { key: 'amount_desc', label: 'Highest' },
-                  ] as const
-                ).map((s) => {
-                  const isSel = recentSort === s.key;
-                  return (
-                    <TouchableOpacity
-                      key={s.key}
-                      onPress={() => setRecentSort(s.key)}
-                      style={[
-                        styles.sortMiniPill,
-                        isSel && {
-                          backgroundColor: isDark ? '#1F2937' : '#F1F5F9',
-                          borderColor: palette.accent,
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.sortMiniPillText,
-                          {
-                            color: isSel ? palette.accent : theme.textMuted,
-                            fontWeight: isSel ? '800' : '600',
-                          },
-                        ]}
-                      >
-                        {s.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-          )}
-
           {recentTransactions.length === 0 ? (
             <Text style={[styles.emptyText, { color: theme.textMuted }]}>
-              No transactions yet. Tap Income or Expense above to record your
-              first movement.
+              No transactions yet.
             </Text>
           ) : (
             recentTransactions.map((t, idx) => {
               const isIncome = t.type === 'income';
-              const scope = t.accountScope || 'Personal';
               return (
                 <View
                   key={t.id}
@@ -986,58 +596,16 @@ export default function DashboardScreen() {
                   </View>
 
                   <View style={{ flex: 1 }}>
-                    <View style={styles.titleScopeRow}>
-                      <Text
-                        style={[
-                          styles.itemTitle,
-                          { color: theme.textPrimary, flexShrink: 1 },
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {t.title}
-                      </Text>
-                      <View
-                        style={[
-                          styles.scopeBadge,
-                          {
-                            backgroundColor:
-                              scope === 'Personal'
-                                ? isDark
-                                  ? '#1E3A8A'
-                                  : '#DBEAFE'
-                                : isDark
-                                  ? '#4C1D95'
-                                  : '#EDE9FE',
-                          },
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.scopeBadgeText,
-                            {
-                              color:
-                                scope === 'Personal'
-                                  ? isDark
-                                    ? '#60A5FA'
-                                    : '#2563EB'
-                                  : isDark
-                                    ? '#A78BFA'
-                                    : '#7C3AED',
-                            },
-                          ]}
-                        >
-                          {scope}
-                        </Text>
-                      </View>
-                    </View>
-
                     <Text
-                      style={[
-                        styles.itemSubtitle,
-                        { color: theme.textMuted },
-                      ]}
+                      style={[styles.itemTitle, { color: theme.textPrimary }]}
+                      numberOfLines={1}
                     >
-                      {t.category} • {t.paymentMethod} •{' '}
+                      {t.title}
+                    </Text>
+                    <Text
+                      style={[styles.itemSubtitle, { color: theme.textMuted }]}
+                    >
+                      {t.category} •{' '}
                       {formatDisplayDate(
                         t.dateISO,
                         settings.preferredCalendar,
@@ -1066,88 +634,57 @@ export default function DashboardScreen() {
           )}
         </CardWithHeader>
 
-        {/* 8. UNIFIED UPCOMING REMINDERS & DAILY HABITS AGENDA CARD */}
+        {/* 8. UPCOMING SCHEDULE & HABITS */}
         <CardWithHeader
-          title="Schedule & Daily Habits"
-          subtitle="Upcoming alerts and tracked routines"
+          title="Today & Upcoming"
           isDark={isDark}
           headerActionIcon={<Plus size={13} color={palette.accent} />}
-          headerActionText="Reminder"
+          headerActionText="Alert"
           onHeaderActionPress={() => setReminderModalVisible(true)}
           accentColor={palette.accent}
         >
           {upcomingReminders.length === 0 && recentActivities.length === 0 ? (
             <Text style={[styles.emptyText, { color: theme.textMuted }]}>
-              No active reminders or habits scheduled yet.
+              Nothing scheduled yet.
             </Text>
           ) : (
             <>
-              {upcomingReminders.map((rem, idx) => {
-                const priorityColor =
-                  rem.priority === 'High'
-                    ? '#EF4444'
-                    : rem.priority === 'Medium'
-                      ? '#D97706'
-                      : '#2563EB';
-                return (
-                  <TouchableOpacity
-                    key={rem.id}
-                    onPress={() => toggleReminderCompleted(rem.id)}
-                    accessibilityRole="checkbox"
-                    accessibilityState={{ checked: rem.isCompleted }}
-                    accessibilityLabel={`Mark ${rem.title} as completed`}
-                    style={[
-                      styles.listItemRow,
-                      (idx < upcomingReminders.length - 1 ||
-                        recentActivities.length > 0) && {
-                        borderBottomWidth: 1,
-                        borderBottomColor: theme.divider,
-                      },
-                    ]}
-                  >
-                    <Circle size={20} color="#EA580C" />
-                    <View style={{ flex: 1 }}>
-                      <Text
-                        style={[styles.itemTitle, { color: theme.textPrimary }]}
-                        numberOfLines={1}
-                      >
-                        {rem.title}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.itemSubtitle,
-                          { color: theme.textMuted },
-                        ]}
-                      >
-                        Alert •{' '}
-                        {formatDisplayDate(
-                          rem.dateISO,
-                          settings.preferredCalendar,
-                          settings.language
-                        )}{' '}
-                        •{' '}
-                        {formatTimeString(rem.timeString, settings.timeFormat)}{' '}
-                        NPT
-                      </Text>
-                    </View>
-                    <View
-                      style={[
-                        styles.priorityTag,
-                        { backgroundColor: `${priorityColor}1F` },
-                      ]}
+              {upcomingReminders.map((rem, idx) => (
+                <TouchableOpacity
+                  key={rem.id}
+                  onPress={() => toggleReminderCompleted(rem.id)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: rem.isCompleted }}
+                  style={[
+                    styles.listItemRow,
+                    (idx < upcomingReminders.length - 1 ||
+                      recentActivities.length > 0) && {
+                      borderBottomWidth: 1,
+                      borderBottomColor: theme.divider,
+                    },
+                  ]}
+                >
+                  <Circle size={20} color="#EA580C" />
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={[styles.itemTitle, { color: theme.textPrimary }]}
+                      numberOfLines={1}
                     >
-                      <Text
-                        style={[
-                          styles.priorityTagText,
-                          { color: priorityColor },
-                        ]}
-                      >
-                        {rem.priority}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
+                      {rem.title}
+                    </Text>
+                    <Text
+                      style={[styles.itemSubtitle, { color: theme.textMuted }]}
+                    >
+                      {formatDisplayDate(
+                        rem.dateISO,
+                        settings.preferredCalendar,
+                        settings.language
+                      )}{' '}
+                      • {formatTimeString(rem.timeString, settings.timeFormat)}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
 
               {recentActivities.map((act, idx) => {
                 const isDone = act.status === 'completed';
@@ -1157,9 +694,6 @@ export default function DashboardScreen() {
                     onPress={() => toggleActivityStatus(act.id)}
                     accessibilityRole="checkbox"
                     accessibilityState={{ checked: isDone }}
-                    accessibilityLabel={`Mark ${act.title} as ${
-                      isDone ? 'pending' : 'completed'
-                    }`}
                     style={[
                       styles.listItemRow,
                       idx < recentActivities.length - 1 && {
@@ -1169,7 +703,7 @@ export default function DashboardScreen() {
                     ]}
                   >
                     {isDone ? (
-                      <CheckCircle2 size={20} color="#6D28D9" />
+                      <CheckCircle2 size={20} color="#7C3AED" />
                     ) : (
                       <Circle size={20} color={theme.textMuted} />
                     )}
@@ -1189,36 +723,9 @@ export default function DashboardScreen() {
                         {act.title}
                       </Text>
                       <Text
-                        style={[
-                          styles.itemSubtitle,
-                          { color: theme.textMuted },
-                        ]}
+                        style={[styles.itemSubtitle, { color: theme.textMuted }]}
                       >
-                        Habit • {act.category} •{' '}
-                        {formatDisplayDate(
-                          act.dateISO,
-                          settings.preferredCalendar,
-                          settings.language
-                        )}
-                      </Text>
-                    </View>
-                    <View
-                      style={[
-                        styles.metricPill,
-                        {
-                          backgroundColor: isDark
-                            ? 'rgba(167, 139, 250, 0.18)'
-                            : '#EDE9FE',
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.metricPillText,
-                          { color: isDark ? '#A78BFA' : '#6D28D9' },
-                        ]}
-                      >
-                        {act.numericValue} {act.unit}
+                        {act.category} • {act.numericValue} {act.unit}
                       </Text>
                     </View>
                   </TouchableOpacity>
@@ -1257,7 +764,7 @@ export default function DashboardScreen() {
         onSelectDate={(iso) => setInspectedDateISO(iso)}
         onClose={() => setCalendarModalVisible(false)}
         accentColor={palette.accent}
-        title="Nepali Bikram Sambat Calendar (पात्रो)"
+        title="Nepali Calendar (पात्रो)"
       />
     </SafeAreaView>
   );
@@ -1273,7 +780,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     paddingHorizontal: 16,
     paddingTop: 10,
-    paddingBottom: 40,
+    paddingBottom: 36,
   },
   headerRow: {
     flexDirection: 'row',
@@ -1289,17 +796,16 @@ const styles = StyleSheet.create({
     gap: 11,
   },
   userAvatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
+    width: 40,
+    height: 40,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
   },
   userAvatarText: {
     color: '#FFFFFF',
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '800',
-    letterSpacing: 0.4,
   },
   welcomeHint: {
     fontSize: 11.5,
@@ -1308,7 +814,6 @@ const styles = StyleSheet.create({
   userNameText: {
     fontSize: 17,
     fontWeight: '800',
-    marginTop: 1,
   },
   headerBtnsGroup: {
     flexDirection: 'row',
@@ -1324,75 +829,63 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   heroCard: {
-    borderRadius: 22,
+    borderRadius: 20,
     borderWidth: 1,
-    paddingTop: 16,
-    paddingBottom: 14,
+    padding: 16,
     marginBottom: 12,
-    overflow: 'hidden',
-    elevation: 2,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1.5 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
   },
   heroHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    marginBottom: 6,
+    marginBottom: 8,
     gap: 8,
   },
-  evolutionLabel: {
+  heroLabel: {
     fontSize: 10.5,
     fontWeight: '800',
-    letterSpacing: 0.6,
-    flexShrink: 1,
+    letterSpacing: 0.7,
   },
-  evolutionValueRow: {
+  scopeMiniTabs: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-    paddingHorizontal: 16,
-    gap: 8,
+    borderRadius: 9,
+    padding: 2,
+    gap: 2,
   },
-  chartWrapper: {
-    marginTop: 6,
-    marginBottom: 6,
+  scopeMiniTab: {
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 7,
+  },
+  scopeMiniTabText: {
+    fontSize: 10.5,
+  },
+  heroBalanceWrap: {
+    marginBottom: 14,
   },
   heroFlowsRow: {
     flexDirection: 'row',
-    gap: 10,
-    paddingHorizontal: 14,
+    alignItems: 'center',
     paddingTop: 12,
-    marginTop: 10,
     borderTopWidth: 1,
   },
-  heroFlowTile: {
+  heroFlowCol: {
     flex: 1,
-    borderRadius: 16,
-    padding: 12,
-    gap: 4,
+    gap: 3,
   },
-  flowCardTop: {
+  flowDivider: {
+    width: 1,
+    height: 32,
+    marginHorizontal: 14,
+  },
+  flowLabelRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 2,
-  },
-  flowIconBadge: {
-    width: 24,
-    height: 24,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
+    gap: 4,
   },
   flowLabelText: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.5,
+    fontSize: 11,
+    fontWeight: '700',
   },
   quickDockRow: {
     flexDirection: 'row',
@@ -1407,54 +900,28 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     borderWidth: 1,
   },
-  bentoGrid: {
-    gap: 10,
-    marginBottom: 16,
-  },
-  bentoRow: {
+  statsStrip: {
     flexDirection: 'row',
-    gap: 10,
-  },
-  bentoCard: {
-    flex: 1,
+    alignItems: 'center',
     borderRadius: 18,
     borderWidth: 1,
-    padding: 14,
+    paddingVertical: 12,
+    marginBottom: 14,
   },
-  bentoTopRow: {
-    flexDirection: 'row',
+  stripCell: {
+    flex: 1,
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
   },
-  bentoIconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
+  stripDivider: {
+    width: 1,
+    height: 26,
   },
-  bentoTagPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 999,
-  },
-  bentoTagText: {
-    fontSize: 9.5,
-    fontWeight: '800',
-    letterSpacing: 0.4,
-  },
-  bentoValue: {
-    fontSize: 20,
+  stripNum: {
+    fontSize: 17,
     fontWeight: '900',
-    letterSpacing: -0.3,
   },
-  bentoValueSub: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  bentoLabel: {
-    fontSize: 11.5,
+  stripLabel: {
+    fontSize: 11,
     fontWeight: '600',
     marginTop: 2,
   },
@@ -1470,94 +937,22 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   txnIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+    width: 34,
+    height: 34,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  titleScopeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
   },
   itemTitle: {
     fontSize: 14,
     fontWeight: '700',
   },
   itemSubtitle: {
-    fontSize: 11,
+    fontSize: 11.5,
     marginTop: 2,
   },
   amountBadgeText: {
-    fontSize: 13,
+    fontSize: 13.5,
     fontWeight: '800',
-  },
-  priorityTag: {
-    paddingHorizontal: 8,
-    paddingVertical: 3.5,
-    borderRadius: 999,
-  },
-  priorityTagText: {
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  metricPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-  },
-  metricPillText: {
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  scopeBadge: {
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  scopeBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  scopeMiniTabs: {
-    flexDirection: 'row',
-    borderRadius: 9,
-    borderWidth: 1,
-    padding: 2,
-    gap: 2,
-  },
-  scopeMiniTab: {
-    paddingHorizontal: 8,
-    paddingVertical: 3.5,
-    borderRadius: 7,
-  },
-  scopeMiniTabText: {
-    fontSize: 10,
-  },
-  recentControlsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-    paddingBottom: 6,
-  },
-  recentSubtitle: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  recentSortPills: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  sortMiniPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3.5,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  sortMiniPillText: {
-    fontSize: 10.5,
   },
 });

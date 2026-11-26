@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -284,89 +283,6 @@ export const TrendingValueChip: React.FC<TrendingValueChipProps> = ({
   );
 };
 
-/**
- * 4. Monekin `DateRangeChips` (from `lib/core/presentation/widgets/dates/date_range_chips.dart`)
- */
-export type MonekinPeriodKey = '7D' | '1M' | '3M' | '1Y' | 'ALL';
-
-export const MONEKIN_PERIODS: { key: MonekinPeriodKey; label: string; days: number | null }[] = [
-  { key: '7D', label: '7D', days: 7 },
-  { key: '1M', label: '1M', days: 30 },
-  { key: '3M', label: '3M', days: 90 },
-  { key: '1Y', label: '1Y', days: 365 },
-  { key: 'ALL', label: 'ALL', days: null },
-];
-
-interface DateRangeChipsProps {
-  selected: MonekinPeriodKey;
-  onSelect: (period: MonekinPeriodKey) => void;
-  accentColor: string;
-  isDark: boolean;
-}
-
-export const DateRangeChips: React.FC<DateRangeChipsProps> = ({
-  selected,
-  onSelect,
-  accentColor,
-  isDark,
-}) => {
-  const theme = getThemeColors(isDark);
-
-  return (
-    <View style={styles.chipsContainer}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={[
-          styles.chipsRow,
-          {
-            backgroundColor: isDark
-              ? 'rgba(30, 41, 59, 0.65)'
-              : 'rgba(241, 245, 249, 0.9)',
-            borderColor: isDark
-              ? 'rgba(255, 255, 255, 0.08)'
-              : 'rgba(0, 0, 0, 0.06)',
-          },
-        ]}
-      >
-        {MONEKIN_PERIODS.map((p) => {
-          const isSelected = p.key === selected;
-          return (
-            <TouchableOpacity
-              key={p.key}
-              onPress={() => onSelect(p.key)}
-              activeOpacity={0.75}
-              style={[
-                styles.periodChip,
-                isSelected && {
-                  backgroundColor: accentColor,
-                  shadowColor: accentColor,
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.3,
-                  shadowRadius: 4,
-                  elevation: 2,
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.periodChipText,
-                  {
-                    color: isSelected ? '#FFFFFF' : theme.textMuted,
-                    fontWeight: isSelected ? '800' : '600',
-                  },
-                ]}
-              >
-                {p.label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-    </View>
-  );
-};
-
 const styles = StyleSheet.create({
   cardContainer: {
     borderRadius: 20, // Monekin cardWithHeaderRadius = 20.0
@@ -452,29 +368,5 @@ const styles = StyleSheet.create({
   trendingAfterText: {
     fontSize: 11,
     fontWeight: '600',
-  },
-  chipsContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 4,
-  },
-  chipsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    paddingHorizontal: 5,
-    paddingVertical: 4,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  periodChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 999,
-  },
-  periodChipText: {
-    fontSize: 12,
-    letterSpacing: 0.3,
   },
 });

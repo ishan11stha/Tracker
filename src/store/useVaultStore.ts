@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import {
   VaultBackupPayload,
-  dbDeleteAccount,
   dbDeleteActivity,
   dbDeleteItem,
   dbDeleteReminder,
@@ -13,7 +12,6 @@ import {
   dbGetAllTransactions,
   dbGetItemHistory,
   dbGetSettings,
-  dbInsertAccount,
   dbInsertActivity,
   dbInsertItem,
   dbInsertReminder,
@@ -21,7 +19,6 @@ import {
   dbResetAllUserData,
   dbRestoreBackup,
   dbSaveSettings,
-  dbUpdateAccount,
   dbUpdateActivity,
   dbUpdateItem,
   dbUpdateReminder,
@@ -38,7 +35,6 @@ import {
   PersonalItem,
   ReminderItem,
   Transaction,
-  accountSchema,
   activitySchema,
   itemSchema,
   reminderSchema,
@@ -82,16 +78,6 @@ interface VaultState {
   hydrateFromDB: () => Promise<void>;
   clearError: () => void;
   updateSettings: (partial: Partial<AppSettings>) => Promise<boolean>;
-
-  // Accounts
-  addAccount: (
-    data: Omit<Account, 'id' | 'createdAt' | 'updatedAt'>
-  ) => Promise<void>;
-  editAccount: (
-    id: string,
-    data: Omit<Account, 'id' | 'createdAt' | 'updatedAt'>
-  ) => Promise<void>;
-  removeAccount: (id: string) => Promise<void>;
 
   // Transactions
   addTransaction: (
@@ -283,71 +269,6 @@ export const useVaultStore = create<VaultState>((set, get) => ({
     }
 
     return true;
-  },
-
-  // Accounts
-  addAccount: async (data) => {
-    if (get().isSubmitting) return;
-    set({ isSubmitting: true, error: null });
-    try {
-      const validated = accountSchema.parse(data);
-      const now = new Date().toISOString();
-      const newAcc: Account = {
-        ...validated,
-        id: `acc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-        createdAt: now,
-        updatedAt: now,
-      };
-      await dbInsertAccount(newAcc);
-      const accounts = await dbGetAllAccounts();
-      set({ accounts, isSubmitting: false });
-    } catch (err) {
-      set({
-        isSubmitting: false,
-        error: err instanceof Error ? err.message : 'Failed to add account',
-      });
-      throw err;
-    }
-  },
-
-  editAccount: async (id, data) => {
-    if (get().isSubmitting) return;
-    set({ isSubmitting: true, error: null });
-    try {
-      const existing = get().accounts.find((a) => a.id === id);
-      if (!existing) throw new Error('Account not found');
-      const validated = accountSchema.parse(data);
-      const updated: Account = {
-        ...existing,
-        ...validated,
-        updatedAt: new Date().toISOString(),
-      };
-      await dbUpdateAccount(updated);
-      const accounts = await dbGetAllAccounts();
-      set({ accounts, isSubmitting: false });
-    } catch (err) {
-      set({
-        isSubmitting: false,
-        error: err instanceof Error ? err.message : 'Failed to update account',
-      });
-      throw err;
-    }
-  },
-
-  removeAccount: async (id) => {
-    if (get().isSubmitting) return;
-    set({ isSubmitting: true, error: null });
-    try {
-      await dbDeleteAccount(id);
-      const accounts = await dbGetAllAccounts();
-      set({ accounts, isSubmitting: false });
-    } catch (err) {
-      set({
-        isSubmitting: false,
-        error: err instanceof Error ? err.message : 'Failed to remove account',
-      });
-      throw err;
-    }
   },
 
   // Transactions

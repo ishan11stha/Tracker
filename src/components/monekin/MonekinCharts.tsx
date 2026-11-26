@@ -1,12 +1,6 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import Svg, {
-  Circle,
-  Defs,
-  LinearGradient,
-  Path,
-  Stop,
-} from 'react-native-svg';
+import Svg, { Circle } from 'react-native-svg';
 import { CATEGORY_PALETTE, getThemeColors } from '../../theme/colors';
 import {
   formatCurrency,
@@ -15,210 +9,6 @@ import {
 
 export { getFinanceHealthMeta };
 
-/**
- * 1. Monekin `DashboardBalanceChart` (from `lib/app/home/widgets/dashboard_balance_chart.dart`)
- * Full-bleed smooth cubic bezier SVG area chart with vertical gradient fill (0.35 -> 0.12 -> 0).
- */
-interface BalanceEvolutionChartProps {
-  dataPoints: number[];
-  lineColor: string;
-  height?: number;
-}
-
-export const BalanceEvolutionChart: React.FC<BalanceEvolutionChartProps> = ({
-  dataPoints,
-  lineColor,
-  height = 115,
-}) => {
-  const width = 360;
-  const padTop = 12;
-  const padBottom = 8;
-
-  const { linePath, areaPath, lastPoint } = useMemo(() => {
-    const pts =
-      dataPoints.length >= 2
-        ? dataPoints
-        : dataPoints.length === 1
-        ? [dataPoints[0] * 0.85, dataPoints[0]]
-        : [0, 0];
-
-    const minVal = Math.min(...pts);
-    const maxVal = Math.max(...pts);
-    const range = maxVal - minVal === 0 ? 1 : maxVal - minVal;
-    const drawH = height - padTop - padBottom;
-
-    const coords = pts.map((v, i) => {
-      const x = (i / (pts.length - 1)) * width;
-      const y = padTop + drawH - ((v - minVal) / range) * drawH;
-      return { x, y };
-    });
-
-    // Smooth cubic bezier curve through points
-    let d = `M ${coords[0].x.toFixed(1)} ${coords[0].y.toFixed(1)}`;
-    for (let i = 0; i < coords.length - 1; i++) {
-      const p0 = coords[i];
-      const p1 = coords[i + 1];
-      const midX = (p0.x + p1.x) / 2;
-      d += ` C ${midX.toFixed(1)} ${p0.y.toFixed(1)}, ${midX.toFixed(
-        1
-      )} ${p1.y.toFixed(1)}, ${p1.x.toFixed(1)} ${p1.y.toFixed(1)}`;
-    }
-
-    const area = `${d} L ${width} ${height} L 0 ${height} Z`;
-    return {
-      linePath: d,
-      areaPath: area,
-      lastPoint: coords[coords.length - 1],
-    };
-  }, [dataPoints, height]);
-
-  return (
-    <View style={{ height, width: '100%' }}>
-      <Svg
-        width="100%"
-        height={height}
-        viewBox={`0 0 ${width} ${height}`}
-        preserveAspectRatio="none"
-      >
-        <Defs>
-          <LinearGradient id="monekinAreaGrad" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0%" stopColor={lineColor} stopOpacity={0.36} />
-            <Stop offset="55%" stopColor={lineColor} stopOpacity={0.12} />
-            <Stop offset="100%" stopColor={lineColor} stopOpacity={0.0} />
-          </LinearGradient>
-        </Defs>
-        <Path d={areaPath} fill="url(#monekinAreaGrad)" />
-        <Path
-          d={linePath}
-          fill="none"
-          stroke={lineColor}
-          strokeWidth={2.8}
-          strokeLinecap="round"
-        />
-        {lastPoint && (
-          <Circle
-            cx={lastPoint.x - 4}
-            cy={lastPoint.y}
-            r={4.2}
-            fill={lineColor}
-            stroke="#FFFFFF"
-            strokeWidth={2}
-          />
-        )}
-      </Svg>
-    </View>
-  );
-};
-
-/**
- * 2. Monekin `FinanceHealthGauge` (from `lib/core/presentation/widgets/finance_health_gauge.dart`)
- * A 270° circular gauge (startAngle 135°, sweepAngle 270°) with a rounded value arc
- * and a centered "score / 100" label.
- */
-interface FinanceHealthGaugeProps {
-  score: number; // 0 to 100
-  size?: number;
-  isDark: boolean;
-}
-
-function polarToCartesian(
-  cx: number,
-  cy: number,
-  r: number,
-  angleInDegrees: number
-) {
-  const angleInRadians = (angleInDegrees * Math.PI) / 180.0;
-  return {
-    x: cx + r * Math.cos(angleInRadians),
-    y: cy + r * Math.sin(angleInRadians),
-  };
-}
-
-function describeArc(
-  cx: number,
-  cy: number,
-  r: number,
-  startAngle: number,
-  endAngle: number
-): string {
-  const start = polarToCartesian(cx, cy, r, startAngle);
-  const end = polarToCartesian(cx, cy, r, endAngle);
-  const sweep = endAngle - startAngle;
-  const largeArcFlag = sweep <= 180 ? '0' : '1';
-  return [
-    'M',
-    start.x.toFixed(2),
-    start.y.toFixed(2),
-    'A',
-    r.toFixed(2),
-    r.toFixed(2),
-    0,
-    largeArcFlag,
-    1,
-    end.x.toFixed(2),
-    end.y.toFixed(2),
-  ].join(' ');
-}
-
-export const FinanceHealthGauge: React.FC<FinanceHealthGaugeProps> = ({
-  score,
-  size = 96,
-  isDark,
-}) => {
-  const theme = getThemeColors(isDark);
-  const clamped = Math.max(0, Math.min(100, Math.round(score)));
-  const meta = getFinanceHealthMeta(clamped);
-
-  const strokeWidth = 9;
-  const cx = size / 2;
-  const cy = size / 2;
-  const r = (size - strokeWidth) / 2;
-
-  const startAngle = 135;
-  const totalSweep = 270;
-  const trackPath = describeArc(cx, cy, r, startAngle, startAngle + totalSweep);
-  const activeSweep = (clamped / 100) * totalSweep;
-  const valuePath =
-    activeSweep > 1
-      ? describeArc(cx, cy, r, startAngle, startAngle + activeSweep)
-      : '';
-
-  return (
-    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-      <Svg width={size} height={size}>
-        <Path
-          d={trackPath}
-          fill="none"
-          stroke={isDark ? '#30363D' : '#E2E8F0'}
-          strokeWidth={strokeWidth}
-          strokeLinecap="round"
-        />
-        {valuePath ? (
-          <Path
-            d={valuePath}
-            fill="none"
-            stroke={meta.color}
-            strokeWidth={strokeWidth}
-            strokeLinecap="round"
-          />
-        ) : null}
-      </Svg>
-      <View style={styles.gaugeCenter}>
-        <Text style={[styles.gaugeScoreText, { color: meta.color }]}>
-          {clamped}
-        </Text>
-        <Text style={[styles.gaugeMaxText, { color: theme.textMuted }]}>
-          /100
-        </Text>
-      </View>
-    </View>
-  );
-};
-
-/**
- * 3. Monekin `CategoryDonutChart` (from `lib/app/stats/widgets/movements_distribution/pie_chart_by_categories.dart`)
- * Multi-segment SVG Donut Chart + Legend list with percentage badges.
- */
 export interface CategoryDistributionItem {
   category: string;
   amount: number;
@@ -343,10 +133,6 @@ export const CategoryDonutChart: React.FC<CategoryDonutChartProps> = ({
   );
 };
 
-/**
- * 4. Monekin `ScopeDistributionChart` (Personal vs Family comparative visualization)
- * Dual-color proportional pill bar, percentage chips & live currency displays.
- */
 export interface ScopeDistributionChartProps {
   personalAmount: number;
   familyAmount: number;
@@ -371,13 +157,10 @@ export const ScopeDistributionChart: React.FC<ScopeDistributionChartProps> = ({
 
   return (
     <View style={styles.scopeDistContainer}>
-      {/* Proportional Segmented Bar */}
       <View
         style={[
           styles.scopeBarWrapper,
-          {
-            backgroundColor: isDark ? '#1F2937' : '#F1F5F9',
-          },
+          { backgroundColor: isDark ? '#1F2937' : '#F1F5F9' },
         ]}
       >
         <View
@@ -409,7 +192,6 @@ export const ScopeDistributionChart: React.FC<ScopeDistributionChartProps> = ({
         />
       </View>
 
-      {/* Proportional Legend Row with Totals */}
       <View style={styles.scopeDistLegend}>
         <View style={styles.scopeLegendItem}>
           <View style={[styles.scopeColorDot, { backgroundColor: '#2563EB' }]} />
@@ -471,7 +253,7 @@ const styles = StyleSheet.create({
   },
   scopeBarWrapper: {
     flexDirection: 'row',
-    height: 14,
+    height: 12,
     borderRadius: 10,
     overflow: 'hidden',
     marginBottom: 12,
@@ -481,35 +263,22 @@ const styles = StyleSheet.create({
   },
   scopeDistLegend: {
     flexDirection: 'row',
-    gap: 16,
+    gap: 12,
     justifyContent: 'space-between',
+    flexWrap: 'wrap',
   },
   scopeLegendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   scopeColorDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
   },
   scopeLegendTitle: {
     fontSize: 12,
-    fontWeight: '700',
-  },
-  gaugeCenter: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  gaugeScoreText: {
-    fontSize: 22,
-    fontWeight: '900',
-    lineHeight: 24,
-  },
-  gaugeMaxText: {
-    fontSize: 11,
     fontWeight: '700',
   },
   emptyChartText: {

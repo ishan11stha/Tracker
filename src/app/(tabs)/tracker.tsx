@@ -13,7 +13,6 @@ import {
   Calendar,
   CheckCircle2,
   Circle,
-  Clock,
   Edit3,
   Plus,
   Trash2,
@@ -26,14 +25,12 @@ import {
   adToBs,
   formatADDateFull,
   formatBSDateNepali,
-  formatTimeString,
   toNepaliDigits,
 } from '../../utils/nepaliDate';
 import { useCurrentNPT } from '../../hooks/useCurrentNPT';
 import { ACTIVITY_CATEGORIES, ActivityRecord } from '../../types';
 import { ActivityFormModal } from '../../components/ActivityFormModal';
 import { NepaliCalendarModal } from '../../components/NepaliCalendarModal';
-import { FinanceHealthGauge } from '../../components/monekin/MonekinCharts';
 
 export default function ActivityTrackerScreen() {
   const {
@@ -58,7 +55,6 @@ export default function ActivityTrackerScreen() {
 
   const selectedBS = useMemo(() => adToBs(selectedDateISO), [selectedDateISO]);
 
-  // Filter activities by Daily or Monthly view
   const filteredActivities = useMemo(() => {
     return activities.filter((act) => {
       if (selectedCategory !== 'All' && act.category !== selectedCategory) {
@@ -87,17 +83,10 @@ export default function ActivityTrackerScreen() {
     const completed = filteredActivities.filter(
       (a) => a.status === 'completed'
     ).length;
-    const pending = total - completed;
-    const totalNumeric = filteredActivities.reduce(
-      (acc, a) => acc + (a.numericValue || 0),
-      0
-    );
-    const completionRate =
-      total > 0 ? Math.round((completed / total) * 100) : 0;
-    return { total, completed, pending, totalNumeric, completionRate };
+    const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
+    return { total, completed, rate };
   }, [filteredActivities]);
 
-  // Marked dates for calendar picker
   const markedDates = useMemo(() => {
     const map: Record<string, { count: number; color: string }> = {};
     for (const a of activities) {
@@ -111,8 +100,8 @@ export default function ActivityTrackerScreen() {
 
   const handleDelete = (act: ActivityRecord) => {
     Alert.alert(
-      'Delete Activity',
-      `Delete "${act.title}" (${act.numericValue} ${act.unit})?`,
+      'Delete Habit',
+      `Delete "${act.title}"?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -137,13 +126,13 @@ export default function ActivityTrackerScreen() {
         <View style={styles.headerRow}>
           <View style={{ flex: 1, marginRight: 10 }}>
             <Text style={[styles.screenTitle, { color: theme.textPrimary }]}>
-              Activity & Habits
+              Tracker
             </Text>
             <Text
               style={[styles.screenSubtitle, { color: theme.textMuted }]}
               numberOfLines={1}
             >
-              दैनिक क्रियाकलाप तथा बानी ट्र्याकर
+              Daily habits & progress
             </Text>
           </View>
           <TouchableOpacity
@@ -154,151 +143,121 @@ export default function ActivityTrackerScreen() {
             style={[styles.addBtn, { backgroundColor: palette.accent }]}
           >
             <Plus size={15} color="#FFFFFF" strokeWidth={2.5} />
-            <Text style={styles.addBtnText}>Log Activity</Text>
+            <Text style={styles.addBtnText}>Add</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Unified Daily/Monthly Switcher + Date Selector + Completion Gauge Hero Card */}
+        {/* Simple Overview Card: Daily/Monthly + Date + Progress Bar */}
         <View
           style={[
-            styles.dateControlCard,
+            styles.overviewCard,
             { backgroundColor: theme.card, borderColor: theme.border },
           ]}
         >
-          <View
-            style={[
-              styles.viewModeToggle,
-              { backgroundColor: theme.surfaceContainerHigh },
-            ]}
-          >
+          <View style={styles.topControlsRow}>
             <TouchableOpacity
-              onPress={() => setViewMode('daily')}
-              style={[
-                styles.viewModeBtn,
-                viewMode === 'daily' && { backgroundColor: palette.accent },
-              ]}
+              onPress={() => setShowCalendar(true)}
+              style={styles.dateTapArea}
+              accessibilityRole="button"
+              accessibilityLabel="Select date"
             >
-              <Text
-                style={[
-                  styles.viewModeText,
-                  {
-                    color:
-                      viewMode === 'daily' ? '#FFFFFF' : theme.textMuted,
-                  },
-                ]}
-              >
-                Daily View (दैनिक)
-              </Text>
+              <Calendar size={16} color={palette.accent} />
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={[styles.activeDateMain, { color: theme.textPrimary }]}
+                  numberOfLines={1}
+                >
+                  {viewMode === 'daily'
+                    ? formatBSDateNepali(selectedBS, false)
+                    : `${BS_MONTHS_NE[selectedBS.month - 1]} ${toNepaliDigits(
+                        selectedBS.year
+                      )}`}
+                </Text>
+                <Text
+                  style={[styles.activeDateSub, { color: theme.textMuted }]}
+                  numberOfLines={1}
+                >
+                  {formatADDateFull(selectedDateISO)}
+                </Text>
+              </View>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={() => setViewMode('monthly')}
+            <View
               style={[
-                styles.viewModeBtn,
-                viewMode === 'monthly' && { backgroundColor: palette.accent },
+                styles.viewModeToggle,
+                { backgroundColor: theme.surfaceContainerHigh },
               ]}
             >
-              <Text
+              <TouchableOpacity
+                onPress={() => setViewMode('daily')}
                 style={[
-                  styles.viewModeText,
-                  {
-                    color:
-                      viewMode === 'monthly' ? '#FFFFFF' : theme.textMuted,
-                  },
+                  styles.viewModeBtn,
+                  viewMode === 'daily' && { backgroundColor: palette.accent },
                 ]}
               >
-                Monthly View (मासिक)
-              </Text>
-            </TouchableOpacity>
+                <Text
+                  style={[
+                    styles.viewModeText,
+                    { color: viewMode === 'daily' ? '#FFFFFF' : theme.textMuted },
+                  ]}
+                >
+                  Day
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setViewMode('monthly')}
+                style={[
+                  styles.viewModeBtn,
+                  viewMode === 'monthly' && { backgroundColor: palette.accent },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.viewModeText,
+                    {
+                      color:
+                        viewMode === 'monthly' ? '#FFFFFF' : theme.textMuted,
+                    },
+                  ]}
+                >
+                  Month
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
-          <TouchableOpacity
-            onPress={() => setShowCalendar(true)}
-            style={[
-              styles.activeDateBanner,
-              { backgroundColor: theme.inputBg, borderColor: theme.border },
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel={`Change activity date. Current date ${formatBSDateNepali(
-              selectedBS,
-              true
-            )}`}
-          >
-            <Calendar size={18} color={palette.accent} />
-            <View style={{ flex: 1 }}>
-              <Text
-                style={[styles.activeDateMain, { color: theme.textPrimary }]}
-              >
-                {viewMode === 'daily'
-                  ? formatBSDateNepali(selectedBS, true)
-                  : `${BS_MONTHS_NE[selectedBS.month - 1]} ${toNepaliDigits(
-                    selectedBS.year
-                  )} (मासिक सारांश)`}
+          {/* Clean Progress Bar */}
+          <View style={styles.progressSection}>
+            <View style={styles.progressHeader}>
+              <Text style={[styles.progressLabel, { color: theme.textMuted }]}>
+                {summary.completed} of {summary.total} completed
               </Text>
-              <Text
-                style={[styles.activeDateSub, { color: theme.textMuted }]}
-              >
-                {formatADDateFull(selectedDateISO)}
+              <Text style={[styles.progressPct, { color: palette.accent }]}>
+                {summary.rate}%
               </Text>
             </View>
-            <Text style={[styles.changeDateText, { color: palette.accent }]}>
-              Change
-            </Text>
-          </TouchableOpacity>
-
-          <View
-            style={[
-              styles.gaugeSummaryRow,
-              {
-                borderTopColor: theme.divider,
-                borderTopWidth: 1,
-                marginTop: 12,
-                paddingTop: 12,
-              },
-            ]}
-          >
-            <FinanceHealthGauge
-              score={summary.completionRate}
-              size={84}
-              isDark={isDark}
-            />
-            <View style={styles.statsGridRight}>
-              <View style={styles.statMiniBox}>
-                <Text style={[styles.statVal, { color: palette.accent }]}>
-                  {summary.total}
-                </Text>
-                <Text style={[styles.statLabel, { color: theme.textMuted }]}>
-                  Total Logs
-                </Text>
-              </View>
-
-              <View style={styles.statMiniBox}>
-                <Text style={[styles.statVal, { color: '#37A13B' }]}>
-                  {summary.completed}
-                </Text>
-                <Text style={[styles.statLabel, { color: theme.textMuted }]}>
-                  Completed
-                </Text>
-              </View>
-
-              <View style={styles.statMiniBox}>
-                <Text style={[styles.statVal, { color: '#D97706' }]}>
-                  {summary.pending}
-                </Text>
-                <Text style={[styles.statLabel, { color: theme.textMuted }]}>
-                  Pending
-                </Text>
-              </View>
+            <View
+              style={[
+                styles.progressTrack,
+                { backgroundColor: theme.surfaceContainerHigh },
+              ]}
+            >
+              <View
+                style={[
+                  styles.progressFill,
+                  {
+                    backgroundColor: palette.accent,
+                    width: `${summary.rate}%`,
+                  },
+                ]}
+              />
             </View>
           </View>
         </View>
 
-        {/* Category Filter Chips */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterRow}
-        >
+        {/* Simple 5-Option Category Filter Row */}
+        <View style={styles.filterRow}>
           {['All', ...ACTIVITY_CATEGORIES].map((cat) => {
             const active = selectedCategory === cat;
             return (
@@ -318,7 +277,7 @@ export default function ActivityTrackerScreen() {
                 <Text
                   style={[
                     styles.filterChipText,
-                    { color: active ? '#FFFFFF' : theme.textPrimary },
+                    { color: active ? '#FFFFFF' : theme.textSecondary },
                   ]}
                 >
                   {cat}
@@ -326,9 +285,9 @@ export default function ActivityTrackerScreen() {
               </TouchableOpacity>
             );
           })}
-        </ScrollView>
+        </View>
 
-        {/* Activity Entries List */}
+        {/* Activity List */}
         {filteredActivities.length === 0 ? (
           <View
             style={[
@@ -336,29 +295,17 @@ export default function ActivityTrackerScreen() {
               { backgroundColor: theme.card, borderColor: theme.border },
             ]}
           >
-            <Activity size={28} color={palette.accent} />
+            <Activity size={24} color={palette.accent} />
             <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
-              No activities logged for this{' '}
-              {viewMode === 'daily' ? 'day' : 'month'}
+              No habits logged
             </Text>
             <Text style={[styles.emptySub, { color: theme.textMuted }]}>
-              {selectedCategory !== 'All'
-                ? `No activities logged under "${selectedCategory}".`
-                : 'Tap "Log Activity" to record workouts, study hours, hydration, or daily habits.'}
+              Tap "+ Add" to log a habit or daily goal.
             </Text>
-            {selectedCategory !== 'All' && (
-              <TouchableOpacity
-                onPress={() => setSelectedCategory('All')}
-                style={[styles.resetFilterBtn, { backgroundColor: palette.accent }]}
-              >
-                <Text style={styles.resetFilterBtnText}>Show All Categories</Text>
-              </TouchableOpacity>
-            )}
           </View>
         ) : (
           filteredActivities.map((act) => {
             const isCompleted = act.status === 'completed';
-            const bs = adToBs(act.dateISO);
             return (
               <View
                 key={act.id}
@@ -367,118 +314,60 @@ export default function ActivityTrackerScreen() {
                   { backgroundColor: theme.card, borderColor: theme.border },
                 ]}
               >
-                <View style={styles.activityMainRow}>
-                  <TouchableOpacity
-                    onPress={() => toggleActivityStatus(act.id)}
-                    style={styles.checkBtn}
-                    accessibilityRole="checkbox"
-                    accessibilityState={{ checked: isCompleted }}
-                    accessibilityLabel={`Mark ${act.title} as ${
-                      isCompleted ? 'pending' : 'completed'
-                    }`}
-                  >
-                    {isCompleted ? (
-                      <CheckCircle2 size={24} color={palette.accent} />
-                    ) : (
-                      <Circle size={24} color={theme.textMuted} />
-                    )}
-                  </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => toggleActivityStatus(act.id)}
+                  style={styles.checkBtn}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: isCompleted }}
+                >
+                  {isCompleted ? (
+                    <CheckCircle2 size={22} color={palette.accent} />
+                  ) : (
+                    <Circle size={22} color={theme.textMuted} />
+                  )}
+                </TouchableOpacity>
 
-                  <View style={{ flex: 1 }}>
-                    <Text
-                      style={[
-                        styles.activityTitle,
-                        {
-                          color: theme.textPrimary,
-                          textDecorationLine: isCompleted
-                            ? 'line-through'
-                            : 'none',
-                        },
-                      ]}
-                    >
-                      {act.title}
-                    </Text>
-
-                    <Text
-                      style={[
-                        styles.activityCategory,
-                        { color: theme.textMuted },
-                      ]}
-                    >
-                      {act.category}
-                    </Text>
-
-                    <View style={styles.timeMetaRow}>
-                      <Clock size={12} color={theme.textMuted} />
-                      <Text
-                        style={[
-                          styles.timeMetaText,
-                          { color: theme.textMuted },
-                        ]}
-                      >
-                        {formatBSDateNepali(bs, false)} •{' '}
-                        {formatTimeString(act.timeString, settings.timeFormat)}{' '}
-                        NPT
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={{ alignItems: 'flex-end', gap: 8 }}>
-                    <View
-                      style={[
-                        styles.numericBadge,
-                        { backgroundColor: palette.accentSoft },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.numericBadgeText,
-                          { color: palette.accent },
-                        ]}
-                      >
-                        {act.numericValue} {act.unit}
-                      </Text>
-                    </View>
-
-                    <View style={styles.actionsGroup}>
-                      <TouchableOpacity
-                        onPress={() => {
-                          setEditingActivity(act);
-                          setFormVisible(true);
-                        }}
-                        style={styles.iconBtn}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Edit activity ${act.title}`}
-                        hitSlop={8}
-                      >
-                        <Edit3 size={15} color={theme.textMuted} />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => handleDelete(act)}
-                        style={styles.iconBtn}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Delete activity ${act.title}`}
-                        hitSlop={8}
-                      >
-                        <Trash2 size={15} color="#EF4444" />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </View>
-
-                {act.description ? (
+                <View style={{ flex: 1 }}>
                   <Text
                     style={[
-                      styles.activityDesc,
+                      styles.activityTitle,
                       {
-                        color: theme.textSecondary,
-                        borderTopColor: theme.divider,
+                        color: theme.textPrimary,
+                        textDecorationLine: isCompleted
+                          ? 'line-through'
+                          : 'none',
                       },
                     ]}
+                    numberOfLines={1}
                   >
-                    {act.description}
+                    {act.title}
                   </Text>
-                ) : null}
+                  <Text
+                    style={[styles.activityMeta, { color: theme.textMuted }]}
+                  >
+                    {act.category} • {act.numericValue} {act.unit}
+                  </Text>
+                </View>
+
+                <View style={styles.actionsGroup}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setEditingActivity(act);
+                      setFormVisible(true);
+                    }}
+                    style={styles.iconBtn}
+                    hitSlop={8}
+                  >
+                    <Edit3 size={15} color={theme.textMuted} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => handleDelete(act)}
+                    style={styles.iconBtn}
+                    hitSlop={8}
+                  >
+                    <Trash2 size={15} color="#EF4444" />
+                  </TouchableOpacity>
+                </View>
               </View>
             );
           })
@@ -501,7 +390,7 @@ export default function ActivityTrackerScreen() {
         onSelectDate={(iso) => setSelectedDateISO(iso)}
         onClose={() => setShowCalendar(false)}
         accentColor={palette.accent}
-        title="Select Activity Date (BS / AD)"
+        title="Select Date"
         markedDates={markedDates}
       />
     </SafeAreaView>
@@ -527,7 +416,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   screenTitle: {
-    fontSize: 21,
+    fontSize: 22,
     fontWeight: '800',
   },
   screenSubtitle: {
@@ -538,45 +427,34 @@ const styles = StyleSheet.create({
   addBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
+    gap: 4,
     paddingHorizontal: 14,
     paddingVertical: 9,
     borderRadius: 999,
   },
   addBtnText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: 12.5,
     fontWeight: '800',
   },
-  dateControlCard: {
+  overviewCard: {
     borderRadius: 20,
-    padding: 14,
+    padding: 15,
     borderWidth: 1,
+    marginBottom: 12,
+  },
+  topControlsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
     marginBottom: 14,
   },
-  viewModeToggle: {
-    flexDirection: 'row',
-    padding: 4,
-    borderRadius: 999,
-    marginBottom: 10,
-  },
-  viewModeBtn: {
+  dateTapArea: {
     flex: 1,
-    paddingVertical: 8,
-    borderRadius: 999,
-    alignItems: 'center',
-  },
-  viewModeText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  activeDateBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    borderRadius: 14,
-    borderWidth: 1,
-    gap: 10,
+    gap: 9,
   },
   activeDateMain: {
     fontSize: 14,
@@ -586,39 +464,54 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 1,
   },
-  changeDateText: {
-    fontSize: 12,
+  viewModeToggle: {
+    flexDirection: 'row',
+    padding: 3,
+    borderRadius: 999,
+  },
+  viewModeBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+  },
+  viewModeText: {
+    fontSize: 11.5,
     fontWeight: '700',
   },
-  gaugeSummaryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
+  progressSection: {
+    gap: 6,
   },
-  statsGridRight: {
-    flex: 1,
+  progressHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  statMiniBox: {
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
-  statVal: {
-    fontSize: 20,
-    fontWeight: '900',
-  },
-  statLabel: {
-    fontSize: 11,
+  progressLabel: {
+    fontSize: 12,
     fontWeight: '600',
-    marginTop: 2,
+  },
+  progressPct: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  progressTrack: {
+    height: 8,
+    borderRadius: 999,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 999,
   },
   filterRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
-    paddingBottom: 14,
+    marginBottom: 14,
   },
   filterChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingHorizontal: 13,
+    paddingVertical: 6.5,
     borderRadius: 999,
     borderWidth: 1,
   },
@@ -627,86 +520,46 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   emptyCard: {
-    borderRadius: 20,
-    padding: 26,
+    borderRadius: 18,
+    padding: 24,
     borderWidth: 1,
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   emptyTitle: {
-    fontSize: 15,
+    fontSize: 14.5,
     fontWeight: '800',
-    textAlign: 'center',
   },
   emptySub: {
     fontSize: 12,
     textAlign: 'center',
   },
   activityCard: {
-    borderRadius: 20,
-    padding: 15,
-    borderWidth: 1,
-    marginBottom: 10,
-  },
-  activityMainRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    borderRadius: 16,
+    padding: 13,
+    borderWidth: 1,
+    marginBottom: 10,
+    gap: 11,
   },
   checkBtn: {
     padding: 2,
   },
   activityTitle: {
-    fontSize: 15,
+    fontSize: 14.5,
     fontWeight: '700',
   },
-  activityCategory: {
-    fontSize: 12,
+  activityMeta: {
+    fontSize: 11.5,
     marginTop: 2,
-  },
-  timeMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 4,
-  },
-  timeMetaText: {
-    fontSize: 11,
-  },
-  numericBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-  },
-  numericBadgeText: {
-    fontSize: 12,
-    fontWeight: '800',
   },
   actionsGroup: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
   },
   iconBtn: {
     padding: 6,
     borderRadius: 8,
-  },
-  activityDesc: {
-    fontSize: 12,
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-  },
-  resetFilterBtn: {
-    marginTop: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  resetFilterBtnText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
   },
 });
