@@ -519,7 +519,7 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {/* 3. Currency, Notifications & Theme */}
+        {/* 3. Appearance, Privacy & Notifications */}
         <View
           style={[
             styles.card,
@@ -529,51 +529,15 @@ export default function SettingsScreen() {
           <View style={styles.cardTitleRow}>
             <Wallet size={18} color="#16A34A" />
             <Text style={[styles.cardTitle, { color: theme.textPrimary }]}>
-              Currency & Appearance
+              Appearance & Alerts
             </Text>
-          </View>
-
-          <View style={styles.settingBlock}>
-            <Text style={[styles.settingLabel, { color: theme.textPrimary }]}>
-              Default Currency
-            </Text>
-            <View style={styles.SegmentRow}>
-              {(['NPR', 'INR', 'USD'] as const).map((curr) => (
-                <TouchableOpacity
-                  key={curr}
-                  onPress={() => updateSettings({ currency: curr })}
-                  style={[
-                    styles.segmentBtn,
-                    {
-                      backgroundColor:
-                        settings.currency === curr ? '#16A34A' : theme.inputBg,
-                      borderColor: theme.border,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.segmentBtnText,
-                      {
-                        color:
-                          settings.currency === curr
-                            ? '#FFFFFF'
-                            : theme.textPrimary,
-                      },
-                    ]}
-                  >
-                    {curr === 'NPR' ? 'NPR (रू)' : curr}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
           </View>
 
           {/* Theme Switcher */}
           <View
             style={[
               styles.switchRow,
-              { borderTopColor: theme.divider },
+              { borderTopWidth: 0, marginTop: 0, paddingTop: 0 },
             ]}
           >
             <View style={styles.inlineIconLabel}>

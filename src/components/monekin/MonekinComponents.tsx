@@ -14,7 +14,6 @@ import {
 } from 'lucide-react-native';
 import { getThemeColors } from '../../theme/colors';
 import { formatCurrencyParts } from '../../utils/currency';
-import { useVaultStore } from '../../store/useVaultStore';
 
 /**
  * 1. Monekin `CardWithHeader` (from `lib/core/presentation/widgets/card_with_header.dart`)
@@ -149,7 +148,6 @@ export const CurrencyDisplayer: React.FC<CurrencyDisplayerProps> = ({
   compact = false,
 }) => {
   const theme = getThemeColors(isDark);
-  const cycleCurrency = useVaultStore((s) => s.cycleCurrency);
   const parts = formatCurrencyParts(amount, currency, compact, privateMode);
 
   const fontSizes = {
@@ -161,76 +159,6 @@ export const CurrencyDisplayer: React.FC<CurrencyDisplayerProps> = ({
 
   const mainColor = color || theme.textPrimary;
   const subColor = color ? `${color}CC` : theme.textMuted;
-
-  if (size === 'xl') {
-    return (
-      <View style={styles.xlCurrencyWrap}>
-        <TouchableOpacity
-          onPress={() => {
-            void cycleCurrency();
-          }}
-          activeOpacity={0.75}
-          hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
-          accessibilityRole="button"
-          accessibilityLabel={`Change currency across all sections. Current currency ${currency}`}
-          style={[
-            styles.currencyCyclePill,
-            {
-              backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
-              borderColor: theme.border,
-            },
-          ]}
-        >
-          <Text style={[styles.currencyCycleText, { color: theme.textPrimary }]}>
-            {parts.symbol} ▾
-          </Text>
-        </TouchableOpacity>
-        <Text numberOfLines={1} style={styles.currencyRow}>
-          {parts.sign ? (
-            <Text
-              style={{
-                fontSize: fontSizes.int,
-                fontWeight: '800',
-                color: mainColor,
-              }}
-            >
-              {parts.sign}{' '}
-            </Text>
-          ) : null}
-          <Text
-            style={
-              privateMode
-                ? {
-                    fontSize: fontSizes.mask,
-                    fontWeight: '600',
-                    color: mainColor,
-                    letterSpacing: 3,
-                  }
-                : {
-                    fontSize: fontSizes.int,
-                    fontWeight: '800',
-                    color: mainColor,
-                    letterSpacing: -0.4,
-                  }
-            }
-          >
-            {parts.integerPart}
-          </Text>
-          {parts.decimalPart ? (
-            <Text
-              style={{
-                fontSize: fontSizes.sub,
-                fontWeight: '700',
-                color: subColor,
-              }}
-            >
-              {parts.decimalPart}
-            </Text>
-          ) : null}
-        </Text>
-      </View>
-    );
-  }
 
   return (
     <Text numberOfLines={1} style={styles.currencyRow}>
@@ -246,9 +174,6 @@ export const CurrencyDisplayer: React.FC<CurrencyDisplayerProps> = ({
         </Text>
       ) : null}
       <Text
-        onPress={() => {
-          void cycleCurrency();
-        }}
         style={{
           fontSize: fontSizes.sub,
           fontWeight: '700',
@@ -429,23 +354,6 @@ const styles = StyleSheet.create({
   currencyRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
-  },
-  xlCurrencyWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flexWrap: 'wrap',
-  },
-  currencyCyclePill: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  currencyCycleText: {
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 0.3,
   },
   trendingWrap: {
     flexDirection: 'row',

@@ -58,7 +58,6 @@ export default function SavingsGoalsScreen() {
   const router = useRouter();
   const {
     settings,
-    cycleCurrency,
     savingsGoals,
     contributeToSavingsGoal,
     removeSavingsGoal,
@@ -148,51 +147,31 @@ export default function SavingsGoalsScreen() {
             <ArrowLeft size={20} color={theme.textPrimary} />
           </TouchableOpacity>
 
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <TouchableOpacity
-              onPress={() => {
-                void cycleCurrency();
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={`Switch currency across all sections. Current ${settings.currency}`}
+          <TouchableOpacity
+            onPress={() => {
+              setEditingGoal(null);
+              setFormVisible(true);
+            }}
+            style={[
+              styles.addGoalPill,
+              {
+                backgroundColor: theme.card,
+                borderColor: theme.border,
+              },
+            ]}
+          >
+            <View style={styles.addGoalCircle}>
+              <Plus size={14} color="#FFFFFF" strokeWidth={2.8} />
+            </View>
+            <Text
               style={[
-                styles.currencyPillBtn,
-                { backgroundColor: theme.card, borderColor: theme.border },
+                styles.addGoalText,
+                { color: isDark ? '#34D399' : '#065F46' },
               ]}
             >
-              <Text
-                style={[styles.currencyPillText, { color: theme.textPrimary }]}
-              >
-                {settings.currency} ▾
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => {
-                setEditingGoal(null);
-                setFormVisible(true);
-              }}
-              style={[
-                styles.addGoalPill,
-                {
-                  backgroundColor: theme.card,
-                  borderColor: theme.border,
-                },
-              ]}
-            >
-              <View style={styles.addGoalCircle}>
-                <Plus size={14} color="#FFFFFF" strokeWidth={2.8} />
-              </View>
-              <Text
-                style={[
-                  styles.addGoalText,
-                  { color: isDark ? '#34D399' : '#065F46' },
-                ]}
-              >
-                Add Goal
-              </Text>
-            </TouchableOpacity>
-          </View>
+              Add Goal
+            </Text>
+          </TouchableOpacity>
         </View>
 
         <Text style={[styles.screenTitle, { color: theme.textPrimary }]}>
@@ -654,16 +633,6 @@ const styles = StyleSheet.create({
   },
   addGoalText: {
     fontSize: 13,
-    fontWeight: '800',
-  },
-  currencyPillBtn: {
-    paddingHorizontal: 11,
-    paddingVertical: 8,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  currencyPillText: {
-    fontSize: 12,
     fontWeight: '800',
   },
   screenTitle: {
