@@ -11,7 +11,7 @@
       "android"
     ],
     "androidStatusBar": {
-      "backgroundColor": "#F5F6F8",
+      "backgroundColor": "#F8FAFC",
       "barStyle": "dark-content"
     },
     "android": {
@@ -68,6 +68,15 @@
             "webpAnimated": false,
             "networkInspector": false,
             "usesCleartextTraffic": false
+          }
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F8FAFC",
+          "dark": {
+            "backgroundColor": "#0B0F19"
           }
         }
       ]
