@@ -163,16 +163,20 @@ export const itemSchema = z.object({
 
 export type ActivityStatus = 'completed' | 'pending';
 
+export type ActivityRepeat = 'everyday' | 'weekdays' | 'once';
+
 export interface ActivityRecord {
   id: string;
   title: string;
   description: string;
   category: string;
-  dateISO: string; // YYYY-MM-DD
+  dateISO: string; // YYYY-MM-DD (creation/target date)
   timeString: string; // HH:mm
   numericValue: number;
-  unit: string; // e.g., 'mins', 'km', 'glasses', 'pages', 'hrs', 'kcal'
+  unit: string; // e.g., 'mins', 'hrs', 'km', 'count'
   status: ActivityStatus;
+  repeat?: ActivityRepeat;
+  completedDates?: string[]; // YYYY-MM-DD dates completed for recurring habits
   createdAt: string;
   updatedAt: string;
 }
@@ -186,7 +190,32 @@ export const activitySchema = z.object({
   numericValue: z.number().min(0, 'Cannot be negative'),
   unit: z.string().trim().max(30),
   status: z.enum(['completed', 'pending']),
+  repeat: z.enum(['everyday', 'weekdays', 'once']).optional().default('once'),
+  completedDates: z.array(isoDateSchema).optional().default([]),
 });
+
+export function isActivityCompletedOnDate(
+  act: Pick<ActivityRecord, 'repeat' | 'completedDates' | 'status'>,
+  dateISO: string
+): boolean {
+  if (act.repeat === 'everyday' || act.repeat === 'weekdays') {
+    return (act.completedDates || []).includes(dateISO);
+  }
+  return act.status === 'completed';
+}
+
+export function isActivityScheduledOnDate(
+  act: Pick<ActivityRecord, 'repeat' | 'dateISO'>,
+  dateISO: string
+): boolean {
+  if (act.repeat === 'everyday') return true;
+  if (act.repeat === 'weekdays') {
+    const [y, m, d] = dateISO.split('-').map(Number);
+    const weekday = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+    return weekday !== 6; // Sunday–Friday (Saturday is Nepal weekend)
+  }
+  return act.dateISO === dateISO;
+}
 
 export type ReminderPriority = 'Low' | 'Medium' | 'High';
 

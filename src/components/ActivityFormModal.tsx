@@ -16,9 +16,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Calendar, Check, X } from 'lucide-react-native';
 import {
   ACTIVITY_CATEGORIES,
-  COMMON_ACTIVITY_UNITS,
   ActivityRecord,
+  ActivityRepeat,
   ActivityStatus,
+  COMMON_ACTIVITY_UNITS,
   activitySchema,
 } from '../types';
 import { useVaultStore } from '../store/useVaultStore';
@@ -48,6 +49,8 @@ interface ActivityFormValues {
   numericValue: number;
   unit: string;
   status: ActivityStatus;
+  repeat?: ActivityRepeat;
+  completedDates?: string[];
 }
 
 export const ActivityFormModal: React.FC<ActivityFormModalProps> = ({
@@ -86,13 +89,16 @@ export const ActivityFormModal: React.FC<ActivityFormModalProps> = ({
       timeString: defaultTime,
       numericValue: 30,
       unit: 'mins',
-      status: 'completed',
+      status: 'pending',
+      repeat: 'everyday',
+      completedDates: [],
     },
   });
 
   const currentDateISO = watch('dateISO');
   const currentCategory = watch('category');
   const currentUnit = watch('unit');
+  const currentRepeat = watch('repeat') || 'everyday';
 
   useEffect(() => {
     if (visible) {
@@ -106,6 +112,8 @@ export const ActivityFormModal: React.FC<ActivityFormModalProps> = ({
           numericValue: editingActivity.numericValue,
           unit: editingActivity.unit || 'mins',
           status: editingActivity.status,
+          repeat: editingActivity.repeat || 'once',
+          completedDates: editingActivity.completedDates || [],
         });
         setNumInput(String(editingActivity.numericValue));
       } else {
@@ -121,7 +129,9 @@ export const ActivityFormModal: React.FC<ActivityFormModalProps> = ({
           timeString: nowTime,
           numericValue: 30,
           unit: 'mins',
-          status: 'completed',
+          status: 'pending',
+          repeat: 'everyday',
+          completedDates: [],
         });
         setNumInput('30');
       }
@@ -311,29 +321,73 @@ export const ActivityFormModal: React.FC<ActivityFormModalProps> = ({
               </View>
             </View>
 
-            {/* Compact Date Selector */}
+            {/* Repeat Schedule: Everyday / Sun-Fri / Once */}
             <View style={styles.fieldGroup}>
               <Text style={[styles.label, { color: theme.textSecondary }]}>
-                Date
+                Schedule
               </Text>
-              <TouchableOpacity
-                onPress={() => setShowCalendar(true)}
-                style={[
-                  styles.pickerBtn,
-                  {
-                    backgroundColor: theme.inputBg,
-                    borderColor: theme.border,
-                  },
-                ]}
-              >
-                <Calendar size={16} color={palette.accent} />
-                <Text
-                  style={[styles.pickerMainText, { color: theme.textPrimary }]}
-                >
-                  {formatBSDateNepali(bsDate, false)} ({currentDateISO})
-                </Text>
-              </TouchableOpacity>
+              <View style={styles.catRow}>
+                {(
+                  [
+                    { key: 'everyday', label: 'Everyday' },
+                    { key: 'weekdays', label: 'Sun–Fri' },
+                    { key: 'once', label: 'Once' },
+                  ] as const
+                ).map((opt) => {
+                  const selected = currentRepeat === opt.key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.key}
+                      onPress={() => setValue('repeat', opt.key)}
+                      style={[
+                        styles.catBtn,
+                        {
+                          backgroundColor: selected
+                            ? palette.accent
+                            : theme.inputBg,
+                          borderColor: selected ? palette.accent : theme.border,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.catBtnText,
+                          { color: selected ? '#FFFFFF' : theme.textPrimary },
+                        ]}
+                      >
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             </View>
+
+            {/* Date Selector — only shown for one-time logs */}
+            {currentRepeat === 'once' && (
+              <View style={styles.fieldGroup}>
+                <Text style={[styles.label, { color: theme.textSecondary }]}>
+                  Date
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setShowCalendar(true)}
+                  style={[
+                    styles.pickerBtn,
+                    {
+                      backgroundColor: theme.inputBg,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                >
+                  <Calendar size={16} color={palette.accent} />
+                  <Text
+                    style={[styles.pickerMainText, { color: theme.textPrimary }]}
+                  >
+                    {formatBSDateNepali(bsDate, false)} ({currentDateISO})
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
             {/* Optional 1-line Note */}
             <View style={styles.fieldGroup}>

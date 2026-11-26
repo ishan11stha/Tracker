@@ -519,15 +519,19 @@ export default function RemindersScreen() {
                     </Text>
 
                     <View style={styles.dateTimeRow}>
-                      <Calendar size={12} color={palette.accent} />
-                      <Text
-                        style={[
-                          styles.dateTimeText,
-                          { color: theme.textPrimary },
-                        ]}
-                      >
-                        {formatBSDateNepali(bs, false)}
-                      </Text>
+                      {rem.recurrence === 'none' && (
+                        <>
+                          <Calendar size={12} color={palette.accent} />
+                          <Text
+                            style={[
+                              styles.dateTimeText,
+                              { color: theme.textPrimary },
+                            ]}
+                          >
+                            {formatBSDateNepali(bs, false)}
+                          </Text>
+                        </>
+                      )}
                       <Clock size={12} color={theme.textMuted} />
                       <Text
                         style={[

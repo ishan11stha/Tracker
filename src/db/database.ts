@@ -151,6 +151,8 @@ async function initializeSchema(db: SQLite.SQLiteDatabase): Promise<void> {
       numericValue REAL NOT NULL DEFAULT 0,
       unit TEXT NOT NULL DEFAULT 'mins',
       status TEXT NOT NULL CHECK(status IN ('completed', 'pending')),
+      repeat TEXT NOT NULL DEFAULT 'once',
+      completedDates TEXT NOT NULL DEFAULT '[]',
       createdAt TEXT NOT NULL,
       updatedAt TEXT NOT NULL
     );
@@ -212,6 +214,16 @@ async function initializeSchema(db: SQLite.SQLiteDatabase): Promise<void> {
   }
   try {
     await db.execAsync(`ALTER TABLE reminders ADD COLUMN alertMode TEXT DEFAULT 'both';`);
+  } catch {
+    // Column already exists
+  }
+  try {
+    await db.execAsync(`ALTER TABLE activities ADD COLUMN repeat TEXT DEFAULT 'once';`);
+  } catch {
+    // Column already exists
+  }
+  try {
+    await db.execAsync(`ALTER TABLE activities ADD COLUMN completedDates TEXT DEFAULT '[]';`);
   } catch {
     // Column already exists
   }
@@ -499,19 +511,39 @@ export async function dbDeleteItem(id: string): Promise<void> {
 }
 
 // Activities CRUD
+interface ActivityRow extends Omit<ActivityRecord, 'completedDates'> {
+  completedDates?: string;
+}
+
 export async function dbGetAllActivities(): Promise<ActivityRecord[]> {
   const db = await getDatabase();
-  return await db.getAllAsync<ActivityRecord>(
+  const rows = await db.getAllAsync<ActivityRow>(
     `SELECT * FROM activities ORDER BY dateISO DESC, timeString DESC`
   );
+  return rows.map((r) => {
+    let parsedDates: string[] = [];
+    if (r.completedDates) {
+      try {
+        const arr = JSON.parse(r.completedDates);
+        if (Array.isArray(arr)) parsedDates = arr;
+      } catch {
+        parsedDates = [];
+      }
+    }
+    return {
+      ...r,
+      repeat: r.repeat || 'once',
+      completedDates: parsedDates,
+    };
+  });
 }
 
 export async function dbInsertActivity(activity: ActivityRecord): Promise<void> {
   const db = await getDatabase();
   await db.withTransactionAsync(async () => {
     await db.runAsync(
-      `INSERT INTO activities (id, title, description, category, dateISO, timeString, numericValue, unit, status, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO activities (id, title, description, category, dateISO, timeString, numericValue, unit, status, repeat, completedDates, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         activity.id,
         activity.title,
@@ -522,6 +554,8 @@ export async function dbInsertActivity(activity: ActivityRecord): Promise<void> 
         activity.numericValue,
         activity.unit,
         activity.status,
+        activity.repeat || 'once',
+        JSON.stringify(activity.completedDates || []),
         activity.createdAt,
         activity.updatedAt,
       ]
@@ -534,7 +568,7 @@ export async function dbUpdateActivity(activity: ActivityRecord): Promise<void> 
   await db.withTransactionAsync(async () => {
     await db.runAsync(
       `UPDATE activities
-       SET title = ?, description = ?, category = ?, dateISO = ?, timeString = ?, numericValue = ?, unit = ?, status = ?, updatedAt = ?
+       SET title = ?, description = ?, category = ?, dateISO = ?, timeString = ?, numericValue = ?, unit = ?, status = ?, repeat = ?, completedDates = ?, updatedAt = ?
        WHERE id = ?`,
       [
         activity.title,
@@ -545,6 +579,8 @@ export async function dbUpdateActivity(activity: ActivityRecord): Promise<void> 
         activity.numericValue,
         activity.unit,
         activity.status,
+        activity.repeat || 'once',
+        JSON.stringify(activity.completedDates || []),
         activity.updatedAt,
         activity.id,
       ]
@@ -810,8 +846,8 @@ export async function dbRestoreBackup(payload: VaultBackupPayload): Promise<void
 
     for (const act of payload.activities || []) {
       await db.runAsync(
-        `INSERT INTO activities (id, title, description, category, dateISO, timeString, numericValue, unit, status, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO activities (id, title, description, category, dateISO, timeString, numericValue, unit, status, repeat, completedDates, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           act.id,
           act.title,
@@ -822,6 +858,8 @@ export async function dbRestoreBackup(payload: VaultBackupPayload): Promise<void
           act.numericValue,
           act.unit || 'mins',
           act.status,
+          act.repeat || 'once',
+          JSON.stringify(act.completedDates || []),
           act.createdAt,
           act.updatedAt,
         ]

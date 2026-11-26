@@ -28,7 +28,12 @@ import {
   toNepaliDigits,
 } from '../../utils/nepaliDate';
 import { useCurrentNPT } from '../../hooks/useCurrentNPT';
-import { ACTIVITY_CATEGORIES, ActivityRecord } from '../../types';
+import {
+  ACTIVITY_CATEGORIES,
+  ActivityRecord,
+  isActivityCompletedOnDate,
+  isActivityScheduledOnDate,
+} from '../../types';
 import { ActivityFormModal } from '../../components/ActivityFormModal';
 import { NepaliCalendarModal } from '../../components/NepaliCalendarModal';
 
@@ -75,7 +80,10 @@ export default function ActivityTrackerScreen() {
         return false;
       }
       if (viewMode === 'daily') {
-        return act.dateISO === selectedDateISO;
+        return isActivityScheduledOnDate(act, selectedDateISO);
+      }
+      if (act.repeat === 'everyday' || act.repeat === 'weekdays') {
+        return true;
       }
       if (viewMode === 'weekly') {
         return (
@@ -100,12 +108,12 @@ export default function ActivityTrackerScreen() {
 
   const summary = useMemo(() => {
     const total = filteredActivities.length;
-    const completed = filteredActivities.filter(
-      (a) => a.status === 'completed'
+    const completed = filteredActivities.filter((a) =>
+      isActivityCompletedOnDate(a, selectedDateISO)
     ).length;
     const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
     return { total, completed, rate };
-  }, [filteredActivities]);
+  }, [filteredActivities, selectedDateISO]);
 
   const markedDates = useMemo(() => {
     const map: Record<string, { count: number; color: string }> = {};
@@ -324,7 +332,13 @@ export default function ActivityTrackerScreen() {
           </View>
         ) : (
           filteredActivities.map((act) => {
-            const isCompleted = act.status === 'completed';
+            const isCompleted = isActivityCompletedOnDate(act, selectedDateISO);
+            const repeatTag =
+              act.repeat === 'everyday'
+                ? 'Everyday'
+                : act.repeat === 'weekdays'
+                  ? 'Sun–Fri'
+                  : null;
             return (
               <View
                 key={act.id}
@@ -334,7 +348,7 @@ export default function ActivityTrackerScreen() {
                 ]}
               >
                 <TouchableOpacity
-                  onPress={() => toggleActivityStatus(act.id)}
+                  onPress={() => toggleActivityStatus(act.id, selectedDateISO)}
                   style={styles.checkBtn}
                   accessibilityRole="checkbox"
                   accessibilityState={{ checked: isCompleted }}
@@ -365,6 +379,7 @@ export default function ActivityTrackerScreen() {
                     style={[styles.activityMeta, { color: theme.textMuted }]}
                   >
                     {act.category} • {act.numericValue} {act.unit}
+                    {repeatTag ? ` • ${repeatTag}` : ''}
                   </Text>
                 </View>
 

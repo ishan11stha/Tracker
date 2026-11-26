@@ -163,6 +163,9 @@ export const ReminderFormModal: React.FC<ReminderFormModalProps> = ({
   };
 
   const bsDate = adToBs(currentDateISO || npt.isoDate);
+  const selectedWeekdays = parseRecurrenceWeekdays(currentRecurrence);
+  const hasRepeatDays = selectedWeekdays.length > 0;
+  const isEveryDaySelected = selectedWeekdays.length === REMINDER_WEEKDAYS.length;
 
   return (
     <Modal
@@ -235,38 +238,46 @@ export const ReminderFormModal: React.FC<ReminderFormModalProps> = ({
               )}
             </View>
 
-            {/* Nepali Date & NPT Time Row */}
+            {/* Nepali Date (hidden when Repeat Days are selected) & NPT Time Row */}
             <View style={styles.twoColRow}>
-              <View style={{ flex: 1.35 }}>
-                <Text style={[styles.label, { color: theme.textSecondary }]}>
-                  Nepali Date (BS / AD) *
-                </Text>
-                <TouchableOpacity
-                  onPress={() => setShowCalendar(true)}
-                  style={[
-                    styles.pickerBtn,
-                    {
-                      backgroundColor: theme.inputBg,
-                      borderColor: theme.border,
-                    },
-                  ]}
-                >
-                  <Calendar size={16} color={palette.accent} />
-                  <View style={{ flex: 1 }}>
-                    <Text
-                      style={[styles.pickerMainText, { color: theme.textPrimary }]}
-                      numberOfLines={1}
-                    >
-                      {formatBSDateNepali(bsDate, false)}
-                    </Text>
-                    <Text
-                      style={[styles.pickerSubText, { color: theme.textMuted }]}
-                    >
-                      {currentDateISO}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              </View>
+              {!hasRepeatDays && (
+                <View style={{ flex: 1.35 }}>
+                  <Text style={[styles.label, { color: theme.textSecondary }]}>
+                    Date (BS / AD) *
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => setShowCalendar(true)}
+                    style={[
+                      styles.pickerBtn,
+                      {
+                        backgroundColor: theme.inputBg,
+                        borderColor: theme.border,
+                      },
+                    ]}
+                  >
+                    <Calendar size={16} color={palette.accent} />
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={[
+                          styles.pickerMainText,
+                          { color: theme.textPrimary },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {formatBSDateNepali(bsDate, false)}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.pickerSubText,
+                          { color: theme.textMuted },
+                        ]}
+                      >
+                        {currentDateISO}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              )}
 
               <View style={{ flex: 1 }}>
                 <Text style={[styles.label, { color: theme.textSecondary }]}>
@@ -285,7 +296,10 @@ export const ReminderFormModal: React.FC<ReminderFormModalProps> = ({
                   <Clock size={16} color={palette.accent} />
                   <View style={{ flex: 1 }}>
                     <Text
-                      style={[styles.pickerMainText, { color: theme.textPrimary }]}
+                      style={[
+                        styles.pickerMainText,
+                        { color: theme.textPrimary },
+                      ]}
                     >
                       {formatTimeString(currentTime, settings.timeFormat)}
                     </Text>
@@ -431,11 +445,39 @@ export const ReminderFormModal: React.FC<ReminderFormModalProps> = ({
 
             {/* Recurrence (Days of the Week) */}
             <View style={styles.fieldGroup}>
-              <View style={styles.labelRow}>
-                <Repeat size={13} color={theme.textSecondary} />
-                <Text style={[styles.label, { color: theme.textSecondary, marginBottom: 0 }]}>
-                  Repeat Days
-                </Text>
+              <View
+                style={[
+                  styles.labelRow,
+                  { justifyContent: 'space-between' },
+                ]}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Repeat size={13} color={theme.textSecondary} />
+                  <Text style={[styles.label, { color: theme.textSecondary, marginBottom: 0 }]}>
+                    Repeat Days
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() =>
+                    setValue(
+                      'recurrence',
+                      isEveryDaySelected
+                        ? 'none'
+                        : REMINDER_WEEKDAYS.map((d) => d.key).join(','),
+                      { shouldValidate: true }
+                    )
+                  }
+                >
+                  <Text
+                    style={{
+                      fontSize: 11.5,
+                      fontWeight: '800',
+                      color: palette.accent,
+                    }}
+                  >
+                    {isEveryDaySelected ? 'Clear' : 'Every Day'}
+                  </Text>
+                </TouchableOpacity>
               </View>
               <View style={styles.chipsWrap}>
                 {REMINDER_WEEKDAYS.map((day) => {

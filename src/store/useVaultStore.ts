@@ -116,7 +116,7 @@ interface VaultState {
     id: string,
     data: Omit<ActivityRecord, 'id' | 'createdAt' | 'updatedAt'>
   ) => Promise<void>;
-  toggleActivityStatus: (id: string) => Promise<void>;
+  toggleActivityStatus: (id: string, dateISO?: string) => Promise<void>;
   removeActivity: (id: string) => Promise<void>;
 
   // Reminders
@@ -524,14 +524,35 @@ export const useVaultStore = create<VaultState>((set, get) => ({
     }
   },
 
-  toggleActivityStatus: async (id) => {
+  toggleActivityStatus: async (id, dateISO) => {
     const existing = get().activities.find((a) => a.id === id);
     if (!existing) return;
-    const updated: ActivityRecord = {
-      ...existing,
-      status: existing.status === 'completed' ? 'pending' : 'completed',
-      updatedAt: new Date().toISOString(),
-    };
+    const targetDate = dateISO || getNowInNPT().isoDate;
+    const isRecurring =
+      existing.repeat === 'everyday' || existing.repeat === 'weekdays';
+
+    let updated: ActivityRecord;
+    if (isRecurring) {
+      const prevDates = existing.completedDates || [];
+      const alreadyDone = prevDates.includes(targetDate);
+      const nextDates = alreadyDone
+        ? prevDates.filter((d) => d !== targetDate)
+        : [...prevDates, targetDate];
+      const todayISO = getNowInNPT().isoDate;
+      updated = {
+        ...existing,
+        completedDates: nextDates,
+        status: nextDates.includes(todayISO) ? 'completed' : 'pending',
+        updatedAt: new Date().toISOString(),
+      };
+    } else {
+      updated = {
+        ...existing,
+        status: existing.status === 'completed' ? 'pending' : 'completed',
+        updatedAt: new Date().toISOString(),
+      };
+    }
+
     try {
       await dbUpdateActivity(updated);
       set((state) => ({
