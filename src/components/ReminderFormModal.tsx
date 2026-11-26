@@ -491,8 +491,8 @@ export const ReminderFormModal: React.FC<ReminderFormModalProps> = ({
                     const nextDays = isCurrentlySelected
                       ? liveDays.filter((d) => d !== key)
                       : REMINDER_WEEKDAYS.filter(
-                          (d) => liveDays.includes(d.key) || d.key === key
-                        ).map((d) => d.key);
+                        (d) => liveDays.includes(d.key) || d.key === key
+                      ).map((d) => d.key);
                     setValue(
                       'recurrence',
                       nextDays.length > 0 ? nextDays.join(',') : 'none',

@@ -85,6 +85,7 @@ interface VaultState {
   hydrateFromDB: () => Promise<void>;
   clearError: () => void;
   updateSettings: (partial: Partial<AppSettings>) => Promise<boolean>;
+  cycleCurrency: () => Promise<void>;
 
   // Transactions
   addTransaction: (
@@ -291,6 +292,13 @@ export const useVaultStore = create<VaultState>((set, get) => ({
     }
 
     return true;
+  },
+
+  cycleCurrency: async () => {
+    const order: AppSettings['currency'][] = ['NPR', 'INR', 'USD'];
+    const current = get().settings.currency;
+    const next = order[(order.indexOf(current) + 1) % order.length];
+    await get().updateSettings({ currency: next });
   },
 
   // Transactions
