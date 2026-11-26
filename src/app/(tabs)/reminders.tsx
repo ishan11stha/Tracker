@@ -73,6 +73,8 @@ export default function RemindersScreen() {
 
   const isReminderOverdue = (r: ReminderItem) => {
     if (r.isCompleted) return false;
+    // Repeating alarms (Everyday / Weekdays) roll forward automatically and are never overdue
+    if (r.recurrence && r.recurrence !== 'none') return false;
     if (r.dateISO < nptNow.isoDate) return true;
     if (r.dateISO === nptNow.isoDate && r.timeString < currentTime24)
       return true;

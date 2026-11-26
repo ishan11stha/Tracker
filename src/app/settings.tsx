@@ -56,6 +56,7 @@ export default function SettingsScreen() {
     items,
     activities,
     reminders,
+    savingsGoals,
   } = useVaultStore();
 
   const isDark = settings.theme === 'dark';
@@ -740,8 +741,8 @@ export default function SettingsScreen() {
 
           <Text style={[styles.dbStatsText, { color: theme.textSecondary }]}>
             Stored locally in SQLite: {transactions.length} transactions •{' '}
-            {items.length} items • {activities.length} activities •{' '}
-            {reminders.length} reminders
+            {savingsGoals.length} goals • {items.length} items •{' '}
+            {activities.length} habits • {reminders.length} reminders
           </Text>
 
           <TouchableOpacity

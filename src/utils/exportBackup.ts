@@ -86,7 +86,7 @@ export async function exportVaultDataToCSV(
   // 4. Activities
   lines.push('--- DAILY ACTIVITIES ---');
   lines.push(
-    'ID,Title,Category,Status,Value,Unit,Date (AD),Date (BS),Time (NPT),Description'
+    'ID,Title,Category,Schedule,Status,Value,Unit,Date (AD),Date (BS),Time (NPT),Description'
   );
   for (const a of payload.activities) {
     const bs = adToBs(a.dateISO);
@@ -95,6 +95,7 @@ export async function exportVaultDataToCSV(
         escapeCSV(a.id),
         escapeCSV(a.title),
         escapeCSV(a.category),
+        escapeCSV(a.repeat || 'once'),
         escapeCSV(a.status),
         a.numericValue,
         escapeCSV(a.unit),
@@ -127,6 +128,23 @@ export async function exportVaultDataToCSV(
         escapeCSV(formatBSDateEnglish(bs, false)),
         escapeCSV(r.timeString),
         escapeCSV(r.description),
+      ].join(',')
+    );
+  }
+  lines.push('');
+
+  // 6. Savings Goals
+  lines.push('--- SAVINGS GOALS ---');
+  lines.push('ID,Title,Saved Amount,Target Amount,Target Date (AD),Icon');
+  for (const g of payload.savingsGoals || []) {
+    lines.push(
+      [
+        escapeCSV(g.id),
+        escapeCSV(g.title),
+        g.savedAmount,
+        g.targetAmount,
+        escapeCSV(g.targetDateISO || ''),
+        escapeCSV(g.icon),
       ].join(',')
     );
   }

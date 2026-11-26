@@ -34,6 +34,7 @@ import {
   formatTimeString,
 } from '../../utils/nepaliDate';
 import { formatCurrency } from '../../utils/currency';
+import { useCurrentNPT } from '../../hooks/useCurrentNPT';
 import { useNepalClock } from '../../hooks/useNepalClock';
 import { QuickActionMessageBox } from '../../components/QuickActionMessageBox';
 import { TransactionFormModal } from '../../components/TransactionFormModal';
@@ -117,14 +118,7 @@ export default function DashboardScreen() {
     useState<'All' | 'Personal' | 'Family'>('All');
   const [feedTab, setFeedTab] = useState<'recent' | 'schedule'>('recent');
 
-  const todayISO = useMemo(() => {
-    const now = new Date();
-    const npt = new Date(now.getTime() + 345 * 60 * 1000);
-    return `${npt.getUTCFullYear()}-${String(npt.getUTCMonth() + 1).padStart(
-      2,
-      '0'
-    )}-${String(npt.getUTCDate()).padStart(2, '0')}`;
-  }, []);
+  const todayISO = useCurrentNPT().isoDate;
 
   const scopedTransactions = useMemo(() => {
     if (overviewScope === 'All') return transactions;

@@ -410,11 +410,11 @@ export function parseQuickInput(rawText: string): ParsedQuickInput {
 
     // Capitalize activity name
     let title = norm.charAt(0).toUpperCase() + norm.slice(1);
-    let category = 'Fitness & Health';
+    let category = 'Health';
     if (lower.includes('read') || lower.includes('study') || lower.includes('studied')) {
-      category = 'Reading & Study';
+      category = 'Study';
     } else if (lower.includes('meditat')) {
-      category = 'Meditation';
+      category = 'Personal';
     }
 
     return {

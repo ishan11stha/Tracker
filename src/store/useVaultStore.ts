@@ -862,7 +862,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
         const created = await get().addActivity({
           title: parsed.title,
           description: `Logged via Quick Input: "${rawText}"`,
-          category: parsed.category || 'Fitness & Health',
+          category: parsed.category || 'Health',
           dateISO: npt.isoDate,
           timeString: parsed.timeString || npt.time24,
           numericValue: parsed.numericValue || 1,
