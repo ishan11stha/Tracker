@@ -44,7 +44,7 @@ export default function ActivityTrackerScreen() {
   const palette = getSectionPalette('tracker', isDark);
 
   const nptToday = useCurrentNPT();
-  const [viewMode, setViewMode] = useState<'daily' | 'monthly'>('daily');
+  const [viewMode, setViewMode] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [selectedDateISO, setSelectedDateISO] = useState(nptToday.isoDate);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [showCalendar, setShowCalendar] = useState(false);
@@ -55,6 +55,20 @@ export default function ActivityTrackerScreen() {
 
   const selectedBS = useMemo(() => adToBs(selectedDateISO), [selectedDateISO]);
 
+  // Compute Sunday–Saturday week bounds containing selectedDateISO
+  const weekBounds = useMemo(() => {
+    const [y, m, d] = selectedDateISO.split('-').map(Number);
+    const utcDate = new Date(Date.UTC(y, m - 1, d));
+    const weekday = utcDate.getUTCDay(); // 0 = Sunday
+    const startUTC = new Date(utcDate.getTime() - weekday * 86400000);
+    const endUTC = new Date(startUTC.getTime() + 6 * 86400000);
+    const fmt = (dt: Date) =>
+      `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, '0')}-${String(
+        dt.getUTCDate()
+      ).padStart(2, '0')}`;
+    return { startISO: fmt(startUTC), endISO: fmt(endUTC) };
+  }, [selectedDateISO]);
+
   const filteredActivities = useMemo(() => {
     return activities.filter((act) => {
       if (selectedCategory !== 'All' && act.category !== selectedCategory) {
@@ -62,6 +76,11 @@ export default function ActivityTrackerScreen() {
       }
       if (viewMode === 'daily') {
         return act.dateISO === selectedDateISO;
+      }
+      if (viewMode === 'weekly') {
+        return (
+          act.dateISO >= weekBounds.startISO && act.dateISO <= weekBounds.endISO
+        );
       }
       if (settings.preferredCalendar === 'BS') {
         const bs = adToBs(act.dateISO);
@@ -73,6 +92,7 @@ export default function ActivityTrackerScreen() {
     activities,
     viewMode,
     selectedDateISO,
+    weekBounds,
     selectedBS,
     selectedCategory,
     settings.preferredCalendar,
@@ -147,85 +167,84 @@ export default function ActivityTrackerScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Simple Overview Card: Daily/Monthly + Date + Progress Bar */}
+        {/* Simple Overview Card: Daily/Weekly/Monthly + Date + Progress Bar */}
         <View
           style={[
             styles.overviewCard,
             { backgroundColor: theme.card, borderColor: theme.border },
           ]}
         >
-          <View style={styles.topControlsRow}>
-            <TouchableOpacity
-              onPress={() => setShowCalendar(true)}
-              style={styles.dateTapArea}
-              accessibilityRole="button"
-              accessibilityLabel="Select date"
-            >
-              <Calendar size={16} color={palette.accent} />
-              <View style={{ flex: 1 }}>
-                <Text
-                  style={[styles.activeDateMain, { color: theme.textPrimary }]}
-                  numberOfLines={1}
+          <View
+            style={[
+              styles.viewModeToggle,
+              { backgroundColor: theme.surfaceContainerHigh },
+            ]}
+          >
+            {(
+              [
+                { key: 'daily', label: 'Daily' },
+                { key: 'weekly', label: 'Weekly' },
+                { key: 'monthly', label: 'Monthly' },
+              ] as const
+            ).map((tab) => {
+              const active = viewMode === tab.key;
+              return (
+                <TouchableOpacity
+                  key={tab.key}
+                  onPress={() => setViewMode(tab.key)}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: active }}
+                  style={[
+                    styles.viewModeBtn,
+                    active && { backgroundColor: palette.accent },
+                  ]}
                 >
-                  {viewMode === 'daily'
-                    ? formatBSDateNepali(selectedBS, false)
+                  <Text
+                    style={[
+                      styles.viewModeText,
+                      { color: active ? '#FFFFFF' : theme.textMuted },
+                    ]}
+                  >
+                    {tab.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <TouchableOpacity
+            onPress={() => setShowCalendar(true)}
+            style={styles.dateTapArea}
+            accessibilityRole="button"
+            accessibilityLabel="Select date"
+          >
+            <Calendar size={16} color={palette.accent} />
+            <View style={{ flex: 1 }}>
+              <Text
+                style={[styles.activeDateMain, { color: theme.textPrimary }]}
+                numberOfLines={1}
+              >
+                {viewMode === 'daily'
+                  ? formatBSDateNepali(selectedBS, false)
+                  : viewMode === 'weekly'
+                    ? `${formatBSDateNepali(adToBs(weekBounds.startISO), false)} – ${formatBSDateNepali(
+                        adToBs(weekBounds.endISO),
+                        false
+                      )}`
                     : `${BS_MONTHS_NE[selectedBS.month - 1]} ${toNepaliDigits(
                         selectedBS.year
                       )}`}
-                </Text>
-                <Text
-                  style={[styles.activeDateSub, { color: theme.textMuted }]}
-                  numberOfLines={1}
-                >
-                  {formatADDateFull(selectedDateISO)}
-                </Text>
-              </View>
-            </TouchableOpacity>
-
-            <View
-              style={[
-                styles.viewModeToggle,
-                { backgroundColor: theme.surfaceContainerHigh },
-              ]}
-            >
-              <TouchableOpacity
-                onPress={() => setViewMode('daily')}
-                style={[
-                  styles.viewModeBtn,
-                  viewMode === 'daily' && { backgroundColor: palette.accent },
-                ]}
+              </Text>
+              <Text
+                style={[styles.activeDateSub, { color: theme.textMuted }]}
+                numberOfLines={1}
               >
-                <Text
-                  style={[
-                    styles.viewModeText,
-                    { color: viewMode === 'daily' ? '#FFFFFF' : theme.textMuted },
-                  ]}
-                >
-                  Day
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => setViewMode('monthly')}
-                style={[
-                  styles.viewModeBtn,
-                  viewMode === 'monthly' && { backgroundColor: palette.accent },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.viewModeText,
-                    {
-                      color:
-                        viewMode === 'monthly' ? '#FFFFFF' : theme.textMuted,
-                    },
-                  ]}
-                >
-                  Month
-                </Text>
-              </TouchableOpacity>
+                {viewMode === 'weekly'
+                  ? `${weekBounds.startISO} to ${weekBounds.endISO}`
+                  : formatADDateFull(selectedDateISO)}
+              </Text>
             </View>
-          </View>
+          </TouchableOpacity>
 
           {/* Clean Progress Bar */}
           <View style={styles.progressSection}>
@@ -443,18 +462,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 12,
   },
-  topControlsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-    marginBottom: 14,
-  },
   dateTapArea: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 9,
+    marginBottom: 14,
   },
   activeDateMain: {
     fontSize: 14,
@@ -468,11 +480,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     padding: 3,
     borderRadius: 999,
+    marginBottom: 12,
   },
   viewModeBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    flex: 1,
+    paddingVertical: 7,
     borderRadius: 999,
+    alignItems: 'center',
   },
   viewModeText: {
     fontSize: 11.5,
