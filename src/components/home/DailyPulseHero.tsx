@@ -7,7 +7,7 @@ import {
   Target,
 } from 'lucide-react-native';
 import Svg, { Circle as SvgCircle } from 'react-native-svg';
-import { ObsidianHeroCard } from '../ui/ObsidianHero';
+import { HeroCard } from '../ui/HeroCard';
 import { CurrencyDisplayer } from '../finance/FinanceDisplay';
 import { AppSettings } from '../../types';
 
@@ -103,7 +103,7 @@ export function DailyPulseHero({
   const chevronColor = isDark ? 'rgba(248, 250, 252, 0.5)' : '#64748B';
 
   return (
-    <ObsidianHeroCard isDark={isDark} style={cardStyle}>
+    <HeroCard isDark={isDark} style={cardStyle}>
       <View style={styles.pulseTopRow}>
         <View style={{ flex: 1 }}>
           <Text style={[styles.heroLabel, { color: labelColor }]}>
@@ -256,7 +256,7 @@ export function DailyPulseHero({
           />
         </TouchableOpacity>
       </View>
-    </ObsidianHeroCard>
+    </HeroCard>
   );
 }
 

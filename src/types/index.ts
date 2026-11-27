@@ -401,6 +401,7 @@ export interface AppSettings {
   alarmRepeatCount?: number; // 1, 2, 3, or 5 times
   theme: 'light' | 'dark';
   privateMode?: boolean;
+  lastBackupAt?: string;
 }
 
 export const appSettingsSchema = z.object({
@@ -412,9 +413,10 @@ export const appSettingsSchema = z.object({
   preferredCalendar: z.enum(['BS', 'AD']),
   timeFormat: z.enum(['12h', '24h']),
   notificationsEnabled: z.boolean(),
-  alarmRepeatCount: z.number().int().min(1).max(10).optional().default(3),
+  alarmRepeatCount: z.number().int().min(1).max(10).optional().default(1),
   theme: z.enum(['light', 'dark']),
   privateMode: z.boolean().optional(),
+  lastBackupAt: z.string().optional(),
 });
 
 export const vaultBackupSchema = z.object({

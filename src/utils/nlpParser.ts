@@ -321,16 +321,18 @@ export function parseQuickInput(rawText: string): ParsedQuickInput {
   const lower = norm.toLowerCase();
   const nptNow = getNPTNow();
 
-  // 1. Check for Reminder Intent
+  // 1. Check for Reminder Intent (supports spoken phrases like "set alarm for 7 am college")
   if (
     lower.startsWith('remind') ||
     lower.includes('reminder') ||
     lower.includes('alert me') ||
-    lower.includes("don't forget")
+    lower.includes("don't forget") ||
+    /\b(?:set\s+(?:an?\s+)?alarm|wake\s+me\s+up)\b/i.test(lower)
   ) {
     let clean = norm
-      .replace(/^remind(?:\s+me)?\s*/i, '')
+      .replace(/^(?:please\s+)?remind(?:\s+me)?\s*/i, '')
       .replace(/^reminder(?:\s+to)?\s*/i, '')
+      .replace(/^(?:set\s+(?:an?\s+)?alarm|wake\s+me\s+up|alert\s+me)\s*/i, '')
       .trim();
 
     // Check date: tomorrow vs today
@@ -342,12 +344,12 @@ export function parseQuickInput(rawText: string): ParsedQuickInput {
       clean = clean.replace(/tomorrow/gi, '').replace(/bholi/gi, '').trim();
     }
 
-    // Check time: 5pm, 17:00, 9am, 10:30 am
+    // Check time: 5pm, 17:00, 9am, 10:30 am, "at 7 am"
     let timeString = '09:00';
     const meridiemMatch = clean.match(
-      /\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i
+      /(?:\bat\s+)?\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i
     );
-    const colonMatch = clean.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/);
+    const colonMatch = clean.match(/(?:\bat\s+)?\b([01]?\d|2[0-3]):([0-5]\d)\b/);
     const atMatch = clean.match(
       /\bat\s+([01]?\d|2[0-3])(?::([0-5]\d))?\b/i
     );
@@ -364,9 +366,10 @@ export function parseQuickInput(rawText: string): ParsedQuickInput {
       clean = clean.replace(timeMatch[0], '').trim();
     }
 
-    // Remove leading words like "to ", "about "
+    // Remove leading filler words like "to ", "about ", "for ", "at "
     clean = clean
       .replace(/^(?:to|about|for|at)\s+/i, '')
+      .replace(/\s+/g, ' ')
       .replace(/[,\.]/g, '')
       .trim();
     const title = clean.length > 0 ? clean.charAt(0).toUpperCase() + clean.slice(1) : 'Scheduled Reminder';
@@ -386,12 +389,13 @@ export function parseQuickInput(rawText: string): ParsedQuickInput {
   // 2. Check for Activity / Habit Intent
   // e.g. "5km run 30 mins", "run 5km 30 mins", "studied 45 mins", "read 20 pages"
   const isActivity =
-    /\b(run|jog|walk|steps?|gym|workout|studied|study|read|reading|meditat(?:e|ed)|water)\b/i.test(
+    /\b(run|jog|walk|steps?|gym|workout|exercis(?:e|ed)|studied|study|read|reading|meditat(?:e|ed)|water)\b/i.test(
       lower
     ) &&
     !lower.includes('bought') &&
     !lower.includes('buy') &&
     !lower.includes('get') &&
+    !lower.includes('spent') &&
     !lower.includes('paid');
 
   if (isActivity) {
@@ -436,7 +440,7 @@ export function parseQuickInput(rawText: string): ParsedQuickInput {
   // Check for Income
   // Triggers: "get by mom", "got from", "received", "from mom", "salary", "credited", "earned", "gift"
   const isIncome =
-    /\b(get\s+by|got\s+from|from\s+mom|from\s+dad|received|income|salary|credited|earned|gift|bonus|deposit)\b/i.test(
+    /\b(get\s+by|got\s+from|from\s+mom|from\s+dad|received|pocket\s+money|income|salary|credited|earned|gift|bonus|deposit)\b/i.test(
       lower
     ) ||
     (lower.includes('add to bank') && !lower.includes('bought') && !lower.includes('paid') && !lower.includes('spent')) ||
@@ -491,13 +495,17 @@ export function parseQuickInput(rawText: string): ParsedQuickInput {
   const isPurchase =
     /\b(bought|buy|purchased|ordered|acquired|got\s+new)\b/i.test(lower);
 
-  // Extract candidate item name
+  // Extract candidate item/expense name (handles natural spoken phrases like "spent 250 on momo", "paid 1500 for wifi")
   let candidateTitle = norm;
   if (isPurchase) {
-    candidateTitle = norm.replace(/\b(bought|buy|purchased|ordered|got\s+new)\b/i, '').trim();
+    candidateTitle = norm.replace(/\b(i\s+)?(bought|buy|purchased|ordered|got\s+new)\b/i, '').trim();
+  } else {
+    candidateTitle = norm
+      .replace(/^(?:i\s+)?(?:spent|spend|paid|pay)\b/i, '')
+      .trim();
   }
 
-  // Strip amount and payment method from candidate title
+  // Strip amount, payment method, and leading spoken prepositions ("on", "for", "a", "an", "the")
   candidateTitle = candidateTitle
     .replace(/\b(?:rs\.?|रू|npr|rupees?|inr|\$)?\s*\d+(?:,\d+)*(?:\.\d+)?\s*(?:rs\.?|रू|npr|rupees?|k)?\b/gi, '')
     .replace(/\b(in|with|via|by|to|from)\s+(bank|cash|esewa|khalti|card)\b/gi, '')
@@ -505,6 +513,7 @@ export function parseQuickInput(rawText: string): ParsedQuickInput {
     .replace(/[,\.\:\-]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
+    .replace(/^(?:on|for|at|in|a|an|the)\s+/i, '')
     .replace(/\b(?:for|at|on|from)\s*$/i, '')
     .trim();
 

@@ -26,6 +26,7 @@ import type {
 } from 'expo-speech-recognition';
 import { useVaultStore } from '../store/useVaultStore';
 import { getThemeColors } from '../theme/colors';
+import { triggerLightHaptic } from '../utils/haptics';
 
 type SpeechRecognitionNativeModule = {
   addListener?: (
@@ -180,6 +181,7 @@ export function QuickActionMessageBox({
 
   const handleToggleMic = useCallback(async () => {
     if (isProcessing) return;
+    triggerLightHaptic();
 
     const mod = getSpeechModule();
     if (!mod) {

@@ -38,9 +38,10 @@ import {
 import { ActivityFormModal } from '../../components/ActivityFormModal';
 import { NepaliCalendarModal } from '../../components/NepaliCalendarModal';
 import {
+  HeroCard,
   HeroPillTabs,
-  ObsidianHeroCard,
-} from '../../components/ui/ObsidianHero';
+} from '../../components/ui/HeroCard';
+import { EmptyState } from '../../components/ui/EmptyState';
 
 const TRACKER_VIEW_TABS = [
   { key: 'daily', label: 'Daily' },
@@ -194,12 +195,13 @@ export default function ActivityTrackerScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Signature Obsidian Overview Card: Daily/Weekly/Monthly + Date + Progress Bar */}
-        <ObsidianHeroCard isDark={isDark}>
+        {/* Overview Hero Card: Daily/Weekly/Monthly + Date + Progress Bar */}
+        <HeroCard isDark={isDark}>
           <HeroPillTabs
             options={TRACKER_VIEW_TABS}
             value={viewMode}
             onChange={setViewMode}
+            isDark={isDark}
             style={styles.viewModeToggle}
           />
 
@@ -209,9 +211,15 @@ export default function ActivityTrackerScreen() {
             accessibilityRole="button"
             accessibilityLabel="Select date"
           >
-            <Calendar size={16} color="#A78BFA" />
+            <Calendar size={16} color={isDark ? '#A78BFA' : '#7C3AED'} />
             <View style={{ flex: 1 }}>
-              <Text style={styles.activeDateMain} numberOfLines={1}>
+              <Text
+                style={[
+                  styles.activeDateMain,
+                  { color: isDark ? '#FFFFFF' : '#0F172A' },
+                ]}
+                numberOfLines={1}
+              >
                 {viewMode === 'daily'
                   ? formatBSDateNepali(selectedBS, false)
                   : viewMode === 'weekly'
@@ -223,7 +231,13 @@ export default function ActivityTrackerScreen() {
                         selectedBS.year
                       )}`}
               </Text>
-              <Text style={styles.activeDateSub} numberOfLines={1}>
+              <Text
+                style={[
+                  styles.activeDateSub,
+                  { color: isDark ? 'rgba(248, 250, 252, 0.65)' : '#64748B' },
+                ]}
+                numberOfLines={1}
+              >
                 {viewMode === 'weekly'
                   ? `${weekBounds.startISO} to ${weekBounds.endISO}`
                   : formatADDateFull(selectedDateISO)}
@@ -231,27 +245,44 @@ export default function ActivityTrackerScreen() {
             </View>
           </TouchableOpacity>
 
-          {/* Luminous Progress Bar */}
+          {/* Progress Bar */}
           <View style={styles.progressSection}>
             <View style={styles.progressHeader}>
-              <Text style={styles.progressLabel}>
+              <Text
+                style={[
+                  styles.progressLabel,
+                  { color: isDark ? 'rgba(248, 250, 252, 0.72)' : '#475569' },
+                ]}
+              >
                 {summary.completed} of {summary.total} completed
               </Text>
-              <Text style={styles.progressPct}>{summary.rate}%</Text>
+              <Text
+                style={[
+                  styles.progressPct,
+                  { color: isDark ? '#A78BFA' : '#7C3AED' },
+                ]}
+              >
+                {summary.rate}%
+              </Text>
             </View>
-            <View style={styles.progressTrack}>
+            <View
+              style={[
+                styles.progressTrack,
+                !isDark && { backgroundColor: '#EDE9FE' },
+              ]}
+            >
               <View
                 style={[
                   styles.progressFill,
                   {
-                    backgroundColor: '#A78BFA',
+                    backgroundColor: isDark ? '#A78BFA' : '#7C3AED',
                     width: `${summary.rate}%`,
                   },
                 ]}
               />
             </View>
           </View>
-        </ObsidianHeroCard>
+        </HeroCard>
 
         {/* Simple 5-Option Category Filter Row */}
         <View style={styles.filterRow}>
@@ -286,20 +317,18 @@ export default function ActivityTrackerScreen() {
 
         {/* Activity List */}
         {filteredActivities.length === 0 ? (
-          <View
-            style={[
-              styles.emptyCard,
-              { backgroundColor: theme.card, borderColor: theme.border },
-            ]}
-          >
-            <Activity size={24} color={palette.accent} />
-            <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
-              No habits logged
-            </Text>
-            <Text style={[styles.emptySub, { color: theme.textMuted }]}>
-              Tap "+ Add" to log a habit or daily goal.
-            </Text>
-          </View>
+          <EmptyState
+            isDark={isDark}
+            icon={<Activity size={22} color={palette.accent} />}
+            accentColor={palette.accent}
+            title="No habits logged"
+            subtitle="Create a daily habit or log an activity to track your consistency."
+            actionLabel="Add Habit"
+            onAction={() => {
+              setEditingActivity(null);
+              setFormVisible(true);
+            }}
+          />
         ) : (
           filteredActivities.map((act) => {
             const isCompleted = isActivityCompletedOnDate(act, selectedDateISO);
@@ -330,7 +359,16 @@ export default function ActivityTrackerScreen() {
                   )}
                 </TouchableOpacity>
 
-                <View style={{ flex: 1 }}>
+                <TouchableOpacity
+                  activeOpacity={0.75}
+                  onPress={() => {
+                    setEditingActivity(act);
+                    setFormVisible(true);
+                  }}
+                  style={{ flex: 1 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Edit ${act.title}`}
+                >
                   <Text
                     style={[
                       styles.activityTitle,
@@ -351,27 +389,17 @@ export default function ActivityTrackerScreen() {
                     {act.category} • {act.numericValue} {act.unit}
                     {repeatTag ? ` • ${repeatTag}` : ''}
                   </Text>
-                </View>
+                </TouchableOpacity>
 
-                <View style={styles.actionsGroup}>
-                  <TouchableOpacity
-                    onPress={() => {
-                      setEditingActivity(act);
-                      setFormVisible(true);
-                    }}
-                    style={styles.iconBtn}
-                    hitSlop={8}
-                  >
-                    <Edit3 size={15} color={theme.textMuted} />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => handleDelete(act)}
-                    style={styles.iconBtn}
-                    hitSlop={8}
-                  >
-                    <Trash2 size={15} color="#EF4444" />
-                  </TouchableOpacity>
-                </View>
+                <TouchableOpacity
+                  onPress={() => handleDelete(act)}
+                  style={styles.iconBtn}
+                  hitSlop={10}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Delete ${act.title}`}
+                >
+                  <Trash2 size={15} color="#EF4444" />
+                </TouchableOpacity>
               </View>
             );
           })

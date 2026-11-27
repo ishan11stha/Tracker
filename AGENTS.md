@@ -29,7 +29,7 @@ Expo ships breaking changes every SDK release. Before writing code that touches 
 
 ## UI, Layout & Performance Standards
 
-- **Design System**: Use the unified **Signature Obsidian Hero Card** (`#0F172A` light / `#151F32` dark) across all main tabs with frosted sub-tiles (`rgba(255,255,255,0.07)`). Avoid duplicating Money's Net Balance card on Home (Home uses the Today's Pulse + Next Up + Spent Today / Net Worth hero).
+- **Design System**: Use the unified **Hero Card** (`src/components/ui/HeroCard.tsx`) across all main tabs with crisp light/dark contrast. Avoid duplicating Money's Net Balance card on Home (Home uses the Today's Pulse + Next Up + Spent Today / Net Worth hero).
 - **Compact Spacing (No Excess Whitespace)**: Keep outer screen padding compact (`paddingHorizontal: 14`, `paddingTop: 10`, `paddingBottom: 22`), card gaps `12px`, and hero padding `14–16px`. Keep Home's quick dock and 4-module pulse strip icon-only (no noisy text labels).
 - **Header Controls**: Home top-right has **Light/Dark Theme (`Sun`/`Moon`)** + **Settings**; **Private Mode (`Eye`/`EyeOff`)** lives in Money's Balance Hero card.
 - **Responsiveness**:

@@ -41,28 +41,35 @@ export function ScreenShell({
   );
 }
 
-interface ObsidianHeroCardProps {
+interface HeroCardProps {
   isDark: boolean;
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
 }
 
 /**
- * Signature Obsidian Hero Card container shared across all 5 VAULT main tabs.
+ * Unified dark-slate Hero Card container shared across all 5 VAULT main tabs.
  */
-export function ObsidianHeroCard({
+export function HeroCard({
   isDark,
   children,
   style,
-}: ObsidianHeroCardProps) {
+}: HeroCardProps) {
   return (
     <View
       style={[
         styles.heroCard,
-        {
-          backgroundColor: isDark ? '#151F32' : '#0F172A',
-          borderColor: isDark ? '#26344E' : '#1E293B',
-        },
+        isDark
+          ? {
+              backgroundColor: '#151F32',
+              borderColor: '#26344E',
+              shadowOpacity: 0.16,
+            }
+          : {
+              backgroundColor: '#FFFFFF',
+              borderColor: '#E2E8F0',
+              shadowOpacity: 0.06,
+            },
         style,
       ]}
     >
@@ -80,20 +87,34 @@ interface HeroPillTabsProps<T extends string> {
   options: readonly HeroPillOption<T>[];
   value: T;
   onChange: (value: T) => void;
+  isDark?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 
 /**
- * Translucent segmented pill switcher inside an ObsidianHeroCard.
+ * Segmented pill switcher inside a HeroCard with crisp light/dark contrast.
  */
 export function HeroPillTabs<T extends string>({
   options,
   value,
   onChange,
+  isDark = false,
   style,
 }: HeroPillTabsProps<T>) {
   return (
-    <View style={[styles.pillBar, style]}>
+    <View
+      style={[
+        styles.pillBar,
+        isDark
+          ? { backgroundColor: 'rgba(255, 255, 255, 0.09)' }
+          : {
+              backgroundColor: '#F1F5F9',
+              borderWidth: 1,
+              borderColor: '#E2E8F0',
+            },
+        style,
+      ]}
+    >
       {options.map((opt) => {
         const active = value === opt.key;
         return (
@@ -103,13 +124,26 @@ export function HeroPillTabs<T extends string>({
             onPress={() => onChange(opt.key)}
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
-            style={[styles.pillBtn, active && styles.pillBtnActive]}
+            style={[
+              styles.pillBtn,
+              active && {
+                backgroundColor: isDark ? '#FFFFFF' : '#0F172A',
+              },
+            ]}
           >
             <Text
               numberOfLines={1}
               style={[
                 styles.pillText,
-                { color: active ? '#0F172A' : 'rgba(248,250,252,0.7)' },
+                {
+                  color: active
+                    ? isDark
+                      ? '#0F172A'
+                      : '#FFFFFF'
+                    : isDark
+                      ? 'rgba(248,250,252,0.7)'
+                      : '#475569',
+                },
               ]}
             >
               {opt.label}

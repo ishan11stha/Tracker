@@ -46,6 +46,16 @@ import {
   CategoryDonutChart,
   ScopeDistributionChart,
 } from '../../components/finance/FinanceCharts';
+import { HeroCard, HeroPillTabs } from '../../components/ui/HeroCard';
+import { EmptyState } from '../../components/ui/EmptyState';
+
+const MONEY_PERIOD_TABS: readonly { key: TimeRangeKey; label: string }[] = [
+  { key: 'daily', label: 'Day' },
+  { key: 'weekly', label: 'Week' },
+  { key: 'monthly', label: 'Month' },
+  { key: 'yearly', label: 'Year' },
+  { key: 'all', label: 'All' },
+];
 
 type TimeRangeKey = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'all';
 type SortOption =
@@ -350,31 +360,40 @@ export default function MoneyManagerScreen() {
           </View>
         </View>
 
-        {/* Signature Obsidian Balance + Period Summary Card */}
-        <View
-          style={[
-            styles.balanceHeroCard,
-            {
-              backgroundColor: isDark ? '#151F32' : '#0F172A',
-              borderColor: isDark ? '#26344E' : '#1E293B',
-            },
-          ]}
-        >
+        {/* Balance + Period Summary Hero Card */}
+        <HeroCard isDark={isDark}>
           <View style={styles.heroTopRow}>
             <View style={styles.heroLabelRow}>
-              <Text style={styles.heroLabel}>NET AVAILABLE BALANCE</Text>
+              <Text
+                style={[
+                  styles.heroLabel,
+                  { color: isDark ? 'rgba(248, 250, 252, 0.65)' : '#64748B' },
+                ]}
+              >
+                NET AVAILABLE BALANCE
+              </Text>
               <TouchableOpacity
                 onPress={() => updateSettings({ privateMode: !privateMode })}
                 activeOpacity={0.78}
                 accessibilityRole="switch"
                 accessibilityLabel="Hide balances in private mode"
                 accessibilityState={{ checked: privateMode }}
-                style={styles.heroEyeBtn}
+                style={[
+                  styles.heroEyeBtn,
+                  !isDark && {
+                    backgroundColor: '#F1F5F9',
+                    borderWidth: 1,
+                    borderColor: '#E2E8F0',
+                  },
+                ]}
               >
                 {privateMode ? (
-                  <EyeOff size={15} color="#FFFFFF" />
+                  <EyeOff size={15} color={isDark ? '#FFFFFF' : '#0F172A'} />
                 ) : (
-                  <Eye size={15} color="rgba(248, 250, 252, 0.85)" />
+                  <Eye
+                    size={15}
+                    color={isDark ? 'rgba(248, 250, 252, 0.85)' : '#475569'}
+                  />
                 )}
               </TouchableOpacity>
             </View>
@@ -382,97 +401,108 @@ export default function MoneyManagerScreen() {
               <CurrencyDisplayer
                 amount={allTimeSummary.totalBalance}
                 currency={settings.currency}
-                isDark={true}
+                isDark={isDark}
                 privateMode={privateMode}
                 size="xl"
                 color={
-                  allTimeSummary.totalBalance >= 0 ? '#FFFFFF' : '#FB7185'
+                  allTimeSummary.totalBalance >= 0
+                    ? isDark
+                      ? '#FFFFFF'
+                      : '#0F172A'
+                    : isDark
+                      ? '#FB7185'
+                      : '#DC2626'
                 }
               />
               <TrendingValueChip
                 percentage={savingsPct}
                 afterText="saved"
-                isDark={true}
+                isDark={isDark}
               />
             </View>
           </View>
 
           <View style={styles.heroStatsRow}>
-            <View style={styles.heroStatGlass}>
+            <View
+              style={[
+                styles.heroStatGlass,
+                !isDark && {
+                  backgroundColor: '#F8FAFC',
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                },
+              ]}
+            >
               <View style={styles.heroStatTagRow}>
-                <View style={[styles.heroDot, { backgroundColor: '#34D399' }]} />
-                <Text style={styles.heroStatTitle}>
+                <View
+                  style={[
+                    styles.heroDot,
+                    { backgroundColor: isDark ? '#34D399' : '#059669' },
+                  ]}
+                />
+                <Text
+                  style={[
+                    styles.heroStatTitle,
+                    { color: isDark ? 'rgba(248, 250, 252, 0.7)' : '#475569' },
+                  ]}
+                >
                   INCOME ({timeRange.toUpperCase()})
                 </Text>
               </View>
               <CurrencyDisplayer
                 amount={periodSummary.totalIncome}
                 currency={settings.currency}
-                isDark={true}
+                isDark={isDark}
                 privateMode={privateMode}
                 size="md"
-                color="#34D399"
+                color={isDark ? '#34D399' : '#059669'}
               />
             </View>
 
-            <View style={styles.heroStatGlass}>
+            <View
+              style={[
+                styles.heroStatGlass,
+                !isDark && {
+                  backgroundColor: '#F8FAFC',
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                },
+              ]}
+            >
               <View style={styles.heroStatTagRow}>
-                <View style={[styles.heroDot, { backgroundColor: '#FB7185' }]} />
-                <Text style={styles.heroStatTitle}>
+                <View
+                  style={[
+                    styles.heroDot,
+                    { backgroundColor: isDark ? '#FB7185' : '#DC2626' },
+                  ]}
+                />
+                <Text
+                  style={[
+                    styles.heroStatTitle,
+                    { color: isDark ? 'rgba(248, 250, 252, 0.7)' : '#475569' },
+                  ]}
+                >
                   EXPENSES ({timeRange.toUpperCase()})
                 </Text>
               </View>
               <CurrencyDisplayer
                 amount={periodSummary.totalExpense}
                 currency={settings.currency}
-                isDark={true}
+                isDark={isDark}
                 privateMode={privateMode}
                 size="md"
-                color="#FB7185"
+                color={isDark ? '#FB7185' : '#DC2626'}
               />
             </View>
           </View>
 
-          {/* Translucent Period Selector */}
-          <View style={styles.periodTabsBar}>
-            {(
-              [
-                { key: 'daily', label: 'Day' },
-                { key: 'weekly', label: 'Week' },
-                { key: 'monthly', label: 'Month' },
-                { key: 'yearly', label: 'Year' },
-                { key: 'all', label: 'All' },
-              ] as { key: TimeRangeKey; label: string }[]
-            ).map((tab) => {
-              const active = timeRange === tab.key;
-              return (
-                <TouchableOpacity
-                  key={tab.key}
-                  onPress={() => setTimeRange(tab.key)}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: active }}
-                  accessibilityLabel={`Show ${tab.label} transactions`}
-                  style={[
-                    styles.periodTabBtn,
-                    active && styles.periodTabBtnActive,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.periodTabText,
-                      {
-                        color: active ? '#0F172A' : 'rgba(248,250,252,0.68)',
-                        fontWeight: active ? '800' : '600',
-                      },
-                    ]}
-                  >
-                    {tab.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
+          <HeroPillTabs
+            options={MONEY_PERIOD_TABS}
+            value={timeRange}
+            onChange={setTimeRange}
+            isDark={isDark}
+          />
+        </HeroCard>
 
         {/* Savings Goals Quick Access Card */}
         <TouchableOpacity
@@ -794,46 +824,43 @@ export default function MoneyManagerScreen() {
 
         {/* Date-Grouped Transaction Ledger */}
         {dateGroupedTransactions.length === 0 ? (
-          <View
-            style={[
-              styles.emptyCard,
-              { backgroundColor: theme.card, borderColor: theme.border },
-            ]}
-          >
-            <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
-              No matching transactions
-            </Text>
-            <Text style={[styles.emptySub, { color: theme.textMuted }]}>
-              {searchQuery ||
+          (() => {
+            const hasFilters =
+              searchQuery.trim().length > 0 ||
               selectedCategory !== 'All' ||
               typeFilter !== 'all' ||
               scopeFilter !== 'all' ||
-              timeRange !== 'all'
-                ? 'No transactions found with the active filters.'
-                : 'Tap "+ Income" or "+ Expense" above to record your first transaction.'}
-            </Text>
-            {(searchQuery.trim().length > 0 ||
-              selectedCategory !== 'All' ||
-              typeFilter !== 'all' ||
-              scopeFilter !== 'all' ||
-              timeRange !== 'all') && (
-              <TouchableOpacity
-                onPress={() => {
-                  setSearchQuery('');
-                  setSelectedCategory('All');
-                  setTypeFilter('all');
-                  setScopeFilter('all');
-                  setTimeRange('all');
-                }}
-                style={[
-                  styles.resetFilterBtn,
-                  { backgroundColor: palette.accent },
-                ]}
-              >
-                <Text style={styles.resetFilterBtnText}>Reset All Filters</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+              timeRange !== 'all';
+            return (
+              <EmptyState
+                isDark={isDark}
+                icon={<ArrowUpRight size={22} color={palette.accent} />}
+                accentColor={palette.accent}
+                title={
+                  hasFilters
+                    ? 'No matching transactions'
+                    : 'No transactions yet'
+                }
+                subtitle={
+                  hasFilters
+                    ? 'Try clearing your active search or period filters.'
+                    : 'Record your first income or expense to start tracking.'
+                }
+                actionLabel={hasFilters ? 'Reset Filters' : undefined}
+                onAction={
+                  hasFilters
+                    ? () => {
+                        setSearchQuery('');
+                        setSelectedCategory('All');
+                        setTypeFilter('all');
+                        setScopeFilter('all');
+                        setTimeRange('all');
+                      }
+                    : undefined
+                }
+              />
+            );
+          })()
         ) : (
           dateGroupedTransactions.map((group) => (
             <View
@@ -914,7 +941,13 @@ export default function MoneyManagerScreen() {
                       )}
                     </View>
 
-                    <View style={{ flex: 1 }}>
+                    <TouchableOpacity
+                      activeOpacity={0.76}
+                      onPress={() => handleOpenEdit(t)}
+                      style={{ flex: 1 }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Edit transaction ${t.title}`}
+                    >
                       <View
                         style={{
                           flexDirection: 'row',
@@ -983,7 +1016,7 @@ export default function MoneyManagerScreen() {
                           {t.description}
                         </Text>
                       ) : null}
-                    </View>
+                    </TouchableOpacity>
 
                     <View style={{ alignItems: 'flex-end' }}>
                       <Text
@@ -1002,20 +1035,11 @@ export default function MoneyManagerScreen() {
                       </Text>
                       <View style={styles.txnActionsRow}>
                         <TouchableOpacity
-                          onPress={() => handleOpenEdit(t)}
-                          style={styles.iconActionBtn}
-                          accessibilityRole="button"
-                          accessibilityLabel={`Edit transaction ${t.title}`}
-                          hitSlop={8}
-                        >
-                          <Edit3 size={14} color={theme.textMuted} />
-                        </TouchableOpacity>
-                        <TouchableOpacity
                           onPress={() => handleDelete(t)}
                           style={styles.iconActionBtn}
                           accessibilityRole="button"
                           accessibilityLabel={`Delete transaction ${t.title}`}
-                          hitSlop={8}
+                          hitSlop={10}
                         >
                           <Trash2 size={14} color="#EF4444" />
                         </TouchableOpacity>

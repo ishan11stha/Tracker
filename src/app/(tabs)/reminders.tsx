@@ -47,9 +47,10 @@ import {
 import { ReminderFormModal } from '../../components/ReminderFormModal';
 import { triggerImmediateReminderAlert } from '../../utils/notifications';
 import {
+  HeroCard,
   HeroPillTabs,
-  ObsidianHeroCard,
-} from '../../components/ui/ObsidianHero';
+} from '../../components/ui/HeroCard';
+import { EmptyState } from '../../components/ui/EmptyState';
 
 type ReminderTabKey = 'upcoming' | 'overdue' | 'completed' | 'calendar';
 
@@ -207,26 +208,89 @@ export default function RemindersScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Signature Obsidian Alert Summary + Tab Bar */}
-        <ObsidianHeroCard isDark={isDark} style={{ padding: 14 }}>
+        {/* Alert Summary + Tab Bar Hero Card */}
+        <HeroCard isDark={isDark} style={{ padding: 14 }}>
           <View style={styles.heroStatsRow}>
-            <View style={styles.heroStatGlass}>
-              <Text style={[styles.heroStatNum, { color: '#FB923C' }]}>
+            <View
+              style={[
+                styles.heroStatGlass,
+                !isDark && {
+                  backgroundColor: '#F8FAFC',
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.heroStatNum,
+                  { color: isDark ? '#FB923C' : '#EA580C' },
+                ]}
+              >
                 {categorized.upcoming.length}
               </Text>
-              <Text style={styles.heroStatLabel}>Upcoming</Text>
+              <Text
+                style={[
+                  styles.heroStatLabel,
+                  { color: isDark ? 'rgba(248, 250, 252, 0.68)' : '#475569' },
+                ]}
+              >
+                Upcoming
+              </Text>
             </View>
-            <View style={styles.heroStatGlass}>
-              <Text style={[styles.heroStatNum, { color: '#FB7185' }]}>
+            <View
+              style={[
+                styles.heroStatGlass,
+                !isDark && {
+                  backgroundColor: '#F8FAFC',
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.heroStatNum,
+                  { color: isDark ? '#FB7185' : '#DC2626' },
+                ]}
+              >
                 {categorized.overdue.length}
               </Text>
-              <Text style={styles.heroStatLabel}>Overdue</Text>
+              <Text
+                style={[
+                  styles.heroStatLabel,
+                  { color: isDark ? 'rgba(248, 250, 252, 0.68)' : '#475569' },
+                ]}
+              >
+                Overdue
+              </Text>
             </View>
-            <View style={styles.heroStatGlass}>
-              <Text style={[styles.heroStatNum, { color: '#34D399' }]}>
+            <View
+              style={[
+                styles.heroStatGlass,
+                !isDark && {
+                  backgroundColor: '#F8FAFC',
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.heroStatNum,
+                  { color: isDark ? '#34D399' : '#059669' },
+                ]}
+              >
                 {categorized.completed.length}
               </Text>
-              <Text style={styles.heroStatLabel}>Done</Text>
+              <Text
+                style={[
+                  styles.heroStatLabel,
+                  { color: isDark ? 'rgba(248, 250, 252, 0.68)' : '#475569' },
+                ]}
+              >
+                Done
+              </Text>
             </View>
           </View>
 
@@ -234,8 +298,9 @@ export default function RemindersScreen() {
             options={REMINDER_TABS}
             value={activeTab}
             onChange={setActiveTab}
+            isDark={isDark}
           />
-        </ObsidianHeroCard>
+        </HeroCard>
 
         {/* Interactive Embedded Nepali Calendar View when "Calendar" tab is active */}
         {activeTab === 'calendar' && (
@@ -395,21 +460,18 @@ export default function RemindersScreen() {
 
         {/* Reminders List */}
         {displayedList.length === 0 ? (
-          <View
-            style={[
-              styles.emptyCard,
-              { backgroundColor: theme.card, borderColor: theme.border },
-            ]}
-          >
-            <Bell size={28} color={palette.accent} />
-            <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
-              No reminders in this view
-            </Text>
-            <Text style={[styles.emptySub, { color: theme.textSecondary }]}>
-              Create a reminder with Nepali Bikram Sambat date & Nepal Standard
-              Time notification.
-            </Text>
-          </View>
+          <EmptyState
+            isDark={isDark}
+            icon={<Bell size={22} color={palette.accent} />}
+            accentColor={palette.accent}
+            title="No reminders in this view"
+            subtitle="Set an NPT alarm or repeating schedule so you never miss a beat."
+            actionLabel="Add Reminder"
+            onAction={() => {
+              setEditingReminder(null);
+              setFormVisible(true);
+            }}
+          />
         ) : (
           displayedList.map((rem) => {
             const bs = adToBs(rem.dateISO);
@@ -455,7 +517,16 @@ export default function RemindersScreen() {
                     )}
                   </TouchableOpacity>
 
-                  <View style={{ flex: 1 }}>
+                  <TouchableOpacity
+                    activeOpacity={0.78}
+                    onPress={() => {
+                      setEditingReminder(rem);
+                      setFormVisible(true);
+                    }}
+                    style={{ flex: 1 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Edit reminder ${rem.title}`}
+                  >
                     <View style={styles.titlePriorityRow}>
                       <Text
                         style={[
@@ -539,7 +610,7 @@ export default function RemindersScreen() {
                         onPress={() => {
                           void triggerImmediateReminderAlert(
                             rem,
-                            settings.alarmRepeatCount || 3
+                            settings.alarmRepeatCount || 1
                           );
                         }}
                         accessibilityRole="button"
@@ -602,27 +673,15 @@ export default function RemindersScreen() {
                         </Text>
                       </View>
                     )}
-                  </View>
+                  </TouchableOpacity>
 
                   <View style={styles.actionsCol}>
-                    <TouchableOpacity
-                      onPress={() => {
-                        setEditingReminder(rem);
-                        setFormVisible(true);
-                      }}
-                      style={styles.iconBtn}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Edit reminder ${rem.title}`}
-                      hitSlop={8}
-                    >
-                      <Edit3 size={15} color={theme.textSecondary} />
-                    </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => handleDelete(rem)}
                       style={styles.iconBtn}
                       accessibilityRole="button"
                       accessibilityLabel={`Delete reminder ${rem.title}`}
-                      hitSlop={8}
+                      hitSlop={10}
                     >
                       <Trash2 size={15} color="#DC2626" />
                     </TouchableOpacity>

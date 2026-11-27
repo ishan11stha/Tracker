@@ -35,6 +35,8 @@ import {
   CurrencyDisplayer,
 } from '../../components/finance/FinanceDisplay';
 import { CategoryDonutChart } from '../../components/finance/FinanceCharts';
+import { HeroCard } from '../../components/ui/HeroCard';
+import { EmptyState } from '../../components/ui/EmptyState';
 
 const STATUS_BADGE_COLORS: Record<
   ItemStatus,
@@ -164,56 +166,123 @@ export default function ItemTrackerScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Signature Obsidian Asset Portfolio Hero Card */}
-        <View
-          style={[
-            styles.summaryCard,
-            {
-              backgroundColor: isDark ? '#151F32' : '#0F172A',
-              borderColor: isDark ? '#26344E' : '#1E293B',
-            },
-          ]}
-        >
+        {/* Asset Portfolio Hero Card */}
+        <HeroCard isDark={isDark}>
           <View style={styles.summaryTopRow}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.summaryLabel}>ASSET VALUATION</Text>
+              <Text
+                style={[
+                  styles.summaryLabel,
+                  { color: isDark ? 'rgba(248, 250, 252, 0.65)' : '#64748B' },
+                ]}
+              >
+                ASSET VALUATION
+              </Text>
               <CurrencyDisplayer
                 amount={stats.totalValue}
                 currency={settings.currency}
-                isDark={true}
+                isDark={isDark}
                 privateMode={privateMode}
                 size="xl"
-                color="#FFFFFF"
+                color={isDark ? '#FFFFFF' : '#0F172A'}
               />
             </View>
-            <View style={styles.iconBadge}>
-              <Package size={20} color="#60A5FA" />
+            <View
+              style={[
+                styles.iconBadge,
+                !isDark && { backgroundColor: '#EFF6FF' },
+              ]}
+            >
+              <Package size={20} color={isDark ? '#60A5FA' : '#2563EB'} />
             </View>
           </View>
 
           <View style={styles.metricsRow}>
-            <View style={styles.metricBox}>
-              <Text style={[styles.metricNum, { color: '#60A5FA' }]}>
+            <View
+              style={[
+                styles.metricBox,
+                !isDark && {
+                  backgroundColor: '#F8FAFC',
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.metricNum,
+                  { color: isDark ? '#60A5FA' : '#2563EB' },
+                ]}
+              >
                 {stats.totalUnits}
               </Text>
-              <Text style={styles.metricText}>Units</Text>
+              <Text
+                style={[
+                  styles.metricText,
+                  { color: isDark ? 'rgba(248, 250, 252, 0.68)' : '#475569' },
+                ]}
+              >
+                Units
+              </Text>
             </View>
 
-            <View style={styles.metricBox}>
-              <Text style={[styles.metricNum, { color: '#FB923C' }]}>
+            <View
+              style={[
+                styles.metricBox,
+                !isDark && {
+                  backgroundColor: '#F8FAFC',
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.metricNum,
+                  { color: isDark ? '#FB923C' : '#EA580C' },
+                ]}
+              >
                 {stats.lentCount}
               </Text>
-              <Text style={styles.metricText}>Lent</Text>
+              <Text
+                style={[
+                  styles.metricText,
+                  { color: isDark ? 'rgba(248, 250, 252, 0.68)' : '#475569' },
+                ]}
+              >
+                Lent
+              </Text>
             </View>
 
-            <View style={styles.metricBox}>
-              <Text style={[styles.metricNum, { color: '#FBBF24' }]}>
+            <View
+              style={[
+                styles.metricBox,
+                !isDark && {
+                  backgroundColor: '#F8FAFC',
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.metricNum,
+                  { color: isDark ? '#FBBF24' : '#D97706' },
+                ]}
+              >
                 {stats.borrowedCount}
               </Text>
-              <Text style={styles.metricText}>Borrowed</Text>
+              <Text
+                style={[
+                  styles.metricText,
+                  { color: isDark ? 'rgba(248, 250, 252, 0.68)' : '#475569' },
+                ]}
+              >
+                Borrowed
+              </Text>
             </View>
           </View>
-        </View>
+        </HeroCard>
 
         {/* Monekin Asset Valuation Contribution Donut Card (Only shown when valued items exist) */}
         {assetCategoryDistribution.length > 0 && (
@@ -299,32 +368,33 @@ export default function ItemTrackerScreen() {
 
         {/* Items List */}
         {filteredItems.length === 0 ? (
-          <View
-            style={[
-              styles.emptyCard,
-              { backgroundColor: theme.card, borderColor: theme.border },
-            ]}
-          >
-            <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
-              No items found
-            </Text>
-            <Text style={[styles.emptySub, { color: theme.textMuted }]}>
-              {searchQuery || statusFilter !== 'All'
-                ? 'No items match your active search or status filter.'
-                : 'Tap "Add Item" to record electronics, books, documents, or lent belongings.'}
-            </Text>
-            {(searchQuery.trim().length > 0 || statusFilter !== 'All') && (
-              <TouchableOpacity
-                onPress={() => {
-                  setSearchQuery('');
-                  setStatusFilter('All');
+          (() => {
+            const hasFilters =
+              searchQuery.trim().length > 0 || statusFilter !== 'All';
+            return (
+              <EmptyState
+                isDark={isDark}
+                icon={<Package size={22} color={palette.accent} />}
+                accentColor={palette.accent}
+                title={hasFilters ? 'No matching items' : 'No items yet'}
+                subtitle={
+                  hasFilters
+                    ? 'Try clearing your search or status filter.'
+                    : 'Track electronics, books, documents, or lent belongings.'
+                }
+                actionLabel={hasFilters ? 'Reset Filters' : 'Add Item'}
+                onAction={() => {
+                  if (hasFilters) {
+                    setSearchQuery('');
+                    setStatusFilter('All');
+                  } else {
+                    setEditingItem(null);
+                    setFormVisible(true);
+                  }
                 }}
-                style={[styles.resetFilterBtn, { backgroundColor: palette.accent }]}
-              >
-                <Text style={styles.resetFilterBtnText}>Reset Filters</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+              />
+            );
+          })()
         ) : (
           filteredItems.map((item) => {
             const badge = STATUS_BADGE_COLORS[item.status];
@@ -337,7 +407,16 @@ export default function ItemTrackerScreen() {
                   { backgroundColor: theme.card, borderColor: theme.border },
                 ]}
               >
-                <View style={styles.itemTopRow}>
+                <TouchableOpacity
+                  activeOpacity={0.78}
+                  onPress={() => {
+                    setEditingItem(item);
+                    setFormVisible(true);
+                  }}
+                  style={styles.itemTopRow}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Edit ${item.name}`}
+                >
                   {item.imageUri ? (
                     <Image
                       source={{ uri: item.imageUri }}
@@ -400,7 +479,7 @@ export default function ItemTrackerScreen() {
                       </Text>
                     </View>
                   </View>
-                </View>
+                </TouchableOpacity>
 
                 {item.description ? (
                   <Text
@@ -459,22 +538,6 @@ export default function ItemTrackerScreen() {
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                      onPress={() => {
-                        setEditingItem(item);
-                        setFormVisible(true);
-                      }}
-                      style={[
-                        styles.iconBtn,
-                        { backgroundColor: theme.surfaceContainerHigh },
-                      ]}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Edit ${item.name}`}
-                      hitSlop={8}
-                    >
-                      <Edit3 size={15} color={theme.textSecondary} />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
                       onPress={() => handleDelete(item)}
                       style={[
                         styles.iconBtn,
@@ -482,7 +545,7 @@ export default function ItemTrackerScreen() {
                       ]}
                       accessibilityRole="button"
                       accessibilityLabel={`Delete ${item.name}`}
-                      hitSlop={8}
+                      hitSlop={10}
                     >
                       <Trash2 size={15} color="#EF4444" />
                     </TouchableOpacity>

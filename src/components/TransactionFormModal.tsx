@@ -185,6 +185,16 @@ export const TransactionFormModal: React.FC<TransactionFormModalProps> = ({
             { backgroundColor: theme.card, borderColor: theme.border },
           ]}
         >
+          <View
+            style={{
+              width: 38,
+              height: 4,
+              borderRadius: 2,
+              alignSelf: 'center',
+              marginBottom: 10,
+              backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : '#CBD5E1',
+            }}
+          />
           {/* Header */}
           <View style={styles.headerRow}>
             <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>

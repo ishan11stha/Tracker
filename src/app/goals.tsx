@@ -36,6 +36,8 @@ import {
   SavingsGoalFormModal,
   renderGoalIcon,
 } from '../components/SavingsGoalFormModal';
+import { HeroCard, HeroPillTabs } from '../components/ui/HeroCard';
+import { EmptyState } from '../components/ui/EmptyState';
 
 function getOverdueLabel(targetDateISO: string, todayISO: string): string | null {
   if (!targetDateISO || targetDateISO >= todayISO) return null;
@@ -187,140 +189,107 @@ export default function SavingsGoalsScreen() {
           Savings Goals
         </Text>
 
-        {/* Side-by-Side Saved & Target Summary Cards */}
-        <View style={styles.summaryPairRow}>
-          <View
-            style={[
-              styles.summaryBox,
-              { backgroundColor: theme.card, borderColor: theme.border },
-            ]}
-          >
-            <Text style={[styles.summaryLabel, { color: theme.textMuted }]}>
-              Saved
-            </Text>
-            <Text
+        {/* Unified Hero Card: Saved & Target Summary + Active / Achieved Switcher */}
+        <HeroCard isDark={isDark}>
+          <View style={styles.summaryPairRow}>
+            <View
               style={[
-                styles.summaryValue,
-                { color: isDark ? '#34D399' : '#10B981' },
+                styles.summaryBox,
+                isDark
+                  ? {
+                      backgroundColor: 'rgba(255, 255, 255, 0.07)',
+                      borderColor: 'transparent',
+                    }
+                  : { backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' },
               ]}
-              numberOfLines={1}
             >
-              {formatCurrency(totalSaved, settings.currency, true, privateMode)}
-            </Text>
+              <Text
+                style={[
+                  styles.summaryLabel,
+                  { color: isDark ? 'rgba(248, 250, 252, 0.68)' : '#64748B' },
+                ]}
+              >
+                Saved
+              </Text>
+              <Text
+                style={[
+                  styles.summaryValue,
+                  { color: isDark ? '#34D399' : '#059669' },
+                ]}
+                numberOfLines={1}
+              >
+                {formatCurrency(totalSaved, settings.currency, true, privateMode)}
+              </Text>
+            </View>
+
+            <View
+              style={[
+                styles.summaryBox,
+                isDark
+                  ? {
+                      backgroundColor: 'rgba(255, 255, 255, 0.07)',
+                      borderColor: 'transparent',
+                    }
+                  : { backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.summaryLabel,
+                  { color: isDark ? 'rgba(248, 250, 252, 0.68)' : '#64748B' },
+                ]}
+              >
+                Target
+              </Text>
+              <Text
+                style={[
+                  styles.summaryValue,
+                  { color: isDark ? '#60A5FA' : '#2563EB' },
+                ]}
+                numberOfLines={1}
+              >
+                {formatCurrency(totalTarget, settings.currency, true, privateMode)}
+              </Text>
+            </View>
           </View>
 
-          <View
-            style={[
-              styles.summaryBox,
-              { backgroundColor: theme.card, borderColor: theme.border },
+          <HeroPillTabs
+            options={[
+              { key: 'active', label: `Active (${activeGoals.length})` },
+              { key: 'achieved', label: `Achieved (${achievedGoals.length})` },
             ]}
-          >
-            <Text style={[styles.summaryLabel, { color: theme.textMuted }]}>
-              Target
-            </Text>
-            <Text
-              style={[
-                styles.summaryValue,
-                { color: isDark ? '#60A5FA' : '#2563EB' },
-              ]}
-              numberOfLines={1}
-            >
-              {formatCurrency(totalTarget, settings.currency, true, privateMode)}
-            </Text>
-          </View>
-        </View>
-
-        {/* Active / Achieved Tabs */}
-        <View style={styles.tabsRow}>
-          <TouchableOpacity
-            onPress={() => setActiveTab('active')}
-            style={[
-              styles.tabPill,
-              {
-                backgroundColor:
-                  activeTab === 'active'
-                    ? theme.card
-                    : isDark
-                      ? '#131A29'
-                      : '#EEF2F6',
-                borderColor:
-                  activeTab === 'active' ? theme.border : 'transparent',
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.tabPillText,
-                {
-                  color:
-                    activeTab === 'active'
-                      ? theme.textPrimary
-                      : theme.textMuted,
-                },
-              ]}
-            >
-              Active{' '}
-              <Text style={{ color: '#2563EB', fontWeight: '800' }}>
-                {activeGoals.length}
-              </Text>
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => setActiveTab('achieved')}
-            style={[
-              styles.tabPill,
-              {
-                backgroundColor:
-                  activeTab === 'achieved'
-                    ? theme.card
-                    : isDark
-                      ? '#131A29'
-                      : '#EEF2F6',
-                borderColor:
-                  activeTab === 'achieved' ? theme.border : 'transparent',
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.tabPillText,
-                {
-                  color:
-                    activeTab === 'achieved'
-                      ? theme.textPrimary
-                      : theme.textMuted,
-                },
-              ]}
-            >
-              Achieved{' '}
-              <Text style={{ color: '#10B981', fontWeight: '800' }}>
-                {achievedGoals.length}
-              </Text>
-            </Text>
-          </TouchableOpacity>
-        </View>
+            value={activeTab}
+            onChange={setActiveTab}
+            isDark={isDark}
+          />
+        </HeroCard>
 
         {/* Goals List */}
         {displayedGoals.length === 0 ? (
-          <View
-            style={[
-              styles.emptyCard,
-              { backgroundColor: theme.card, borderColor: theme.border },
-            ]}
-          >
-            <Target size={26} color="#10B981" />
-            <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
-              {activeTab === 'active'
+          <EmptyState
+            isDark={isDark}
+            icon={<Target size={22} color="#10B981" />}
+            accentColor="#10B981"
+            title={
+              activeTab === 'active'
                 ? 'No active savings goals'
-                : 'No achieved goals yet'}
-            </Text>
-            <Text style={[styles.emptySub, { color: theme.textMuted }]}>
-              {activeTab === 'active'
-                ? 'Tap "+ Add Goal" above to start saving for a trip, emergency fund, or new device.'
-                : 'Keep adding savings to your active goals to celebrate them here.'}
-            </Text>
-          </View>
+                : 'No achieved goals yet'
+            }
+            subtitle={
+              activeTab === 'active'
+                ? 'Start saving for a trip, emergency fund, or new device.'
+                : 'Keep adding savings to your active goals to celebrate them here.'
+            }
+            actionLabel={activeTab === 'active' ? 'Add Goal' : undefined}
+            onAction={
+              activeTab === 'active'
+                ? () => {
+                    setEditingGoal(null);
+                    setFormVisible(true);
+                  }
+                : undefined
+            }
+          />
         ) : (
           displayedGoals.map((goal) => {
             const pct = Math.min(

@@ -70,7 +70,7 @@ export default function SettingsScreen() {
     setNameInput(settings.userName);
   }, [settings.userName]);
 
-  const activeControlFill = isDark ? '#2563EB' : '#0F3375';
+  const activeControlFill = isDark ? '#38BDF8' : '#0F172A';
 
   const handleSaveProfile = async () => {
     if (!nameInput.trim()) {
@@ -90,6 +90,7 @@ export default function SettingsScreen() {
     try {
       const payload = getFullBackupPayload();
       const uri = await exportVaultDataToCSV(payload);
+      await updateSettings({ lastBackupAt: new Date().toISOString() });
       Alert.alert(
         'CSV Export Complete',
         `Your VAULT records have been exported to:\n${uri}`
@@ -106,6 +107,7 @@ export default function SettingsScreen() {
     try {
       const payload = getFullBackupPayload();
       const uri = await exportVaultBackupJSON(payload);
+      await updateSettings({ lastBackupAt: new Date().toISOString() });
       Alert.alert(
         'Backup Created',
         `Full SQLite JSON backup saved:\n${uri}`
@@ -117,6 +119,24 @@ export default function SettingsScreen() {
       );
     }
   };
+
+  const lastBackupMeta = (() => {
+    if (!settings.lastBackupAt) {
+      return { label: 'Not backed up yet', isStale: true };
+    }
+    const ts = Date.parse(settings.lastBackupAt);
+    if (Number.isNaN(ts)) {
+      return { label: 'Not backed up yet', isStale: true };
+    }
+    const diffDays = Math.max(0, Math.floor((Date.now() - ts) / 86_400_000));
+    if (diffDays === 0) return { label: 'Last backup: Today', isStale: false };
+    if (diffDays === 1)
+      return { label: 'Last backup: Yesterday', isStale: false };
+    return {
+      label: `Last backup: ${diffDays} days ago`,
+      isStale: diffDays >= 14,
+    };
+  })();
 
   const handleRestoreJSON = async () => {
     try {
@@ -202,12 +222,13 @@ export default function SettingsScreen() {
     <SafeAreaView
       style={[
         styles.safeArea,
-        { backgroundColor: isDark ? '#0F172A' : '#F5F6F8' },
+        { backgroundColor: isDark ? '#0B0F19' : '#F8FAFC' },
       ]}
       edges={['top']}
     >
       <ScrollView
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.scrollContent}
       >
         {/* Top Bar */}
@@ -664,7 +685,7 @@ export default function SettingsScreen() {
 
             <View style={styles.SegmentRow}>
               {([1, 2, 3, 5] as const).map((cnt) => {
-                const active = (settings.alarmRepeatCount || 3) === cnt;
+                const active = (settings.alarmRepeatCount || 1) === cnt;
                 return (
                   <TouchableOpacity
                     key={cnt}
@@ -693,7 +714,7 @@ export default function SettingsScreen() {
             <TouchableOpacity
               onPress={() => {
                 const now = getNowInNPT();
-                const repeatCount = settings.alarmRepeatCount || 3;
+                const repeatCount = settings.alarmRepeatCount || 1;
                 void triggerImmediateReminderAlert(
                   {
                     id: 'test_alert',
@@ -719,7 +740,7 @@ export default function SettingsScreen() {
             >
               <Volume2 size={15} color="#EA580C" />
               <Text style={styles.testAlertBtnText}>
-                Test Alarm & Vibrate ({settings.alarmRepeatCount || 3}x)
+                Test Alarm & Vibrate ({settings.alarmRepeatCount || 1}x)
               </Text>
             </TouchableOpacity>
           </View>
@@ -744,6 +765,45 @@ export default function SettingsScreen() {
             {savingsGoals.length} goals • {items.length} items •{' '}
             {activities.length} habits • {reminders.length} reminders
           </Text>
+
+          <View
+            style={[
+              styles.backupStatusPill,
+              {
+                backgroundColor: lastBackupMeta.isStale
+                  ? isDark
+                    ? 'rgba(245, 158, 11, 0.14)'
+                    : '#FFFBEB'
+                  : isDark
+                    ? 'rgba(16, 185, 129, 0.14)'
+                    : '#ECFDF5',
+                borderColor: lastBackupMeta.isStale
+                  ? isDark
+                    ? 'rgba(245, 158, 11, 0.35)'
+                    : '#FDE68A'
+                  : isDark
+                    ? 'rgba(16, 185, 129, 0.35)'
+                    : '#A7F3D0',
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.backupStatusText,
+                {
+                  color: lastBackupMeta.isStale
+                    ? isDark
+                      ? '#FBBF24'
+                      : '#B45309'
+                    : isDark
+                      ? '#34D399'
+                      : '#047857',
+                },
+              ]}
+            >
+              {lastBackupMeta.label}
+            </Text>
+          </View>
 
           <TouchableOpacity
             onPress={handleExportCSV}
@@ -906,15 +966,15 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: LAYOUT.maxContentWidth,
     alignSelf: 'center',
-    paddingHorizontal: 18,
-    paddingTop: 12,
-    paddingBottom: 36,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 26,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   backBtn: {
     width: 42,
@@ -1028,7 +1088,19 @@ const styles = StyleSheet.create({
   dbStatsText: {
     fontSize: 12,
     fontWeight: '600',
+    marginBottom: 8,
+  },
+  backupStatusPill: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    borderWidth: 1,
     marginBottom: 12,
+  },
+  backupStatusText: {
+    fontSize: 11.5,
+    fontWeight: '800',
   },
   dataActionBtn: {
     flexDirection: 'row',

@@ -39,7 +39,8 @@ import { ActivityFormModal } from '../../components/ActivityFormModal';
 import { ReminderFormModal } from '../../components/ReminderFormModal';
 import { NepaliCalendarModal } from '../../components/NepaliCalendarModal';
 import { useShallow } from 'zustand/react/shallow';
-import { ScreenShell } from '../../components/ui/ObsidianHero';
+import { ScreenShell } from '../../components/ui/HeroCard';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { DailyPulseHero } from '../../components/home/DailyPulseHero';
 import {
   TransactionType,
@@ -391,7 +392,7 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {/* 2. SIGNATURE OBSIDIAN DAILY PULSE COMMAND CARD */}
+        {/* 2. DAILY PULSE COMMAND HERO CARD */}
         <DailyPulseHero
           isDark={isDark}
           greetingText={greetingText}
@@ -676,9 +677,14 @@ export default function DashboardScreen() {
 
           {feedTab === 'recent' ? (
             recentTransactions.length === 0 ? (
-              <Text style={[styles.emptyText, { color: theme.textMuted }]}>
-                No movements yet. Tap the green or red icon above to log one.
-              </Text>
+              <EmptyState
+                isDark={isDark}
+                compact
+                icon={<ArrowUpRight size={20} color="#EF4444" />}
+                accentColor="#EF4444"
+                title="No movements yet"
+                subtitle="Use the quick icons or voice bar above to log one."
+              />
             ) : (
               recentTransactions.map((t, idx) => {
                 const isIncome = t.type === 'income';
@@ -748,9 +754,16 @@ export default function DashboardScreen() {
               })
             )
           ) : upcomingScheduleCount === 0 ? (
-            <Text style={[styles.emptyText, { color: theme.textMuted }]}>
-              You're all caught up for today.
-            </Text>
+            <EmptyState
+              isDark={isDark}
+              compact
+              icon={<Bell size={20} color="#EA580C" />}
+              accentColor="#EA580C"
+              title="All caught up for today"
+              subtitle="Add a habit or reminder to keep your day on track."
+              actionLabel="Add Reminder"
+              onAction={() => setReminderModalVisible(true)}
+            />
           ) : (
             <>
               {pendingReminders.slice(0, 3).map((rem, idx) => (

@@ -3,20 +3,16 @@
     "name": "VAULT",
     "slug": "vault-personal-tracker",
     "scheme": "vault",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "platforms": [
       "android"
     ],
-    "androidStatusBar": {
-      "backgroundColor": "#F8FAFC",
-      "barStyle": "dark-content"
-    },
     "android": {
       "package": "com.vault.lifetracker",
-      "versionCode": 2,
+      "versionCode": 3,
       "softwareKeyboardLayoutMode": "pan",
       "permissions": [
         "android.permission.RECEIVE_BOOT_COMPLETED",
@@ -39,8 +35,8 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/icon.png",
-          "color": "#EA580C"
+          "icon": "./assets/android-icon-monochrome.png",
+          "color": "#0F172A"
         }
       ],
       [

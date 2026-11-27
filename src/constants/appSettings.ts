@@ -13,7 +13,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   preferredCalendar: 'BS',
   timeFormat: '12h',
   notificationsEnabled: true,
-  alarmRepeatCount: 3,
+  alarmRepeatCount: 1,
   theme: 'dark',
   privateMode: false,
 };

@@ -1,10 +1,48 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
-import { ReminderAlertMode, ReminderItem } from '../types';
-import { adToBs, formatBSDateNepali } from './nepaliDate';
+import {
+  ReminderAlertMode,
+  ReminderItem,
+  formatRecurrenceLabel,
+} from '../types';
+import { formatTimeString } from './nepaliDate';
 import { computeNextOccurrenceDate, getNPTTargetDate } from './dateRecurrence';
 
 export { computeNextOccurrenceDate, getNPTTargetDate };
+
+function buildCleanNotificationContent(
+  reminder: Pick<
+    ReminderItem,
+    'id' | 'title' | 'description' | 'dateISO' | 'timeString' | 'priority' | 'alertMode'
+  > & { recurrence?: ReminderItem['recurrence'] },
+  alertMode: ReminderAlertMode,
+  safeCount: number
+) {
+  const time12 = formatTimeString(reminder.timeString, '12h');
+  const recurText =
+    reminder.recurrence && reminder.recurrence !== 'none'
+      ? ` • ${formatRecurrenceLabel(reminder.recurrence)}`
+      : '';
+  const descPrefix = reminder.description?.trim()
+    ? `${reminder.description.trim()} • `
+    : '';
+
+  return {
+    title: reminder.title,
+    subtitle: 'VAULT',
+    body: `${descPrefix}${time12} NPT${recurText}`,
+    data: {
+      reminderId: reminder.id,
+      priority: reminder.priority,
+      alertMode,
+      repeatCount: safeCount,
+      route: '/(tabs)/reminders',
+    },
+    sound: alertMode === 'vibrate' ? false : 'default',
+    vibrate: alertMode === 'alarm' ? [] : SINGLE_BURST_VIBRATION,
+    priority: Notifications.AndroidNotificationPriority.MAX,
+  };
+}
 
 /**
  * Builds an Android vibration pattern with `count` strong pulses.
@@ -138,7 +176,7 @@ export async function cancelAllScheduledReminderNotifications(): Promise<void> {
 export async function scheduleReminderNotification(
   reminder: ReminderItem,
   enabled = true,
-  repeatCount = 3
+  repeatCount = 1
 ): Promise<string> {
   if (!enabled || reminder.isCompleted) {
     return '';
@@ -163,41 +201,18 @@ export async function scheduleReminderNotification(
       return '';
     }
 
-    const bs = adToBs(reminder.dateISO);
-    const bsFormatted = formatBSDateNepali(bs, false);
     const alertMode: ReminderAlertMode = reminder.alertMode || 'both';
-    const modePrefix =
-      alertMode === 'alarm'
-        ? '⏰ ALARM'
-        : alertMode === 'vibrate'
-          ? '📳 VIBRATE'
-          : '⏰ ALARM & VIBRATE';
     const channelId =
       Platform.OS === 'android'
         ? getNotificationChannelId(alertMode, safeCount)
         : undefined;
+    const content = buildCleanNotificationContent(reminder, alertMode, safeCount);
 
     const scheduledIds: string[] = [];
     for (let i = 0; i < safeCount; i++) {
       const burstDate = new Date(triggerDate.getTime() + i * 5000);
       const id = await Notifications.scheduleNotificationAsync({
-        content: {
-          title: `${modePrefix} • ${reminder.title}`,
-          body: `${
-            reminder.description ? reminder.description + ' • ' : ''
-          }${bsFormatted} (${reminder.timeString} NPT)${
-            safeCount > 1 ? ` [${i + 1}/${safeCount}]` : ''
-          }`,
-          data: {
-            reminderId: reminder.id,
-            priority: reminder.priority,
-            alertMode,
-            repeatCount: safeCount,
-          },
-          sound: alertMode === 'vibrate' ? false : 'default',
-          vibrate: alertMode === 'alarm' ? [] : SINGLE_BURST_VIBRATION,
-          priority: Notifications.AndroidNotificationPriority.MAX,
-        },
+        content,
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,
           date: burstDate,
@@ -221,7 +236,7 @@ export async function triggerImmediateReminderAlert(
     ReminderItem,
     'id' | 'title' | 'description' | 'dateISO' | 'timeString' | 'priority' | 'alertMode'
   >,
-  repeatCount = 3
+  repeatCount = 1
 ): Promise<void> {
   const safeCount = Math.max(1, Math.min(10, Math.round(repeatCount)));
   const alertMode: ReminderAlertMode = reminder.alertMode || 'both';
@@ -230,38 +245,15 @@ export async function triggerImmediateReminderAlert(
     const hasPerm = await requestNotificationPermissions(safeCount);
     if (!hasPerm) return;
 
-    const bs = adToBs(reminder.dateISO);
-    const bsFormatted = formatBSDateNepali(bs, false);
-    const modePrefix =
-      alertMode === 'alarm'
-        ? '⏰ ALARM'
-        : alertMode === 'vibrate'
-          ? '📳 VIBRATE'
-          : '⏰ ALARM & VIBRATE';
     const channelId =
       Platform.OS === 'android'
         ? getNotificationChannelId(alertMode, safeCount)
         : undefined;
+    const content = buildCleanNotificationContent(reminder, alertMode, safeCount);
 
     for (let i = 0; i < safeCount; i++) {
       await Notifications.scheduleNotificationAsync({
-        content: {
-          title: `${modePrefix} • ${reminder.title}`,
-          body: `${
-            reminder.description ? reminder.description + ' • ' : ''
-          }${bsFormatted} (${reminder.timeString} NPT)${
-            safeCount > 1 ? ` [${i + 1}/${safeCount}]` : ''
-          }`,
-          data: {
-            reminderId: reminder.id,
-            priority: reminder.priority,
-            alertMode,
-            repeatCount: safeCount,
-          },
-          sound: alertMode === 'vibrate' ? false : 'default',
-          vibrate: alertMode === 'alarm' ? [] : SINGLE_BURST_VIBRATION,
-          priority: Notifications.AndroidNotificationPriority.MAX,
-        },
+        content,
         trigger:
           Platform.OS === 'android'
             ? {

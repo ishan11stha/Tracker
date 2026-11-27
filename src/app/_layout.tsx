@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
+import * as Notifications from 'expo-notifications';
 import {
   SafeAreaProvider,
   initialWindowMetrics,
@@ -15,6 +16,7 @@ import { AppErrorBoundary } from '../components/AppErrorBoundary';
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
+  const router = useRouter();
   const { isHydrated, hydrateFromDB, themeMode, error, clearError } =
     useVaultStore(
       useShallow((s) => ({
@@ -37,6 +39,39 @@ export default function RootLayout() {
       SplashScreen.hideAsync().catch(() => {});
     }
   }, [isHydrated]);
+
+  // Tap-to-Open Reminders when the user taps a VAULT Android notification
+  useEffect(() => {
+    if (!isHydrated) return;
+    let active = true;
+
+    const navigateFromResponse = (
+      response: Notifications.NotificationResponse | null
+    ) => {
+      if (!active || !response) return;
+      const route = response.notification.request.content.data?.route;
+      if (typeof route === 'string' && route.startsWith('/')) {
+        router.push(route as '/(tabs)/reminders');
+      } else {
+        router.push('/(tabs)/reminders');
+      }
+    };
+
+    Notifications.getLastNotificationResponseAsync()
+      .then((res) => {
+        if (res) navigateFromResponse(res);
+      })
+      .catch(() => {});
+
+    const sub = Notifications.addNotificationResponseReceivedListener((res) => {
+      navigateFromResponse(res);
+    });
+
+    return () => {
+      active = false;
+      sub.remove();
+    };
+  }, [isHydrated, router]);
 
   useEffect(() => {
     if (!error) return;

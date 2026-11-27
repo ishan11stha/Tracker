@@ -59,6 +59,7 @@ import {
 } from '../utils/accountBalances';
 import { DEFAULT_SETTINGS } from '../constants/appSettings';
 import { deletePersistedItemImage } from '../utils/itemImages';
+import { triggerLightHaptic } from '../utils/haptics';
 
 export {
   AccountSummaryGrouping,
@@ -205,7 +206,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
 
       // Ensure active recurring/upcoming reminders have up-to-date Android notifications queued
       if (settings.notificationsEnabled && reminders.some((r) => !r.isCompleted)) {
-        const repeatCount = settings.alarmRepeatCount || 3;
+        const repeatCount = settings.alarmRepeatCount || 1;
         void (async () => {
           await cancelAllScheduledReminderNotifications();
           const refreshed: ReminderItem[] = [];
@@ -267,7 +268,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
 
     if (notifToggled || (repeatChanged && nextSettings.notificationsEnabled)) {
       try {
-        const repeatCount = nextSettings.alarmRepeatCount || 3;
+        const repeatCount = nextSettings.alarmRepeatCount || 1;
         // Wipe all existing scheduled notifications first so stale bursts from previous settings never linger
         await cancelAllScheduledReminderNotifications();
         if (nextSettings.notificationsEnabled) {
@@ -576,7 +577,8 @@ export const useVaultStore = create<VaultState>((set, get) => ({
       };
     }
 
-    // Optimistic UI update so tapping a habit feels instant (0ms)
+    // Optimistic UI update + crisp tactile tick so tapping a habit feels instant (0ms)
+    triggerLightHaptic();
     set((state) => ({
       activities: state.activities.map((a) => (a.id === id ? updated : a)),
       error: null,
@@ -628,7 +630,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
       const notifId = await scheduleReminderNotification(
         draft,
         get().settings.notificationsEnabled,
-        get().settings.alarmRepeatCount || 3
+        get().settings.alarmRepeatCount || 1
       );
       const finalReminder: ReminderItem = {
         ...draft,
@@ -665,7 +667,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
       const notifId = await scheduleReminderNotification(
         draft,
         get().settings.notificationsEnabled,
-        get().settings.alarmRepeatCount || 3
+        get().settings.alarmRepeatCount || 1
       );
       const updated: ReminderItem = {
         ...draft,
@@ -708,7 +710,8 @@ export const useVaultStore = create<VaultState>((set, get) => ({
           completedDates: nextDates,
           updatedAt: new Date().toISOString(),
         };
-        // Optimistic UI update so tapping a repeating reminder feels instant
+        // Optimistic UI update + crisp tactile tick so tapping a repeating reminder feels instant
+        triggerLightHaptic();
         set((state) => ({
           reminders: state.reminders.map((r) => (r.id === id ? updated : r)),
           error: null,
@@ -738,7 +741,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
         notifId = await scheduleReminderNotification(
           { ...existing, isCompleted: false },
           get().settings.notificationsEnabled,
-          get().settings.alarmRepeatCount || 3
+          get().settings.alarmRepeatCount || 1
         );
       }
 
@@ -1080,7 +1083,7 @@ export const useVaultStore = create<VaultState>((set, get) => ({
     // Reschedule active reminders if notifications are enabled
     if (get().settings.notificationsEnabled) {
       const hydratedReminders = get().reminders;
-      const repeatCount = get().settings.alarmRepeatCount || 3;
+      const repeatCount = get().settings.alarmRepeatCount || 1;
       for (const rem of hydratedReminders) {
         if (!rem.isCompleted) {
           const notifId = await scheduleReminderNotification(rem, true, repeatCount);

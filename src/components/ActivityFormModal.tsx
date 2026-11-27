@@ -171,6 +171,16 @@ export const ActivityFormModal: React.FC<ActivityFormModalProps> = ({
             { backgroundColor: theme.card, borderColor: theme.border },
           ]}
         >
+          <View
+            style={{
+              width: 38,
+              height: 4,
+              borderRadius: 2,
+              alignSelf: 'center',
+              marginBottom: 10,
+              backgroundColor: isDark ? 'rgba(255,255,255,0.2)' : '#CBD5E1',
+            }}
+          />
           <View style={styles.headerRow}>
             <Text style={[styles.headerTitle, { color: theme.textPrimary }]}>
               {editingActivity ? 'Edit Habit' : 'Log Habit'}
