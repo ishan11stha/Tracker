@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import {
   Alert,
   Modal,
@@ -61,7 +62,14 @@ export default function SavingsGoalsScreen() {
     savingsGoals,
     contributeToSavingsGoal,
     removeSavingsGoal,
-  } = useVaultStore();
+  } = useVaultStore(
+    useShallow((s) => ({
+      settings: s.settings,
+      savingsGoals: s.savingsGoals,
+      contributeToSavingsGoal: s.contributeToSavingsGoal,
+      removeSavingsGoal: s.removeSavingsGoal,
+    }))
+  );
   const isDark = settings.theme === 'dark';
   const privateMode = Boolean(settings.privateMode);
   const theme = getThemeColors(isDark);

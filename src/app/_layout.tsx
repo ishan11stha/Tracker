@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -7,6 +7,7 @@ import {
   SafeAreaProvider,
   initialWindowMetrics,
 } from 'react-native-safe-area-context';
+import { useShallow } from 'zustand/react/shallow';
 import { useVaultStore } from '../store/useVaultStore';
 import { getThemeColors } from '../theme/colors';
 import { AppErrorBoundary } from '../components/AppErrorBoundary';
@@ -14,9 +15,17 @@ import { AppErrorBoundary } from '../components/AppErrorBoundary';
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
-  const { isHydrated, hydrateFromDB, settings, error, clearError } =
-    useVaultStore();
-  const isDark = settings.theme === 'dark';
+  const { isHydrated, hydrateFromDB, themeMode, error, clearError } =
+    useVaultStore(
+      useShallow((s) => ({
+        isHydrated: s.isHydrated,
+        hydrateFromDB: s.hydrateFromDB,
+        themeMode: s.settings.theme,
+        error: s.error,
+        clearError: s.clearError,
+      }))
+    );
+  const isDark = themeMode === 'dark';
   const theme = getThemeColors(isDark);
 
   useEffect(() => {

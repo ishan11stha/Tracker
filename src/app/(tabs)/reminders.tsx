@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import {
   Alert,
   ScrollView,
@@ -54,7 +55,14 @@ export default function RemindersScreen() {
     reminders,
     toggleReminderCompleted,
     removeReminder,
-  } = useVaultStore();
+  } = useVaultStore(
+    useShallow((s) => ({
+      settings: s.settings,
+      reminders: s.reminders,
+      toggleReminderCompleted: s.toggleReminderCompleted,
+      removeReminder: s.removeReminder,
+    }))
+  );
   const isDark = settings.theme === 'dark';
   const theme = getThemeColors(isDark);
   const palette = getSectionPalette('reminders', isDark);

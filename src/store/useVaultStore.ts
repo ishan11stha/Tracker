@@ -30,12 +30,10 @@ import {
 } from '../db/database';
 import {
   Account,
-  AccountScope,
   ActivityRecord,
   AppSettings,
   ItemHistoryLog,
   ParsedQuickInput,
-  PaymentMethod,
   PersonalItem,
   ReminderItem,
   SavingsGoal,
@@ -397,14 +395,16 @@ export const useVaultStore = create<VaultState>((set, get) => ({
   },
 
   removeTransaction: async (id) => {
+    const prev = get().transactions;
+    set({
+      transactions: prev.filter((t) => t.id !== id),
+      error: null,
+    });
     try {
       await dbDeleteTransaction(id);
-      set((state) => ({
-        transactions: state.transactions.filter((t) => t.id !== id),
-        error: null,
-      }));
     } catch (err) {
       set({
+        transactions: prev,
         error:
           err instanceof Error ? err.message : 'Failed to delete transaction',
       });
@@ -474,17 +474,21 @@ export const useVaultStore = create<VaultState>((set, get) => ({
   },
 
   removeItem: async (id) => {
-    const existing = get().items.find((item) => item.id === id);
+    const prevItems = get().items;
+    const prevHistory = get().itemHistory;
+    const existing = prevItems.find((item) => item.id === id);
+    set({
+      items: prevItems.filter((i) => i.id !== id),
+      itemHistory: prevHistory.filter((h) => h.itemId !== id),
+      error: null,
+    });
     try {
       await dbDeleteItem(id);
       if (existing?.imageUri) deletePersistedItemImage(existing.imageUri);
-      set((state) => ({
-        items: state.items.filter((i) => i.id !== id),
-        itemHistory: state.itemHistory.filter((h) => h.itemId !== id),
-        error: null,
-      }));
     } catch (err) {
       set({
+        items: prevItems,
+        itemHistory: prevHistory,
         error: err instanceof Error ? err.message : 'Failed to delete item',
       });
     }
@@ -590,14 +594,16 @@ export const useVaultStore = create<VaultState>((set, get) => ({
   },
 
   removeActivity: async (id) => {
+    const prev = get().activities;
+    set({
+      activities: prev.filter((a) => a.id !== id),
+      error: null,
+    });
     try {
       await dbDeleteActivity(id);
-      set((state) => ({
-        activities: state.activities.filter((a) => a.id !== id),
-        error: null,
-      }));
     } catch (err) {
       set({
+        activities: prev,
         error:
           err instanceof Error ? err.message : 'Failed to delete activity',
       });
@@ -755,18 +761,20 @@ export const useVaultStore = create<VaultState>((set, get) => ({
   },
 
   removeReminder: async (id) => {
-    const existing = get().reminders.find((r) => r.id === id);
+    const prev = get().reminders;
+    const existing = prev.find((r) => r.id === id);
+    set({
+      reminders: prev.filter((r) => r.id !== id),
+      error: null,
+    });
     try {
       if (existing?.notificationId) {
         await cancelReminderNotification(existing.notificationId);
       }
       await dbDeleteReminder(id);
-      set((state) => ({
-        reminders: state.reminders.filter((r) => r.id !== id),
-        error: null,
-      }));
     } catch (err) {
       set({
+        reminders: prev,
         error:
           err instanceof Error ? err.message : 'Failed to delete reminder',
       });
@@ -854,14 +862,16 @@ export const useVaultStore = create<VaultState>((set, get) => ({
   },
 
   removeSavingsGoal: async (id) => {
+    const prev = get().savingsGoals;
+    set({
+      savingsGoals: prev.filter((g) => g.id !== id),
+      error: null,
+    });
     try {
       await dbDeleteSavingsGoal(id);
-      set((state) => ({
-        savingsGoals: state.savingsGoals.filter((g) => g.id !== id),
-        error: null,
-      }));
     } catch (err) {
       set({
+        savingsGoals: prev,
         error:
           err instanceof Error ? err.message : 'Failed to delete savings goal',
       });

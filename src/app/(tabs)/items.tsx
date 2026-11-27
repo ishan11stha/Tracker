@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import {
   Alert,
   Image,
@@ -32,8 +33,8 @@ import { ItemFormModal } from '../../components/ItemFormModal';
 import {
   CardWithHeader,
   CurrencyDisplayer,
-} from '../../components/monekin/MonekinComponents';
-import { CategoryDonutChart } from '../../components/monekin/MonekinCharts';
+} from '../../components/finance/FinanceDisplay';
+import { CategoryDonutChart } from '../../components/finance/FinanceCharts';
 
 const STATUS_BADGE_COLORS: Record<
   ItemStatus,
@@ -47,7 +48,14 @@ const STATUS_BADGE_COLORS: Record<
 };
 
 export default function ItemTrackerScreen() {
-  const { settings, items, itemHistory, removeItem } = useVaultStore();
+  const { settings, items, itemHistory, removeItem } = useVaultStore(
+    useShallow((s) => ({
+      settings: s.settings,
+      items: s.items,
+      itemHistory: s.itemHistory,
+      removeItem: s.removeItem,
+    }))
+  );
   const isDark = settings.theme === 'dark';
   const privateMode = Boolean(settings.privateMode);
   const theme = getThemeColors(isDark);

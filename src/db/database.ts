@@ -289,7 +289,6 @@ export async function dbResetAllUserData(): Promise<void> {
     await db.runAsync(`DELETE FROM activities`);
     await db.runAsync(`DELETE FROM reminders`);
     await db.runAsync(`DELETE FROM savings_goals`);
-    await db.runAsync(`DELETE FROM savings_goals`);
     await db.runAsync(`DELETE FROM accounts`);
     await seedDefaultAccounts(db);
     await db.runAsync(

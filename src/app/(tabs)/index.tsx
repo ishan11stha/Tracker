@@ -44,7 +44,8 @@ import { ItemFormModal } from '../../components/ItemFormModal';
 import { ActivityFormModal } from '../../components/ActivityFormModal';
 import { ReminderFormModal } from '../../components/ReminderFormModal';
 import { NepaliCalendarModal } from '../../components/NepaliCalendarModal';
-import { CurrencyDisplayer } from '../../components/monekin/MonekinComponents';
+import { useShallow } from 'zustand/react/shallow';
+import { CurrencyDisplayer } from '../../components/finance/FinanceDisplay';
 import {
   TransactionType,
   isActivityCompletedOnDate,
@@ -110,7 +111,20 @@ export default function DashboardScreen() {
     savingsGoals,
     toggleReminderCompleted,
     toggleActivityStatus,
-  } = useVaultStore();
+  } = useVaultStore(
+    useShallow((s) => ({
+      settings: s.settings,
+      updateSettings: s.updateSettings,
+      accounts: s.accounts,
+      transactions: s.transactions,
+      items: s.items,
+      activities: s.activities,
+      reminders: s.reminders,
+      savingsGoals: s.savingsGoals,
+      toggleReminderCompleted: s.toggleReminderCompleted,
+      toggleActivityStatus: s.toggleActivityStatus,
+    }))
+  );
 
   const isDark = settings.theme === 'dark';
   const privateMode = Boolean(settings.privateMode);

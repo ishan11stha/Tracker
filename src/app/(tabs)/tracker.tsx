@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import {
   Alert,
   ScrollView,
@@ -43,7 +44,14 @@ export default function ActivityTrackerScreen() {
     activities,
     toggleActivityStatus,
     removeActivity,
-  } = useVaultStore();
+  } = useVaultStore(
+    useShallow((s) => ({
+      settings: s.settings,
+      activities: s.activities,
+      toggleActivityStatus: s.toggleActivityStatus,
+      removeActivity: s.removeActivity,
+    }))
+  );
   const isDark = settings.theme === 'dark';
   const theme = getThemeColors(isDark);
   const palette = getSectionPalette('tracker', isDark);

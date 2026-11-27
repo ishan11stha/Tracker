@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Alert,
   ScrollView,
@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useShallow } from 'zustand/react/shallow';
 import {
   ArrowDownLeft,
   ArrowUpDown,
@@ -40,11 +41,11 @@ import {
   CardWithHeader,
   CurrencyDisplayer,
   TrendingValueChip,
-} from '../../components/monekin/MonekinComponents';
+} from '../../components/finance/FinanceDisplay';
 import {
   CategoryDonutChart,
   ScopeDistributionChart,
-} from '../../components/monekin/MonekinCharts';
+} from '../../components/finance/FinanceCharts';
 
 type TimeRangeKey = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'all';
 type SortOption =
@@ -71,7 +72,16 @@ export default function MoneyManagerScreen() {
     transactions,
     savingsGoals,
     removeTransaction,
-  } = useVaultStore();
+  } = useVaultStore(
+    useShallow((s) => ({
+      settings: s.settings,
+      updateSettings: s.updateSettings,
+      accounts: s.accounts,
+      transactions: s.transactions,
+      savingsGoals: s.savingsGoals,
+      removeTransaction: s.removeTransaction,
+    }))
+  );
   const isDark = settings.theme === 'dark';
   const privateMode = Boolean(settings.privateMode);
   const theme = getThemeColors(isDark);
