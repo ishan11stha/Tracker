@@ -47,6 +47,7 @@ import {
   transactionSchema,
 } from '../types';
 import {
+  cancelAllScheduledReminderNotifications,
   cancelReminderNotification,
   requestNotificationPermissions,
   scheduleReminderNotification,
@@ -127,7 +128,7 @@ interface VaultState {
     id: string,
     data: Omit<ReminderItem, 'id' | 'isCompleted' | 'notificationId' | 'createdAt' | 'updatedAt'>
   ) => Promise<void>;
-  toggleReminderCompleted: (id: string) => Promise<void>;
+  toggleReminderCompleted: (id: string, targetDateISO?: string) => Promise<void>;
   removeReminder: (id: string) => Promise<void>;
 
   // Savings Goals
@@ -208,15 +209,25 @@ export const useVaultStore = create<VaultState>((set, get) => ({
       if (settings.notificationsEnabled && reminders.some((r) => !r.isCompleted)) {
         const repeatCount = settings.alarmRepeatCount || 3;
         void (async () => {
+          await cancelAllScheduledReminderNotifications();
+          const refreshed: ReminderItem[] = [];
           for (const rem of reminders) {
-            if (!rem.isCompleted && (rem.recurrence !== 'none' || !rem.notificationId)) {
-              const newNotifId = await scheduleReminderNotification(rem, true, repeatCount);
-              if (newNotifId && newNotifId !== rem.notificationId) {
-                const updated = { ...rem, notificationId: newNotifId };
+            if (!rem.isCompleted) {
+              const newNotifId = await scheduleReminderNotification(
+                { ...rem, notificationId: '' },
+                true,
+                repeatCount
+              );
+              const updated = { ...rem, notificationId: newNotifId };
+              if (newNotifId !== (rem.notificationId || '')) {
                 await dbUpdateReminder(updated);
               }
+              refreshed.push(updated);
+            } else {
+              refreshed.push(rem);
             }
           }
+          set({ reminders: refreshed });
         })();
       }
     } catch (err) {
@@ -259,6 +270,8 @@ export const useVaultStore = create<VaultState>((set, get) => ({
     if (notifToggled || (repeatChanged && nextSettings.notificationsEnabled)) {
       try {
         const repeatCount = nextSettings.alarmRepeatCount || 3;
+        // Wipe all existing scheduled notifications first so stale bursts from previous settings never linger
+        await cancelAllScheduledReminderNotifications();
         if (nextSettings.notificationsEnabled) {
           await requestNotificationPermissions(repeatCount);
         }
@@ -271,15 +284,12 @@ export const useVaultStore = create<VaultState>((set, get) => ({
             continue;
           }
           if (!nextSettings.notificationsEnabled) {
-            if (rem.notificationId) {
-              await cancelReminderNotification(rem.notificationId);
-            }
             const cleared = { ...rem, notificationId: '' };
             await dbUpdateReminder(cleared);
             updatedReminders.push(cleared);
           } else {
             const newNotifId = await scheduleReminderNotification(
-              rem,
+              { ...rem, notificationId: '' },
               true,
               repeatCount
             );
@@ -664,14 +674,42 @@ export const useVaultStore = create<VaultState>((set, get) => ({
     }
   },
 
-  toggleReminderCompleted: async (id) => {
+  toggleReminderCompleted: async (id, targetDateISO) => {
     const existing = get().reminders.find((r) => r.id === id);
     if (!existing) return;
 
-    const nextCompleted = !existing.isCompleted;
-    let notifId = existing.notificationId || '';
+    const isRepeating = Boolean(existing.recurrence && existing.recurrence !== 'none');
 
     try {
+      if (isRepeating) {
+        // Repeating reminders (Daily / Weekdays / Weekly / Monthly) stay active in Upcoming
+        // and only record today's check-off in `completedDates` instead of moving to Done forever.
+        const dateKey = targetDateISO || getNowInNPT().isoDate;
+        const currentDates = Array.isArray(existing.completedDates)
+          ? existing.completedDates
+          : [];
+        const alreadyDoneToday = currentDates.includes(dateKey);
+        const nextDates = alreadyDoneToday
+          ? currentDates.filter((d) => d !== dateKey)
+          : [...currentDates, dateKey];
+
+        const updated: ReminderItem = {
+          ...existing,
+          isCompleted: false,
+          completedDates: nextDates,
+          updatedAt: new Date().toISOString(),
+        };
+        await dbUpdateReminder(updated);
+        set((state) => ({
+          reminders: state.reminders.map((r) => (r.id === id ? updated : r)),
+          error: null,
+        }));
+        return;
+      }
+
+      const nextCompleted = !existing.isCompleted;
+      let notifId = existing.notificationId || '';
+
       if (nextCompleted && notifId) {
         await cancelReminderNotification(notifId);
         notifId = '';

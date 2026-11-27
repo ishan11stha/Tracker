@@ -79,7 +79,8 @@
             "backgroundColor": "#0B0F19"
           }
         }
-      ]
+      ],
+      "expo-speech-recognition"
     ],
     "extra": {
       "eas": {

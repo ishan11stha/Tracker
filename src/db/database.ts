@@ -170,6 +170,7 @@ async function initializeSchema(db: SQLite.SQLiteDatabase): Promise<void> {
       recurrence TEXT NOT NULL DEFAULT 'none',
       alertMode TEXT NOT NULL DEFAULT 'both',
       isCompleted INTEGER NOT NULL DEFAULT 0,
+      completedDates TEXT DEFAULT '[]',
       notificationId TEXT DEFAULT '',
       createdAt TEXT NOT NULL,
       updatedAt TEXT NOT NULL
@@ -214,6 +215,11 @@ async function initializeSchema(db: SQLite.SQLiteDatabase): Promise<void> {
   }
   try {
     await db.execAsync(`ALTER TABLE reminders ADD COLUMN alertMode TEXT DEFAULT 'both';`);
+  } catch {
+    // Column already exists
+  }
+  try {
+    await db.execAsync(`ALTER TABLE reminders ADD COLUMN completedDates TEXT DEFAULT '[]';`);
   } catch {
     // Column already exists
   }
@@ -596,8 +602,9 @@ export async function dbDeleteActivity(id: string): Promise<void> {
 }
 
 // Reminders CRUD
-interface ReminderRow extends Omit<ReminderItem, 'isCompleted'> {
+interface ReminderRow extends Omit<ReminderItem, 'isCompleted' | 'completedDates'> {
   isCompleted: number;
+  completedDates?: string;
 }
 
 export async function dbGetAllReminders(): Promise<ReminderItem[]> {
@@ -605,19 +612,31 @@ export async function dbGetAllReminders(): Promise<ReminderItem[]> {
   const rows = await db.getAllAsync<ReminderRow>(
     `SELECT * FROM reminders ORDER BY dateISO ASC, timeString ASC`
   );
-  return rows.map((r) => ({
-    ...r,
-    alertMode: r.alertMode || 'both',
-    isCompleted: Boolean(r.isCompleted),
-  }));
+  return rows.map((r) => {
+    let parsedDates: string[] = [];
+    if (r.completedDates) {
+      try {
+        const arr = JSON.parse(r.completedDates);
+        if (Array.isArray(arr)) parsedDates = arr.filter((d) => typeof d === 'string');
+      } catch {
+        parsedDates = [];
+      }
+    }
+    return {
+      ...r,
+      alertMode: r.alertMode || 'both',
+      isCompleted: Boolean(r.isCompleted),
+      completedDates: parsedDates,
+    };
+  });
 }
 
 export async function dbInsertReminder(reminder: ReminderItem): Promise<void> {
   const db = await getDatabase();
   await db.withTransactionAsync(async () => {
     await db.runAsync(
-      `INSERT INTO reminders (id, title, description, dateISO, timeString, priority, category, recurrence, alertMode, isCompleted, notificationId, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO reminders (id, title, description, dateISO, timeString, priority, category, recurrence, alertMode, isCompleted, completedDates, notificationId, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         reminder.id,
         reminder.title,
@@ -629,6 +648,7 @@ export async function dbInsertReminder(reminder: ReminderItem): Promise<void> {
         reminder.recurrence,
         reminder.alertMode || 'both',
         reminder.isCompleted ? 1 : 0,
+        JSON.stringify(reminder.completedDates || []),
         reminder.notificationId || '',
         reminder.createdAt,
         reminder.updatedAt,
@@ -642,7 +662,7 @@ export async function dbUpdateReminder(reminder: ReminderItem): Promise<void> {
   await db.withTransactionAsync(async () => {
     await db.runAsync(
       `UPDATE reminders
-       SET title = ?, description = ?, dateISO = ?, timeString = ?, priority = ?, category = ?, recurrence = ?, alertMode = ?, isCompleted = ?, notificationId = ?, updatedAt = ?
+       SET title = ?, description = ?, dateISO = ?, timeString = ?, priority = ?, category = ?, recurrence = ?, alertMode = ?, isCompleted = ?, completedDates = ?, notificationId = ?, updatedAt = ?
        WHERE id = ?`,
       [
         reminder.title,
@@ -654,6 +674,7 @@ export async function dbUpdateReminder(reminder: ReminderItem): Promise<void> {
         reminder.recurrence,
         reminder.alertMode || 'both',
         reminder.isCompleted ? 1 : 0,
+        JSON.stringify(reminder.completedDates || []),
         reminder.notificationId || '',
         reminder.updatedAt,
         reminder.id,

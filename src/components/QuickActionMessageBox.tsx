@@ -13,10 +13,16 @@ import {
 import {
   ArrowUp,
   CheckCircle2,
+  Mic,
   RotateCcw,
   Sparkles,
+  Square,
   X,
 } from 'lucide-react-native';
+import {
+  ExpoSpeechRecognitionModule,
+  useSpeechRecognitionEvent,
+} from 'expo-speech-recognition';
 import { useVaultStore } from '../store/useVaultStore';
 import { getThemeColors } from '../theme/colors';
 
@@ -32,15 +38,22 @@ export function QuickActionMessageBox({
 
   const [inputVal, setInputVal] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const [feedback, setFeedback] = useState<{
     message: string;
     undo?: () => Promise<void>;
   } | null>(null);
   const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestTranscriptRef = useRef('');
 
   useEffect(
     () => () => {
       if (feedbackTimer.current) clearTimeout(feedbackTimer.current);
+      try {
+        ExpoSpeechRecognitionModule.abort();
+      } catch {
+        // Ignore if speech module is not active
+      }
     },
     []
   );
@@ -83,6 +96,77 @@ export function QuickActionMessageBox({
     },
     [inputVal, isProcessing, processQuickCommand]
   );
+
+  useSpeechRecognitionEvent('start', () => {
+    latestTranscriptRef.current = '';
+    setIsListening(true);
+  });
+
+  useSpeechRecognitionEvent('end', () => {
+    setIsListening(false);
+  });
+
+  useSpeechRecognitionEvent('result', (event) => {
+    const transcript = event.results?.[0]?.transcript?.trim() || '';
+    if (!transcript) return;
+    latestTranscriptRef.current = transcript;
+    setInputVal(transcript);
+
+    if (event.isFinal) {
+      setIsListening(false);
+      void handleSubmit(transcript);
+    }
+  });
+
+  useSpeechRecognitionEvent('error', (event) => {
+    setIsListening(false);
+    if (event.error === 'no-speech' || event.error === 'aborted') {
+      return;
+    }
+    Alert.alert(
+      'Voice Input Unavailable',
+      event.message || 'Could not recognize speech. Please try again.'
+    );
+  });
+
+  const handleToggleMic = useCallback(async () => {
+    if (isProcessing) return;
+
+    if (isListening) {
+      try {
+        ExpoSpeechRecognitionModule.stop();
+      } catch {
+        setIsListening(false);
+      }
+      return;
+    }
+
+    Keyboard.dismiss();
+
+    try {
+      const perm = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert(
+          'Microphone Permission Needed',
+          'Allow microphone access in Android Settings to use voice quick input.'
+        );
+        return;
+      }
+
+      ExpoSpeechRecognitionModule.start({
+        lang: 'en-US',
+        interimResults: true,
+        maxAlternatives: 1,
+        continuous: false,
+      });
+    } catch {
+      setIsListening(false);
+      Alert.alert(
+        'Voice Input Requires Android Build',
+        'Voice recognition uses Android native speech services. Rebuild the APK to activate the microphone.'
+      );
+    }
+  }, [isListening, isProcessing]);
 
   const handleUndo = useCallback(async () => {
     if (!feedback?.undo) return;
@@ -164,7 +248,7 @@ export function QuickActionMessageBox({
           styles.inputRow,
           {
             backgroundColor: theme.card,
-            borderColor: theme.border,
+            borderColor: isListening ? '#EF4444' : theme.border,
           },
         ]}
       >
@@ -172,21 +256,30 @@ export function QuickActionMessageBox({
           style={[
             styles.sparkleBadge,
             {
-              backgroundColor: isDark
-                ? 'rgba(56, 189, 248, 0.16)'
-                : '#F1F5F9',
+              backgroundColor: isListening
+                ? 'rgba(239, 68, 68, 0.14)'
+                : isDark
+                  ? 'rgba(56, 189, 248, 0.16)'
+                  : '#F1F5F9',
             },
           ]}
         >
-          <Sparkles size={15} color={isDark ? '#38BDF8' : '#0F172A'} />
+          <Sparkles
+            size={15}
+            color={isListening ? '#EF4444' : isDark ? '#38BDF8' : '#0F172A'}
+          />
         </View>
 
         <TextInput
           style={[styles.textInput, { color: theme.textPrimary }]}
           value={inputVal}
           onChangeText={setInputVal}
-          placeholder="Quick type: coffee 150, 5km run, remind 6pm..."
-          placeholderTextColor={theme.textMuted}
+          placeholder={
+            isListening
+              ? 'Listening... say "coffee 150" or "remind 6pm"'
+              : 'Type or speak: coffee 150, 5km run, remind 6pm...'
+          }
+          placeholderTextColor={isListening ? '#EF4444' : theme.textMuted}
           accessibilityLabel="Quick add command"
           returnKeyType="send"
           onSubmitEditing={() => handleSubmit()}
@@ -195,15 +288,41 @@ export function QuickActionMessageBox({
           editable={!isProcessing}
         />
 
-        {inputVal.length > 0 && (
+        {inputVal.length > 0 && !isListening && (
           <TouchableOpacity
             onPress={() => setInputVal('')}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            style={{ marginRight: 4 }}
+            style={{ marginRight: 2 }}
           >
             <X size={15} color={theme.textMuted} />
           </TouchableOpacity>
         )}
+
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={handleToggleMic}
+          disabled={isProcessing}
+          accessibilityRole="button"
+          accessibilityLabel={
+            isListening ? 'Stop voice input' : 'Start voice input'
+          }
+          style={[
+            styles.micButton,
+            {
+              backgroundColor: isListening
+                ? '#EF4444'
+                : isDark
+                  ? 'rgba(56, 189, 248, 0.14)'
+                  : '#F1F5F9',
+            },
+          ]}
+        >
+          {isListening ? (
+            <Square size={12} color="#FFFFFF" fill="#FFFFFF" />
+          ) : (
+            <Mic size={15} color={isDark ? '#38BDF8' : '#0F172A'} />
+          )}
+        </TouchableOpacity>
 
         <TouchableOpacity
           activeOpacity={0.8}
@@ -245,7 +364,7 @@ export function QuickActionMessageBox({
 
 const styles = StyleSheet.create({
   wrap: {
-    marginBottom: 14,
+    marginBottom: 20,
   },
   feedbackBanner: {
     flexDirection: 'row',
@@ -306,10 +425,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     paddingVertical: Platform.OS === 'ios' ? 7 : 5,
   },
+  micButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   sendButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
+    width: 34,
+    height: 34,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
   },

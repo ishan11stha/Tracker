@@ -287,9 +287,29 @@ export interface ReminderItem {
   recurrence: ReminderRecurrence;
   alertMode?: ReminderAlertMode;
   isCompleted: boolean;
+  completedDates?: string[]; // ISO dates completed for repeating reminders
   notificationId?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * Returns whether a reminder is completed on a given date.
+ * - One-time reminders (`recurrence === 'none'`) use `isCompleted`.
+ * - Repeating reminders (`daily`, `weekdays`, `weekly`, `monthly`, etc.) track per-day
+ *   check-offs in `completedDates` so they stay active for future days instead of
+ *   disappearing permanently into the Done tab.
+ */
+export function isReminderCompletedOnDate(
+  reminder: ReminderItem,
+  dateISO: string
+): boolean {
+  if (!reminder.recurrence || reminder.recurrence === 'none') {
+    return Boolean(reminder.isCompleted);
+  }
+  return Array.isArray(reminder.completedDates)
+    ? reminder.completedDates.includes(dateISO)
+    : false;
 }
 
 export const reminderSchema = z.object({

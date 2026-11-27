@@ -1,5 +1,5 @@
 import * as Notifications from 'expo-notifications';
-import { Platform, Vibration } from 'react-native';
+import { Platform } from 'react-native';
 import { ReminderAlertMode, ReminderItem } from '../types';
 import { adToBs, formatBSDateNepali } from './nepaliDate';
 import { computeNextOccurrenceDate, getNPTTargetDate } from './dateRecurrence';
@@ -10,7 +10,7 @@ export { computeNextOccurrenceDate, getNPTTargetDate };
  * Builds an Android vibration pattern with `count` strong pulses.
  * Format: [initialDelay, vibrateMs, pauseMs, vibrateMs, ...]
  */
-export function buildVibrationPattern(repeatCount = 3): number[] {
+export function buildVibrationPattern(repeatCount = 1): number[] {
   const count = Math.max(1, Math.min(10, Math.round(repeatCount)));
   const pattern: number[] = [0];
   for (let i = 0; i < count; i++) {
@@ -20,23 +20,17 @@ export function buildVibrationPattern(repeatCount = 3): number[] {
   return pattern;
 }
 
+const SINGLE_BURST_VIBRATION = buildVibrationPattern(1);
+
 try {
   Notifications.setNotificationHandler({
     handleNotification: async (notification) => {
       const data = notification.request.content.data || {};
       const alertMode =
         (data.alertMode as ReminderAlertMode | undefined) || 'both';
-      const repeatCount = Number(data.repeatCount) || 3;
 
-      // Physically vibrate on Android when notification fires in foreground
-      if (Platform.OS === 'android' && alertMode !== 'alarm') {
-        try {
-          Vibration.vibrate(buildVibrationPattern(repeatCount));
-        } catch {
-          // Ignore on devices without vibrator hardware
-        }
-      }
-
+      // Android NotificationChannel already handles sound & vibration cleanly
+      // for each scheduled burst — do not double-vibrate via Vibration.vibrate().
       return {
         shouldShowAlert: true,
         shouldPlaySound: alertMode !== 'vibrate',
@@ -52,21 +46,18 @@ try {
 
 export function getNotificationChannelId(
   alertMode: ReminderAlertMode = 'both',
-  repeatCount = 3
+  _repeatCount = 1
 ): string {
-  const safeCount = Math.max(1, Math.min(10, Math.round(repeatCount)));
-  if (alertMode === 'alarm') return 'vault-alarm-v3';
-  if (alertMode === 'vibrate') return `vault-vibrate-v3-${safeCount}x`;
-  return `vault-alarm-vibrate-v3-${safeCount}x`;
+  if (alertMode === 'alarm') return 'vault-alarm-v4';
+  if (alertMode === 'vibrate') return 'vault-vibrate-v4';
+  return 'vault-alarm-vibrate-v4';
 }
 
 export async function requestNotificationPermissions(
-  repeatCount = 3
+  _repeatCount = 1
 ): Promise<boolean> {
   try {
     if (Platform.OS === 'android') {
-      const safeCount = Math.max(1, Math.min(10, Math.round(repeatCount)));
-      const vibPattern = buildVibrationPattern(safeCount);
       const alarmAudioAttributes = {
         usage: Notifications.AndroidAudioUsage.ALARM,
         contentType: Notifications.AndroidAudioContentType.SONIFICATION,
@@ -77,7 +68,7 @@ export async function requestNotificationPermissions(
       };
 
       await Promise.all([
-        Notifications.setNotificationChannelAsync('vault-alarm-v3', {
+        Notifications.setNotificationChannelAsync('vault-alarm-v4', {
           name: 'VAULT Alarm Sound',
           importance: Notifications.AndroidImportance.MAX,
           enableVibrate: false,
@@ -88,35 +79,29 @@ export async function requestNotificationPermissions(
             Notifications.AndroidNotificationVisibility.PUBLIC,
           audioAttributes: alarmAudioAttributes,
         }),
-        Notifications.setNotificationChannelAsync(
-          `vault-vibrate-v3-${safeCount}x`,
-          {
-            name: `VAULT Vibrate (${safeCount}x)`,
-            importance: Notifications.AndroidImportance.HIGH,
-            enableVibrate: true,
-            vibrationPattern: vibPattern,
-            lightColor: '#EA580C',
-            sound: null,
-            bypassDnd: true,
-            lockscreenVisibility:
-              Notifications.AndroidNotificationVisibility.PUBLIC,
-          }
-        ),
-        Notifications.setNotificationChannelAsync(
-          `vault-alarm-vibrate-v3-${safeCount}x`,
-          {
-            name: `VAULT Alarm & Vibrate (${safeCount}x)`,
-            importance: Notifications.AndroidImportance.MAX,
-            enableVibrate: true,
-            vibrationPattern: vibPattern,
-            lightColor: '#EA580C',
-            sound: 'default',
-            bypassDnd: true,
-            lockscreenVisibility:
-              Notifications.AndroidNotificationVisibility.PUBLIC,
-            audioAttributes: alarmAudioAttributes,
-          }
-        ),
+        Notifications.setNotificationChannelAsync('vault-vibrate-v4', {
+          name: 'VAULT Vibrate',
+          importance: Notifications.AndroidImportance.HIGH,
+          enableVibrate: true,
+          vibrationPattern: SINGLE_BURST_VIBRATION,
+          lightColor: '#EA580C',
+          sound: null,
+          bypassDnd: true,
+          lockscreenVisibility:
+            Notifications.AndroidNotificationVisibility.PUBLIC,
+        }),
+        Notifications.setNotificationChannelAsync('vault-alarm-vibrate-v4', {
+          name: 'VAULT Alarm & Vibrate',
+          importance: Notifications.AndroidImportance.MAX,
+          enableVibrate: true,
+          vibrationPattern: SINGLE_BURST_VIBRATION,
+          lightColor: '#EA580C',
+          sound: 'default',
+          bypassDnd: true,
+          lockscreenVisibility:
+            Notifications.AndroidNotificationVisibility.PUBLIC,
+          audioAttributes: alarmAudioAttributes,
+        }),
       ]);
     }
 
@@ -134,8 +119,21 @@ export async function requestNotificationPermissions(
 }
 
 /**
- * Schedules `repeatCount` staggered Android alarm/vibrate alerts (spaced 5s apart)
- * so the alarm rings & vibrates the configured number of times even when locked.
+ * Cancels every pending scheduled notification so stale bursts from previous
+ * repeat-count settings can never fire unexpectedly.
+ */
+export async function cancelAllScheduledReminderNotifications(): Promise<void> {
+  try {
+    await Notifications.cancelAllScheduledNotificationsAsync();
+  } catch {
+    // Ignore on platforms where notifications are unavailable
+  }
+}
+
+/**
+ * Schedules `repeatCount` staggered Android alarm/vibrate alerts (spaced 5s apart).
+ * Each burst rings once and vibrates once, so `1x` fires strictly 1 time,
+ * `2x` fires strictly 2 times, `3x` fires strictly 3 times, etc.
  */
 export async function scheduleReminderNotification(
   reminder: ReminderItem,
@@ -174,7 +172,6 @@ export async function scheduleReminderNotification(
         : alertMode === 'vibrate'
           ? '📳 VIBRATE'
           : '⏰ ALARM & VIBRATE';
-    const vibPattern = buildVibrationPattern(safeCount);
     const channelId =
       Platform.OS === 'android'
         ? getNotificationChannelId(alertMode, safeCount)
@@ -198,7 +195,7 @@ export async function scheduleReminderNotification(
             repeatCount: safeCount,
           },
           sound: alertMode === 'vibrate' ? false : 'default',
-          vibrate: alertMode === 'alarm' ? [] : vibPattern,
+          vibrate: alertMode === 'alarm' ? [] : SINGLE_BURST_VIBRATION,
           priority: Notifications.AndroidNotificationPriority.MAX,
         },
         trigger: {
@@ -217,8 +214,7 @@ export async function scheduleReminderNotification(
 }
 
 /**
- * Fires an immediate test alert & hardware vibration matching `repeatCount`
- * so the user can test Alarm & Vibrate right on their Android phone.
+ * Fires an immediate test alert matching `repeatCount` exactly (1x = 1 alert, 3x = 3 alerts).
  */
 export async function triggerImmediateReminderAlert(
   reminder: Pick<
@@ -229,15 +225,6 @@ export async function triggerImmediateReminderAlert(
 ): Promise<void> {
   const safeCount = Math.max(1, Math.min(10, Math.round(repeatCount)));
   const alertMode: ReminderAlertMode = reminder.alertMode || 'both';
-  const vibPattern = buildVibrationPattern(safeCount);
-
-  if (Platform.OS === 'android' && alertMode !== 'alarm') {
-    try {
-      Vibration.vibrate(vibPattern);
-    } catch {
-      // Ignore if vibrator unavailable
-    }
-  }
 
   try {
     const hasPerm = await requestNotificationPermissions(safeCount);
@@ -272,7 +259,7 @@ export async function triggerImmediateReminderAlert(
             repeatCount: safeCount,
           },
           sound: alertMode === 'vibrate' ? false : 'default',
-          vibrate: alertMode === 'alarm' ? [] : vibPattern,
+          vibrate: alertMode === 'alarm' ? [] : SINGLE_BURST_VIBRATION,
           priority: Notifications.AndroidNotificationPriority.MAX,
         },
         trigger:

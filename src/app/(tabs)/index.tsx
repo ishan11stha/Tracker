@@ -49,6 +49,7 @@ import {
   TransactionType,
   isActivityCompletedOnDate,
   isActivityScheduledOnDate,
+  isReminderCompletedOnDate,
 } from '../../types';
 
 /**
@@ -159,13 +160,13 @@ export default function DashboardScreen() {
   const pendingReminders = useMemo(
     () =>
       reminders
-        .filter((r) => !r.isCompleted)
+        .filter((r) => !isReminderCompletedOnDate(r, todayISO))
         .sort((a, b) =>
           `${a.dateISO}T${a.timeString}`.localeCompare(
             `${b.dateISO}T${b.timeString}`
           )
         ),
-    [reminders]
+    [reminders, todayISO]
   );
 
   const todayReminders = useMemo(
@@ -189,7 +190,8 @@ export default function DashboardScreen() {
 
   const todayTotalTasks = todayHabits.length + todayReminders.length;
   const todayDoneTasks =
-    completedTodayCount + todayReminders.filter((r) => r.isCompleted).length;
+    completedTodayCount +
+    todayReminders.filter((r) => isReminderCompletedOnDate(r, todayISO)).length;
   const dailyProgressPct =
     todayTotalTasks > 0
       ? Math.round((todayDoneTasks / todayTotalTasks) * 100)
@@ -857,9 +859,11 @@ export default function DashboardScreen() {
               {pendingReminders.slice(0, 3).map((rem, idx) => (
                 <TouchableOpacity
                   key={rem.id}
-                  onPress={() => toggleReminderCompleted(rem.id)}
+                  onPress={() => toggleReminderCompleted(rem.id, todayISO)}
                   accessibilityRole="checkbox"
-                  accessibilityState={{ checked: rem.isCompleted }}
+                  accessibilityState={{
+                    checked: isReminderCompletedOnDate(rem, todayISO),
+                  }}
                   style={[
                     styles.listItemRow,
                     (idx < Math.min(3, pendingReminders.length) - 1 ||
@@ -979,30 +983,30 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: LAYOUT.maxContentWidth,
     alignSelf: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 34,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 42,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
-    gap: 10,
+    marginBottom: 22,
+    gap: 12,
   },
   userNameText: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '900',
-    letterSpacing: -0.4,
+    letterSpacing: -0.5,
   },
   dateStripTouch: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginTop: 4,
+    gap: 7,
+    marginTop: 5,
   },
   dateStripText: {
-    fontSize: 12,
+    fontSize: 12.5,
     fontWeight: '600',
     flexShrink: 1,
   },
@@ -1024,56 +1028,56 @@ const styles = StyleSheet.create({
   headerBtnsGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
   circleIconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 14,
+    width: 42,
+    height: 42,
+    borderRadius: 15,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   signatureCard: {
-    borderRadius: 24,
+    borderRadius: 26,
     borderWidth: 1,
-    padding: 18,
-    marginBottom: 14,
-    elevation: 4,
+    padding: 22,
+    marginBottom: 20,
+    elevation: 5,
     shadowColor: '#020617',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.16,
-    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
   },
   pulseTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 12,
-    marginBottom: 14,
+    gap: 14,
+    marginBottom: 18,
   },
   heroLabel: {
-    fontSize: 10,
+    fontSize: 10.5,
     fontWeight: '800',
-    letterSpacing: 1.1,
-    color: 'rgba(248, 250, 252, 0.58)',
+    letterSpacing: 1.2,
+    color: 'rgba(248, 250, 252, 0.56)',
   },
   pulseGreeting: {
-    fontSize: 21,
+    fontSize: 22,
     fontWeight: '900',
     color: '#FFFFFF',
     letterSpacing: -0.4,
-    marginTop: 2,
+    marginTop: 4,
   },
   pulseSubtext: {
-    fontSize: 12,
+    fontSize: 12.5,
     fontWeight: '600',
-    color: 'rgba(248, 250, 252, 0.68)',
-    marginTop: 2,
+    color: 'rgba(248, 250, 252, 0.7)',
+    marginTop: 4,
   },
   ringWrap: {
-    width: 62,
-    height: 62,
+    width: 64,
+    height: 64,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1090,48 +1094,48 @@ const styles = StyleSheet.create({
   nextUpBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 11,
+    gap: 12,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 11,
-    marginBottom: 12,
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    marginBottom: 16,
   },
   nextUpIconBox: {
-    width: 34,
-    height: 34,
-    borderRadius: 11,
+    width: 36,
+    height: 36,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
   nextUpTag: {
     fontSize: 9.5,
     fontWeight: '800',
-    letterSpacing: 0.8,
+    letterSpacing: 0.9,
   },
   nextUpTitle: {
-    fontSize: 13.5,
+    fontSize: 14,
     fontWeight: '800',
     color: '#FFFFFF',
-    marginTop: 1,
+    marginTop: 2,
   },
   nextUpMeta: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: '600',
     color: 'rgba(248, 250, 252, 0.65)',
-    marginTop: 1,
+    marginTop: 2,
   },
   heroFlowPair: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 12,
   },
   heroFlowGlass: {
     flex: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.07)',
-    borderRadius: 16,
-    paddingHorizontal: 13,
-    paddingVertical: 11,
-    gap: 4,
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    gap: 6,
   },
   flowTagRow: {
     flexDirection: 'row',
@@ -1144,87 +1148,87 @@ const styles = StyleSheet.create({
     borderRadius: 3.5,
   },
   heroFlowLabel: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: '700',
     color: 'rgba(248, 250, 252, 0.72)',
   },
   quickDockRow: {
     flexDirection: 'row',
-    gap: 10,
-    marginBottom: 12,
+    gap: 12,
+    marginBottom: 20,
   },
   quickDockBtn: {
     flex: 1,
-    height: 48,
+    height: 52,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 16,
+    borderRadius: 18,
   },
   statsStrip: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 18,
+    borderRadius: 20,
     borderWidth: 1,
-    paddingVertical: 12,
-    marginBottom: 14,
+    paddingVertical: 16,
+    marginBottom: 20,
   },
   stripCell: {
     flex: 1,
     alignItems: 'center',
-    gap: 3,
+    gap: 5,
   },
   stripDivider: {
     width: 1,
-    height: 30,
+    height: 32,
   },
   stripNum: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '900',
   },
   stripLabel: {
-    fontSize: 10.5,
+    fontSize: 11,
     fontWeight: '600',
   },
   feedCard: {
-    borderRadius: 20,
+    borderRadius: 22,
     borderWidth: 1,
-    padding: 15,
+    padding: 18,
   },
   feedHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 14,
   },
   feedTabsPill: {
     flexDirection: 'row',
-    borderRadius: 12,
-    padding: 3,
-    gap: 2,
+    borderRadius: 13,
+    padding: 4,
+    gap: 3,
   },
   feedTabBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 9,
+    paddingHorizontal: 15,
+    paddingVertical: 7,
+    borderRadius: 10,
   },
   feedTabText: {
     fontSize: 12.5,
     fontWeight: '800',
   },
   feedSeeAll: {
-    fontSize: 12,
+    fontSize: 12.5,
     fontWeight: '700',
   },
   emptyText: {
-    fontSize: 12.5,
-    paddingVertical: 18,
+    fontSize: 13,
+    paddingVertical: 22,
     textAlign: 'center',
   },
   listItemRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
-    gap: 12,
+    paddingVertical: 13,
+    gap: 13,
   },
   txnIconWrap: {
     width: 36,

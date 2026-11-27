@@ -38,7 +38,11 @@ import {
   toNepaliDigits,
 } from '../../utils/nepaliDate';
 import { useCurrentNPT } from '../../hooks/useCurrentNPT';
-import { ReminderItem, formatRecurrenceLabel } from '../../types';
+import {
+  ReminderItem,
+  formatRecurrenceLabel,
+  isReminderCompletedOnDate,
+} from '../../types';
 import { ReminderFormModal } from '../../components/ReminderFormModal';
 import { triggerImmediateReminderAlert } from '../../utils/notifications';
 
@@ -87,7 +91,8 @@ export default function RemindersScreen() {
     const completed: ReminderItem[] = [];
 
     for (const r of reminders) {
-      if (r.isCompleted) {
+      const isRepeating = Boolean(r.recurrence && r.recurrence !== 'none');
+      if (!isRepeating && r.isCompleted) {
         completed.push(r);
       } else if (isReminderOverdue(r)) {
         overdue.push(r);
@@ -429,6 +434,10 @@ export default function RemindersScreen() {
           displayedList.map((rem) => {
             const bs = adToBs(rem.dateISO);
             const overdue = isReminderOverdue(rem);
+            const isRepeating = Boolean(
+              rem.recurrence && rem.recurrence !== 'none'
+            );
+            const checkedToday = isReminderCompletedOnDate(rem, nptNow.isoDate);
             const priorityColor =
               rem.priority === 'High'
                 ? '#DC2626'
@@ -449,15 +458,17 @@ export default function RemindersScreen() {
               >
                 <View style={styles.remTopRow}>
                   <TouchableOpacity
-                    onPress={() => toggleReminderCompleted(rem.id)}
+                    onPress={() =>
+                      toggleReminderCompleted(rem.id, nptNow.isoDate)
+                    }
                     style={styles.checkWrap}
                     accessibilityRole="checkbox"
-                    accessibilityState={{ checked: rem.isCompleted }}
+                    accessibilityState={{ checked: checkedToday }}
                     accessibilityLabel={`Mark ${rem.title} as ${
-                      rem.isCompleted ? 'not completed' : 'completed'
+                      checkedToday ? 'not completed' : 'completed'
                     }`}
                   >
-                    {rem.isCompleted ? (
+                    {checkedToday ? (
                       <CheckCircle2 size={24} color="#16A34A" />
                     ) : (
                       <Circle size={24} color={palette.accent} />
@@ -471,9 +482,10 @@ export default function RemindersScreen() {
                           styles.remTitle,
                           {
                             color: theme.textPrimary,
-                            textDecorationLine: rem.isCompleted
+                            textDecorationLine: checkedToday
                               ? 'line-through'
                               : 'none',
+                            opacity: checkedToday ? 0.65 : 1,
                           },
                         ]}
                       >
@@ -581,6 +593,26 @@ export default function RemindersScreen() {
                         </Text>
                       </TouchableOpacity>
                     </View>
+
+                    {isRepeating && checkedToday && (
+                      <View
+                        style={[
+                          styles.overdueBanner,
+                          {
+                            backgroundColor: isDark
+                              ? 'rgba(16, 185, 129, 0.14)'
+                              : '#ECFDF5',
+                          },
+                        ]}
+                      >
+                        <CheckCircle2 size={12} color="#16A34A" />
+                        <Text
+                          style={[styles.overdueText, { color: '#16A34A' }]}
+                        >
+                          Done for today • Stays active for next schedule
+                        </Text>
+                      </View>
+                    )}
 
                     {overdue && (
                       <View style={styles.overdueBanner}>
