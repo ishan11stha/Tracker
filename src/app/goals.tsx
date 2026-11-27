@@ -131,6 +131,7 @@ export default function SavingsGoalsScreen() {
     >
       <ScrollView
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.scrollContent}
       >
         {/* Top Navigation Row */}
@@ -595,15 +596,15 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: LAYOUT.maxContentWidth,
     alignSelf: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 36,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 24,
   },
   topNavRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 14,
+    marginBottom: 12,
   },
   backBtn: {
     width: 40,

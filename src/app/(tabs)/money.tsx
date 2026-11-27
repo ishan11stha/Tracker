@@ -303,6 +303,7 @@ export default function MoneyManagerScreen() {
     >
       <ScrollView
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.scrollContent}
       >
         {/* Header */}
@@ -1039,15 +1040,15 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: LAYOUT.maxContentWidth,
     alignSelf: 'center',
-    paddingHorizontal: LAYOUT.horizontalPadding,
-    paddingTop: 16,
-    paddingBottom: 32,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 22,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 14,
+    marginBottom: 12,
   },
   screenTitle: {
     fontSize: 21,
@@ -1076,10 +1077,10 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   balanceHeroCard: {
-    borderRadius: 24,
-    padding: 18,
+    borderRadius: 22,
+    padding: 16,
     borderWidth: 1,
-    marginBottom: 14,
+    marginBottom: 12,
     elevation: 4,
     shadowColor: '#020617',
     shadowOffset: { width: 0, height: 6 },
@@ -1087,7 +1088,7 @@ const styles = StyleSheet.create({
     shadowRadius: 14,
   },
   heroTopRow: {
-    marginBottom: 14,
+    marginBottom: 11,
   },
   heroLabelRow: {
     flexDirection: 'row',

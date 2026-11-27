@@ -160,6 +160,7 @@ export default function RemindersScreen() {
     >
       <ScrollView
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.scrollContent}
       >
         {/* Header */}
@@ -691,15 +692,15 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: LAYOUT.maxContentWidth,
     alignSelf: 'center',
-    paddingHorizontal: 18,
-    paddingTop: 16,
-    paddingBottom: 32,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+    paddingBottom: 22,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 14,
+    marginBottom: 12,
   },
   screenTitle: {
     fontSize: 22,
@@ -724,10 +725,10 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   heroTabsCard: {
-    borderRadius: 24,
-    padding: 16,
+    borderRadius: 22,
+    padding: 14,
     borderWidth: 1,
-    marginBottom: 14,
+    marginBottom: 12,
     elevation: 4,
     shadowColor: '#020617',
     shadowOffset: { width: 0, height: 6 },
@@ -736,8 +737,8 @@ const styles = StyleSheet.create({
   },
   heroStatsRow: {
     flexDirection: 'row',
-    gap: 10,
-    marginBottom: 14,
+    gap: 9,
+    marginBottom: 11,
   },
   heroStatGlass: {
     flex: 1,
