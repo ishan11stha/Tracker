@@ -63,15 +63,62 @@ export function DailyPulseHero({
         ? `All ${todayTotalTasks} daily tasks completed`
         : `${todayDoneTasks} of ${todayTotalTasks} done today`;
 
+  const cardStyle = isDark
+    ? { backgroundColor: '#151F32', borderColor: '#26344E' }
+    : {
+        backgroundColor: '#FFFFFF',
+        borderColor: '#E2E8F0',
+        shadowOpacity: 0.07,
+      };
+
+  const labelColor = isDark ? 'rgba(248, 250, 252, 0.56)' : '#64748B';
+  const titleColor = isDark ? '#FFFFFF' : '#0F172A';
+  const subColor = isDark ? 'rgba(248, 250, 252, 0.7)' : '#475569';
+  const ringTrack = isDark ? 'rgba(255, 255, 255, 0.12)' : '#E2E8F0';
+  const ringStroke =
+    dailyProgressPct === 100
+      ? isDark
+        ? '#34D399'
+        : '#059669'
+      : isDark
+        ? '#A78BFA'
+        : '#6366F1';
+  const subSurfaceStyle = isDark
+    ? { backgroundColor: 'rgba(255, 255, 255, 0.07)', borderColor: 'transparent', borderWidth: 0 }
+    : { backgroundColor: '#F8FAFC', borderColor: '#E2E8F0', borderWidth: 1 };
+  const nextUpSurfaceStyle = isDark
+    ? { backgroundColor: 'rgba(255, 255, 255, 0.08)', borderColor: 'transparent', borderWidth: 0 }
+    : { backgroundColor: '#F1F5F9', borderColor: '#E2E8F0', borderWidth: 1 };
+  const nextUpAccent = isDark
+    ? nextUp.accent
+    : nextUp.kind === 'reminder'
+      ? '#EA580C'
+      : nextUp.kind === 'habit'
+        ? '#7C3AED'
+        : nextUp.kind === 'goal'
+          ? '#059669'
+          : '#0284C7';
+  const spentColor = isDark ? '#FFFFFF' : '#0F172A';
+  const netWorthColor = isDark ? '#38BDF8' : '#0284C7';
+  const chevronColor = isDark ? 'rgba(248, 250, 252, 0.5)' : '#64748B';
+
   return (
-    <ObsidianHeroCard isDark={isDark}>
+    <ObsidianHeroCard isDark={isDark} style={cardStyle}>
       <View style={styles.pulseTopRow}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.heroLabel}>TODAY'S PULSE</Text>
-          <Text style={styles.pulseGreeting} numberOfLines={1}>
+          <Text style={[styles.heroLabel, { color: labelColor }]}>
+            TODAY'S PULSE
+          </Text>
+          <Text
+            style={[styles.pulseGreeting, { color: titleColor }]}
+            numberOfLines={1}
+          >
             {greetingText}
           </Text>
-          <Text style={styles.pulseSubtext} numberOfLines={1}>
+          <Text
+            style={[styles.pulseSubtext, { color: subColor }]}
+            numberOfLines={1}
+          >
             {statusCopy}
           </Text>
         </View>
@@ -88,7 +135,7 @@ export function DailyPulseHero({
               cx={31}
               cy={31}
               r={RING_RADIUS}
-              stroke="rgba(255, 255, 255, 0.12)"
+              stroke={ringTrack}
               strokeWidth={5.5}
               fill="none"
             />
@@ -96,7 +143,7 @@ export function DailyPulseHero({
               cx={31}
               cy={31}
               r={RING_RADIUS}
-              stroke={dailyProgressPct === 100 ? '#34D399' : '#A78BFA'}
+              stroke={ringStroke}
               strokeWidth={5.5}
               strokeLinecap="round"
               fill="none"
@@ -109,7 +156,9 @@ export function DailyPulseHero({
             />
           </Svg>
           <View style={styles.ringCenter}>
-            <Text style={styles.ringPctText}>{dailyProgressPct}%</Text>
+            <Text style={[styles.ringPctText, { color: titleColor }]}>
+              {dailyProgressPct}%
+            </Text>
           </View>
         </TouchableOpacity>
       </View>
@@ -117,57 +166,70 @@ export function DailyPulseHero({
       <TouchableOpacity
         activeOpacity={0.82}
         onPress={onPressNextUp}
-        style={styles.nextUpBar}
+        style={[styles.nextUpBar, nextUpSurfaceStyle]}
       >
         <View
           style={[
             styles.nextUpIconBox,
-            { backgroundColor: `${nextUp.accent}24` },
+            { backgroundColor: `${nextUpAccent}1E` },
           ]}
         >
           {nextUp.kind === 'reminder' ? (
-            <Bell size={16} color={nextUp.accent} />
+            <Bell size={16} color={nextUpAccent} />
           ) : nextUp.kind === 'habit' ? (
-            <Activity size={16} color={nextUp.accent} />
+            <Activity size={16} color={nextUpAccent} />
           ) : nextUp.kind === 'goal' ? (
-            <Target size={16} color={nextUp.accent} />
+            <Target size={16} color={nextUpAccent} />
           ) : (
-            <Sparkles size={16} color={nextUp.accent} />
+            <Sparkles size={16} color={nextUpAccent} />
           )}
         </View>
 
         <View style={{ flex: 1 }}>
-          <Text style={[styles.nextUpTag, { color: nextUp.accent }]}>
+          <Text style={[styles.nextUpTag, { color: nextUpAccent }]}>
             {nextUp.tag}
           </Text>
-          <Text style={styles.nextUpTitle} numberOfLines={1}>
+          <Text
+            style={[styles.nextUpTitle, { color: titleColor }]}
+            numberOfLines={1}
+          >
             {nextUp.title}
           </Text>
-          <Text style={styles.nextUpMeta} numberOfLines={1}>
+          <Text
+            style={[styles.nextUpMeta, { color: subColor }]}
+            numberOfLines={1}
+          >
             {nextUp.meta}
           </Text>
         </View>
 
-        <ChevronRight size={17} color="rgba(248, 250, 252, 0.5)" />
+        <ChevronRight size={17} color={chevronColor} />
       </TouchableOpacity>
 
       <View style={styles.heroFlowPair}>
         <TouchableOpacity
           activeOpacity={0.8}
           onPress={onPressSpent}
-          style={styles.heroFlowGlass}
+          style={[styles.heroFlowGlass, subSurfaceStyle]}
         >
           <View style={styles.flowTagRow}>
-            <View style={[styles.flowDot, { backgroundColor: '#FB7185' }]} />
-            <Text style={styles.heroFlowLabel}>Spent Today</Text>
+            <View
+              style={[
+                styles.flowDot,
+                { backgroundColor: isDark ? '#FB7185' : '#E11D48' },
+              ]}
+            />
+            <Text style={[styles.heroFlowLabel, { color: subColor }]}>
+              Spent Today
+            </Text>
           </View>
           <CurrencyDisplayer
             amount={spentToday}
             currency={currency}
-            isDark={true}
+            isDark={isDark}
             privateMode={privateMode}
             size="md"
-            color="#FFFFFF"
+            color={spentColor}
             compact={spentToday >= 1000000}
           />
         </TouchableOpacity>
@@ -175,19 +237,21 @@ export function DailyPulseHero({
         <TouchableOpacity
           activeOpacity={0.8}
           onPress={onPressNetWorth}
-          style={styles.heroFlowGlass}
+          style={[styles.heroFlowGlass, subSurfaceStyle]}
         >
           <View style={styles.flowTagRow}>
-            <View style={[styles.flowDot, { backgroundColor: '#38BDF8' }]} />
-            <Text style={styles.heroFlowLabel}>Net Worth</Text>
+            <View style={[styles.flowDot, { backgroundColor: netWorthColor }]} />
+            <Text style={[styles.heroFlowLabel, { color: subColor }]}>
+              Net Worth
+            </Text>
           </View>
           <CurrencyDisplayer
             amount={totalNetWorth}
             currency={currency}
-            isDark={true}
+            isDark={isDark}
             privateMode={privateMode}
             size="md"
-            color="#38BDF8"
+            color={netWorthColor}
             compact={totalNetWorth >= 1000000}
           />
         </TouchableOpacity>
