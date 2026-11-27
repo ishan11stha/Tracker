@@ -19,12 +19,43 @@ import {
   Square,
   X,
 } from 'lucide-react-native';
-import {
-  ExpoSpeechRecognitionModule,
-  useSpeechRecognitionEvent,
+import { requireOptionalNativeModule } from 'expo';
+import type {
+  ExpoSpeechRecognitionErrorEvent,
+  ExpoSpeechRecognitionResultEvent,
 } from 'expo-speech-recognition';
 import { useVaultStore } from '../store/useVaultStore';
 import { getThemeColors } from '../theme/colors';
+
+type SpeechRecognitionNativeModule = {
+  addListener?: (
+    eventName: string,
+    listener: (event: any) => void
+  ) => { remove: () => void };
+  requestPermissionsAsync: () => Promise<{ granted: boolean }>;
+  start: (options: {
+    lang?: string;
+    interimResults?: boolean;
+    maxAlternatives?: number;
+    continuous?: boolean;
+  }) => void;
+  stop: () => void;
+  abort: () => void;
+};
+
+/**
+ * Safely resolves the native ExpoSpeechRecognition module only when it is
+ * compiled into the current Android binary (returns null in Expo Go without crashing).
+ */
+function getSpeechModule(): SpeechRecognitionNativeModule | null {
+  try {
+    return requireOptionalNativeModule<SpeechRecognitionNativeModule>(
+      'ExpoSpeechRecognition'
+    );
+  } catch {
+    return null;
+  }
+}
 
 interface QuickActionMessageBoxProps {
   isDark?: boolean;
@@ -50,7 +81,7 @@ export function QuickActionMessageBox({
     () => () => {
       if (feedbackTimer.current) clearTimeout(feedbackTimer.current);
       try {
-        ExpoSpeechRecognitionModule.abort();
+        getSpeechModule()?.abort();
       } catch {
         // Ignore if speech module is not active
       }
@@ -97,44 +128,71 @@ export function QuickActionMessageBox({
     [inputVal, isProcessing, processQuickCommand]
   );
 
-  useSpeechRecognitionEvent('start', () => {
-    latestTranscriptRef.current = '';
-    setIsListening(true);
-  });
+  useEffect(() => {
+    const mod = getSpeechModule();
+    if (!mod || typeof mod.addListener !== 'function') return;
 
-  useSpeechRecognitionEvent('end', () => {
-    setIsListening(false);
-  });
+    const startSub = mod.addListener('start', () => {
+      latestTranscriptRef.current = '';
+      setIsListening(true);
+    });
 
-  useSpeechRecognitionEvent('result', (event) => {
-    const transcript = event.results?.[0]?.transcript?.trim() || '';
-    if (!transcript) return;
-    latestTranscriptRef.current = transcript;
-    setInputVal(transcript);
-
-    if (event.isFinal) {
+    const endSub = mod.addListener('end', () => {
       setIsListening(false);
-      void handleSubmit(transcript);
-    }
-  });
+    });
 
-  useSpeechRecognitionEvent('error', (event) => {
-    setIsListening(false);
-    if (event.error === 'no-speech' || event.error === 'aborted') {
-      return;
-    }
-    Alert.alert(
-      'Voice Input Unavailable',
-      event.message || 'Could not recognize speech. Please try again.'
+    const resultSub = mod.addListener(
+      'result',
+      (event: ExpoSpeechRecognitionResultEvent) => {
+        const transcript = event.results?.[0]?.transcript?.trim() || '';
+        if (!transcript) return;
+        latestTranscriptRef.current = transcript;
+        setInputVal(transcript);
+
+        if (event.isFinal) {
+          setIsListening(false);
+          void handleSubmit(transcript);
+        }
+      }
     );
-  });
+
+    const errorSub = mod.addListener(
+      'error',
+      (event: ExpoSpeechRecognitionErrorEvent) => {
+        setIsListening(false);
+        if (event.error === 'no-speech' || event.error === 'aborted') {
+          return;
+        }
+        Alert.alert(
+          'Voice Input Unavailable',
+          event.message || 'Could not recognize speech. Please try again.'
+        );
+      }
+    );
+
+    return () => {
+      startSub?.remove?.();
+      endSub?.remove?.();
+      resultSub?.remove?.();
+      errorSub?.remove?.();
+    };
+  }, [handleSubmit]);
 
   const handleToggleMic = useCallback(async () => {
     if (isProcessing) return;
 
+    const mod = getSpeechModule();
+    if (!mod) {
+      Alert.alert(
+        'Voice Input Requires Android APK',
+        'Voice recognition uses Android native speech services, which are included in your built Android APK (not Expo Go).'
+      );
+      return;
+    }
+
     if (isListening) {
       try {
-        ExpoSpeechRecognitionModule.stop();
+        mod.stop();
       } catch {
         setIsListening(false);
       }
@@ -144,7 +202,7 @@ export function QuickActionMessageBox({
     Keyboard.dismiss();
 
     try {
-      const perm = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+      const perm = await mod.requestPermissionsAsync();
       if (!perm.granted) {
         Alert.alert(
           'Microphone Permission Needed',
@@ -153,7 +211,7 @@ export function QuickActionMessageBox({
         return;
       }
 
-      ExpoSpeechRecognitionModule.start({
+      mod.start({
         lang: 'en-US',
         interimResults: true,
         maxAlternatives: 1,
@@ -162,8 +220,8 @@ export function QuickActionMessageBox({
     } catch {
       setIsListening(false);
       Alert.alert(
-        'Voice Input Requires Android Build',
-        'Voice recognition uses Android native speech services. Rebuild the APK to activate the microphone.'
+        'Voice Input Unavailable',
+        'Could not start Android speech recognition on this device.'
       );
     }
   }, [isListening, isProcessing]);
