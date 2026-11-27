@@ -17,11 +17,11 @@ import {
   CheckCircle2,
   ChevronRight,
   Circle,
-  Eye,
-  EyeOff,
+  Moon,
   Package,
   Settings,
   Sparkles,
+  Sun,
   Target,
 } from 'lucide-react-native';
 import Svg, { Circle as SvgCircle } from 'react-native-svg';
@@ -294,9 +294,9 @@ export default function DashboardScreen() {
     setCalendarModalVisible(true);
   }, []);
 
-  const togglePrivateMode = useCallback(() => {
-    updateSettings({ privateMode: !privateMode });
-  }, [privateMode, updateSettings]);
+  const toggleTheme = useCallback(() => {
+    updateSettings({ theme: isDark ? 'light' : 'dark' });
+  }, [isDark, updateSettings]);
 
   const upcomingScheduleCount =
     pendingReminders.slice(0, 3).length + todayHabits.slice(0, 3).length;
@@ -328,19 +328,19 @@ export default function DashboardScreen() {
 
           <View style={styles.headerBtnsGroup}>
             <TouchableOpacity
-              onPress={togglePrivateMode}
+              onPress={toggleTheme}
               style={[
                 styles.circleIconBtn,
                 { backgroundColor: theme.card, borderColor: theme.border },
               ]}
               accessibilityRole="switch"
-              accessibilityLabel="Hide balances in private mode"
-              accessibilityState={{ checked: privateMode }}
+              accessibilityLabel={`Switch to ${isDark ? 'light' : 'dark'} theme`}
+              accessibilityState={{ checked: isDark }}
             >
-              {privateMode ? (
-                <EyeOff size={18} color={theme.textPrimary} />
+              {isDark ? (
+                <Sun size={18} color="#FBBF24" />
               ) : (
-                <Eye size={18} color={theme.textPrimary} />
+                <Moon size={18} color={theme.textPrimary} />
               )}
             </TouchableOpacity>
 

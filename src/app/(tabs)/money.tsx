@@ -16,6 +16,8 @@ import {
   ArrowUpRight,
   ChevronRight,
   Edit3,
+  Eye,
+  EyeOff,
   Plus,
   Search,
   Target,
@@ -62,8 +64,14 @@ const SORT_OPTIONS: { key: SortOption; label: string }[] = [
 
 export default function MoneyManagerScreen() {
   const router = useRouter();
-  const { settings, accounts, transactions, savingsGoals, removeTransaction } =
-    useVaultStore();
+  const {
+    settings,
+    updateSettings,
+    accounts,
+    transactions,
+    savingsGoals,
+    removeTransaction,
+  } = useVaultStore();
   const isDark = settings.theme === 'dark';
   const privateMode = Boolean(settings.privateMode);
   const theme = getThemeColors(isDark);
@@ -342,7 +350,23 @@ export default function MoneyManagerScreen() {
           ]}
         >
           <View style={styles.heroTopRow}>
-            <Text style={styles.heroLabel}>NET AVAILABLE BALANCE</Text>
+            <View style={styles.heroLabelRow}>
+              <Text style={styles.heroLabel}>NET AVAILABLE BALANCE</Text>
+              <TouchableOpacity
+                onPress={() => updateSettings({ privateMode: !privateMode })}
+                activeOpacity={0.78}
+                accessibilityRole="switch"
+                accessibilityLabel="Hide balances in private mode"
+                accessibilityState={{ checked: privateMode }}
+                style={styles.heroEyeBtn}
+              >
+                {privateMode ? (
+                  <EyeOff size={15} color="#FFFFFF" />
+                ) : (
+                  <Eye size={15} color="rgba(248, 250, 252, 0.85)" />
+                )}
+              </TouchableOpacity>
+            </View>
             <View style={styles.heroValueLine}>
               <CurrencyDisplayer
                 amount={allTimeSummary.totalBalance}
@@ -1065,11 +1089,24 @@ const styles = StyleSheet.create({
   heroTopRow: {
     marginBottom: 14,
   },
+  heroLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  heroEyeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   heroLabel: {
     fontSize: 10.5,
     fontWeight: '800',
     letterSpacing: 0.9,
-    marginBottom: 6,
     color: 'rgba(248, 250, 252, 0.65)',
   },
   heroValueLine: {
