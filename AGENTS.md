@@ -11,6 +11,7 @@ Expo ships breaking changes every SDK release. Before writing code that touches 
 ## Verification & Commands (Windows PowerShell)
 
 - **PowerShell syntax**: Chain commands with `;` (never `&&`) and always quote paths containing `(tabs)` (e.g., `"src/app/(tabs)/index.tsx"`).
+- **Git Push Guardrail**: Never run `git push` automatically — only push to remote when the user explicitly asks to push.
 - **Do NOT run `npx expo lint`**: This project intentionally has no ESLint dependency (running it auto-installs ~238 packages).
 - **Required verification before declaring any task done**:
   ```powershell
