@@ -1,12 +1,10 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
   Activity,
@@ -15,22 +13,18 @@ import {
   Bell,
   Calendar,
   CheckCircle2,
-  ChevronRight,
   Circle,
   Moon,
   Package,
   Settings,
-  Sparkles,
   Sun,
   Target,
 } from 'lucide-react-native';
-import Svg, { Circle as SvgCircle } from 'react-native-svg';
 import {
   calculateAccountBalances,
   useVaultStore,
 } from '../../store/useVaultStore';
 import { getSectionPalette, getThemeColors } from '../../theme/colors';
-import { LAYOUT } from '../../theme/layout';
 import {
   formatDisplayDate,
   formatTimeString,
@@ -45,7 +39,8 @@ import { ActivityFormModal } from '../../components/ActivityFormModal';
 import { ReminderFormModal } from '../../components/ReminderFormModal';
 import { NepaliCalendarModal } from '../../components/NepaliCalendarModal';
 import { useShallow } from 'zustand/react/shallow';
-import { CurrencyDisplayer } from '../../components/finance/FinanceDisplay';
+import { ScreenShell } from '../../components/ui/ObsidianHero';
+import { DailyPulseHero } from '../../components/home/DailyPulseHero';
 import {
   TransactionType,
   isActivityCompletedOnDate,
@@ -316,15 +311,38 @@ export default function DashboardScreen() {
     pendingReminders.slice(0, 3).length + todayHabits.slice(0, 3).length;
 
   return (
-    <SafeAreaView
-      style={[styles.safeArea, { backgroundColor: palette.background }]}
-      edges={['top']}
+    <ScreenShell
+      backgroundColor={palette.background}
+      modals={
+        <>
+          <TransactionFormModal
+            visible={txnModalVisible}
+            initialType={txnModalType}
+            onClose={() => setTxnModalVisible(false)}
+          />
+          <ItemFormModal
+            visible={itemModalVisible}
+            onClose={() => setItemModalVisible(false)}
+          />
+          <ActivityFormModal
+            visible={activityModalVisible}
+            onClose={() => setActivityModalVisible(false)}
+          />
+          <ReminderFormModal
+            visible={reminderModalVisible}
+            onClose={() => setReminderModalVisible(false)}
+          />
+          <NepaliCalendarModal
+            visible={calendarModalVisible}
+            selectedDateISO={inspectedDateISO}
+            onSelectDate={(iso) => setInspectedDateISO(iso)}
+            onClose={() => setCalendarModalVisible(false)}
+            accentColor={palette.accent}
+            title="Nepali Calendar (पात्रो)"
+          />
+        </>
+      }
     >
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={styles.scrollContent}
-      >
         {/* 1. CLEAN TOP HEADER */}
         <View style={styles.headerRow}>
           <View style={{ flex: 1 }}>
@@ -374,154 +392,22 @@ export default function DashboardScreen() {
         </View>
 
         {/* 2. SIGNATURE OBSIDIAN DAILY PULSE COMMAND CARD */}
-        <View
-          style={[
-            styles.signatureCard,
-            {
-              backgroundColor: isDark ? '#151F32' : '#0F172A',
-              borderColor: isDark ? '#26344E' : '#1E293B',
-            },
-          ]}
-        >
-          {/* Top Row: Greeting + Live Daily Completion Ring */}
-          <View style={styles.pulseTopRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.heroLabel}>TODAY'S PULSE</Text>
-              <Text style={styles.pulseGreeting} numberOfLines={1}>
-                {greetingText}
-              </Text>
-              <Text style={styles.pulseSubtext} numberOfLines={1}>
-                {todayTotalTasks === 0
-                  ? 'No tasks scheduled today'
-                  : todayDoneTasks === todayTotalTasks
-                    ? `All ${todayTotalTasks} daily tasks completed`
-                    : `${todayDoneTasks} of ${todayTotalTasks} done today`}
-              </Text>
-            </View>
-
-            <TouchableOpacity
-              activeOpacity={0.82}
-              onPress={() => router.push('/(tabs)/tracker')}
-              style={styles.ringWrap}
-              accessibilityRole="button"
-              accessibilityLabel={`Today's completion ${dailyProgressPct} percent. Open tracker.`}
-            >
-              <Svg width={62} height={62} viewBox="0 0 62 62">
-                <SvgCircle
-                  cx={31}
-                  cy={31}
-                  r={25}
-                  stroke="rgba(255, 255, 255, 0.12)"
-                  strokeWidth={5.5}
-                  fill="none"
-                />
-                <SvgCircle
-                  cx={31}
-                  cy={31}
-                  r={25}
-                  stroke={dailyProgressPct === 100 ? '#34D399' : '#A78BFA'}
-                  strokeWidth={5.5}
-                  strokeLinecap="round"
-                  fill="none"
-                  strokeDasharray={2 * Math.PI * 25}
-                  strokeDashoffset={
-                    2 * Math.PI * 25 * (1 - dailyProgressPct / 100)
-                  }
-                  rotation={-90}
-                  origin="31, 31"
-                />
-              </Svg>
-              <View style={styles.ringCenter}>
-                <Text style={styles.ringPctText}>{dailyProgressPct}%</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-
-          {/* Center Spotlight: Interactive Next Up Bar */}
-          <TouchableOpacity
-            activeOpacity={0.82}
-            onPress={handleNextUpPress}
-            style={styles.nextUpBar}
-          >
-            <View
-              style={[
-                styles.nextUpIconBox,
-                { backgroundColor: `${nextUp.accent}24` },
-              ]}
-            >
-              {nextUp.kind === 'reminder' ? (
-                <Bell size={16} color={nextUp.accent} />
-              ) : nextUp.kind === 'habit' ? (
-                <Activity size={16} color={nextUp.accent} />
-              ) : nextUp.kind === 'goal' ? (
-                <Target size={16} color={nextUp.accent} />
-              ) : (
-                <Sparkles size={16} color={nextUp.accent} />
-              )}
-            </View>
-
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.nextUpTag, { color: nextUp.accent }]}>
-                {nextUp.tag}
-              </Text>
-              <Text style={styles.nextUpTitle} numberOfLines={1}>
-                {nextUp.title}
-              </Text>
-              <Text style={styles.nextUpMeta} numberOfLines={1}>
-                {nextUp.meta}
-              </Text>
-            </View>
-
-            <ChevronRight size={17} color="rgba(248, 250, 252, 0.5)" />
-          </TouchableOpacity>
-
-          {/* Bottom Pair: Today's Spend + Holistic Total Net Worth (Cash + Assets) */}
-          <View style={styles.heroFlowPair}>
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => router.push('/(tabs)/money')}
-              style={styles.heroFlowGlass}
-            >
-              <View style={styles.flowTagRow}>
-                <View
-                  style={[styles.flowDot, { backgroundColor: '#FB7185' }]}
-                />
-                <Text style={styles.heroFlowLabel}>Spent Today</Text>
-              </View>
-              <CurrencyDisplayer
-                amount={spentToday}
-                currency={settings.currency}
-                isDark={true}
-                privateMode={privateMode}
-                size="md"
-                color="#FFFFFF"
-                compact={spentToday >= 1000000}
-              />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => router.push('/(tabs)/items')}
-              style={styles.heroFlowGlass}
-            >
-              <View style={styles.flowTagRow}>
-                <View
-                  style={[styles.flowDot, { backgroundColor: '#38BDF8' }]}
-                />
-                <Text style={styles.heroFlowLabel}>Net Worth</Text>
-              </View>
-              <CurrencyDisplayer
-                amount={totalNetWorth}
-                currency={settings.currency}
-                isDark={true}
-                privateMode={privateMode}
-                size="md"
-                color="#38BDF8"
-                compact={totalNetWorth >= 1000000}
-              />
-            </TouchableOpacity>
-          </View>
-        </View>
+        <DailyPulseHero
+          isDark={isDark}
+          greetingText={greetingText}
+          todayTotalTasks={todayTotalTasks}
+          todayDoneTasks={todayDoneTasks}
+          dailyProgressPct={dailyProgressPct}
+          nextUp={nextUp}
+          spentToday={spentToday}
+          totalNetWorth={totalNetWorth}
+          currency={settings.currency}
+          privateMode={privateMode}
+          onPressRing={() => router.push('/(tabs)/tracker')}
+          onPressNextUp={handleNextUpPress}
+          onPressSpent={() => router.push('/(tabs)/money')}
+          onPressNetWorth={() => router.push('/(tabs)/items')}
+        />
 
         {/* 3. 5-ICON QUICK LAUNCH DOCK (Icons only) */}
         <View style={styles.quickDockRow}>
@@ -950,54 +836,11 @@ export default function DashboardScreen() {
             </>
           )}
         </View>
-      </ScrollView>
-
-      {/* Modals */}
-      <TransactionFormModal
-        visible={txnModalVisible}
-        initialType={txnModalType}
-        onClose={() => setTxnModalVisible(false)}
-      />
-
-      <ItemFormModal
-        visible={itemModalVisible}
-        onClose={() => setItemModalVisible(false)}
-      />
-
-      <ActivityFormModal
-        visible={activityModalVisible}
-        onClose={() => setActivityModalVisible(false)}
-      />
-
-      <ReminderFormModal
-        visible={reminderModalVisible}
-        onClose={() => setReminderModalVisible(false)}
-      />
-
-      <NepaliCalendarModal
-        visible={calendarModalVisible}
-        selectedDateISO={inspectedDateISO}
-        onSelectDate={(iso) => setInspectedDateISO(iso)}
-        onClose={() => setCalendarModalVisible(false)}
-        accentColor={palette.accent}
-        title="Nepali Calendar (पात्रो)"
-      />
-    </SafeAreaView>
+    </ScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-  },
-  scrollContent: {
-    width: '100%',
-    maxWidth: LAYOUT.maxContentWidth,
-    alignSelf: 'center',
-    paddingHorizontal: 14,
-    paddingTop: 10,
-    paddingBottom: 22,
-  },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1048,120 +891,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  signatureCard: {
-    borderRadius: 22,
-    borderWidth: 1,
-    padding: 16,
-    marginBottom: 12,
-    elevation: 4,
-    shadowColor: '#020617',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.16,
-    shadowRadius: 14,
-  },
-  pulseTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    marginBottom: 12,
-  },
-  heroLabel: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1.1,
-    color: 'rgba(248, 250, 252, 0.56)',
-  },
-  pulseGreeting: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: '#FFFFFF',
-    letterSpacing: -0.4,
-    marginTop: 2,
-  },
-  pulseSubtext: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: 'rgba(248, 250, 252, 0.7)',
-    marginTop: 2,
-  },
-  ringWrap: {
-    width: 60,
-    height: 60,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ringCenter: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ringPctText: {
-    fontSize: 13,
-    fontWeight: '900',
-    color: '#FFFFFF',
-  },
-  nextUpBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 15,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 11,
-  },
-  nextUpIconBox: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  nextUpTag: {
-    fontSize: 9.5,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-  },
-  nextUpTitle: {
-    fontSize: 13.5,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    marginTop: 1,
-  },
-  nextUpMeta: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: 'rgba(248, 250, 252, 0.65)',
-    marginTop: 1,
-  },
-  heroFlowPair: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  heroFlowGlass: {
-    flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.07)',
-    borderRadius: 15,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 4,
-  },
-  flowTagRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  flowDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-  },
-  heroFlowLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: 'rgba(248, 250, 252, 0.72)',
   },
   quickDockRow: {
     flexDirection: 'row',

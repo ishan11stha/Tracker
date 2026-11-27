@@ -37,6 +37,16 @@ import {
 } from '../../types';
 import { ActivityFormModal } from '../../components/ActivityFormModal';
 import { NepaliCalendarModal } from '../../components/NepaliCalendarModal';
+import {
+  HeroPillTabs,
+  ObsidianHeroCard,
+} from '../../components/ui/ObsidianHero';
+
+const TRACKER_VIEW_TABS = [
+  { key: 'daily', label: 'Daily' },
+  { key: 'weekly', label: 'Weekly' },
+  { key: 'monthly', label: 'Monthly' },
+] as const;
 
 export default function ActivityTrackerScreen() {
   const {
@@ -185,49 +195,13 @@ export default function ActivityTrackerScreen() {
         </View>
 
         {/* Signature Obsidian Overview Card: Daily/Weekly/Monthly + Date + Progress Bar */}
-        <View
-          style={[
-            styles.overviewCard,
-            {
-              backgroundColor: isDark ? '#151F32' : '#0F172A',
-              borderColor: isDark ? '#26344E' : '#1E293B',
-            },
-          ]}
-        >
-          <View style={styles.viewModeToggle}>
-            {(
-              [
-                { key: 'daily', label: 'Daily' },
-                { key: 'weekly', label: 'Weekly' },
-                { key: 'monthly', label: 'Monthly' },
-              ] as const
-            ).map((tab) => {
-              const active = viewMode === tab.key;
-              return (
-                <TouchableOpacity
-                  key={tab.key}
-                  onPress={() => setViewMode(tab.key)}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: active }}
-                  style={[
-                    styles.viewModeBtn,
-                    active && styles.viewModeBtnActive,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.viewModeText,
-                      {
-                        color: active ? '#0F172A' : 'rgba(248,250,252,0.68)',
-                      },
-                    ]}
-                  >
-                    {tab.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
+        <ObsidianHeroCard isDark={isDark}>
+          <HeroPillTabs
+            options={TRACKER_VIEW_TABS}
+            value={viewMode}
+            onChange={setViewMode}
+            style={styles.viewModeToggle}
+          />
 
           <TouchableOpacity
             onPress={() => setShowCalendar(true)}
@@ -277,7 +251,7 @@ export default function ActivityTrackerScreen() {
               />
             </View>
           </View>
-        </View>
+        </ObsidianHeroCard>
 
         {/* Simple 5-Option Category Filter Row */}
         <View style={styles.filterRow}>

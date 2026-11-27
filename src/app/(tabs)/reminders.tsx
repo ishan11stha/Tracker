@@ -46,8 +46,19 @@ import {
 } from '../../types';
 import { ReminderFormModal } from '../../components/ReminderFormModal';
 import { triggerImmediateReminderAlert } from '../../utils/notifications';
+import {
+  HeroPillTabs,
+  ObsidianHeroCard,
+} from '../../components/ui/ObsidianHero';
 
 type ReminderTabKey = 'upcoming' | 'overdue' | 'completed' | 'calendar';
+
+const REMINDER_TABS: readonly { key: ReminderTabKey; label: string }[] = [
+  { key: 'upcoming', label: 'Upcoming' },
+  { key: 'overdue', label: 'Overdue' },
+  { key: 'completed', label: 'Done' },
+  { key: 'calendar', label: 'Calendar' },
+];
 
 export default function RemindersScreen() {
   const {
@@ -197,15 +208,7 @@ export default function RemindersScreen() {
         </View>
 
         {/* Signature Obsidian Alert Summary + Tab Bar */}
-        <View
-          style={[
-            styles.heroTabsCard,
-            {
-              backgroundColor: isDark ? '#151F32' : '#0F172A',
-              borderColor: isDark ? '#26344E' : '#1E293B',
-            },
-          ]}
-        >
+        <ObsidianHeroCard isDark={isDark} style={{ padding: 14 }}>
           <View style={styles.heroStatsRow}>
             <View style={styles.heroStatGlass}>
               <Text style={[styles.heroStatNum, { color: '#FB923C' }]}>
@@ -227,44 +230,12 @@ export default function RemindersScreen() {
             </View>
           </View>
 
-          <View style={styles.tabsContainer}>
-            {(
-              [
-                { key: 'upcoming', label: 'Upcoming' },
-                { key: 'overdue', label: 'Overdue' },
-                { key: 'completed', label: 'Done' },
-                { key: 'calendar', label: 'Calendar' },
-              ] as { key: ReminderTabKey; label: string }[]
-            ).map((t) => {
-              const active = activeTab === t.key;
-              return (
-                <TouchableOpacity
-                  key={t.key}
-                  onPress={() => setActiveTab(t.key)}
-                  activeOpacity={0.75}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: active }}
-                  style={[
-                    styles.tabButton,
-                    active && styles.tabButtonActive,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.tabButtonText,
-                      {
-                        color: active ? '#0F172A' : 'rgba(248,250,252,0.7)',
-                      },
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {t.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
+          <HeroPillTabs
+            options={REMINDER_TABS}
+            value={activeTab}
+            onChange={setActiveTab}
+          />
+        </ObsidianHeroCard>
 
         {/* Interactive Embedded Nepali Calendar View when "Calendar" tab is active */}
         {activeTab === 'calendar' && (
