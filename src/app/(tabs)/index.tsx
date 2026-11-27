@@ -619,7 +619,7 @@ export default function DashboardScreen() {
         {/* 4. SINGLE-LINE SMART COMMAND BAR */}
         <QuickActionMessageBox isDark={isDark} />
 
-        {/* 5. COMPACT 4-MODULE PULSE BAR */}
+        {/* 5. COMPACT 4-MODULE PULSE BAR (Icon + Count only) */}
         <View
           style={[
             styles.statsStrip,
@@ -629,14 +629,13 @@ export default function DashboardScreen() {
           <TouchableOpacity
             activeOpacity={0.75}
             onPress={() => router.push('/goals')}
+            accessibilityRole="button"
+            accessibilityLabel={`${savingsGoals.length} savings goals`}
             style={styles.stripCell}
           >
-            <Target size={15} color="#10B981" />
+            <Target size={17} color="#10B981" />
             <Text style={[styles.stripNum, { color: theme.textPrimary }]}>
               {savingsGoals.length}
-            </Text>
-            <Text style={[styles.stripLabel, { color: theme.textMuted }]}>
-              Goals
             </Text>
           </TouchableOpacity>
 
@@ -647,14 +646,13 @@ export default function DashboardScreen() {
           <TouchableOpacity
             activeOpacity={0.75}
             onPress={() => router.push('/(tabs)/items')}
+            accessibilityRole="button"
+            accessibilityLabel={`${totalItemUnits} items`}
             style={styles.stripCell}
           >
-            <Package size={15} color="#2563EB" />
+            <Package size={17} color="#2563EB" />
             <Text style={[styles.stripNum, { color: theme.textPrimary }]}>
               {totalItemUnits}
-            </Text>
-            <Text style={[styles.stripLabel, { color: theme.textMuted }]}>
-              Items
             </Text>
           </TouchableOpacity>
 
@@ -665,14 +663,13 @@ export default function DashboardScreen() {
           <TouchableOpacity
             activeOpacity={0.75}
             onPress={() => router.push('/(tabs)/tracker')}
+            accessibilityRole="button"
+            accessibilityLabel={`${completedTodayCount} of ${todayHabits.length} habits completed today`}
             style={styles.stripCell}
           >
-            <Activity size={15} color="#7C3AED" />
+            <Activity size={17} color="#7C3AED" />
             <Text style={[styles.stripNum, { color: theme.textPrimary }]}>
               {completedTodayCount}/{todayHabits.length}
-            </Text>
-            <Text style={[styles.stripLabel, { color: theme.textMuted }]}>
-              Today
             </Text>
           </TouchableOpacity>
 
@@ -683,14 +680,13 @@ export default function DashboardScreen() {
           <TouchableOpacity
             activeOpacity={0.75}
             onPress={() => router.push('/(tabs)/reminders')}
+            accessibilityRole="button"
+            accessibilityLabel={`${pendingReminders.length} pending alerts`}
             style={styles.stripCell}
           >
-            <Bell size={15} color="#EA580C" />
+            <Bell size={17} color="#EA580C" />
             <Text style={[styles.stripNum, { color: theme.textPrimary }]}>
               {pendingReminders.length}
-            </Text>
-            <Text style={[styles.stripLabel, { color: theme.textMuted }]}>
-              Alerts
             </Text>
           </TouchableOpacity>
         </View>
@@ -1184,10 +1180,6 @@ const styles = StyleSheet.create({
   stripNum: {
     fontSize: 16,
     fontWeight: '900',
-  },
-  stripLabel: {
-    fontSize: 11,
-    fontWeight: '600',
   },
   feedCard: {
     borderRadius: 22,
