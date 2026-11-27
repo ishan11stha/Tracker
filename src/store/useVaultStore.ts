@@ -572,17 +572,20 @@ export const useVaultStore = create<VaultState>((set, get) => ({
       };
     }
 
+    // Optimistic UI update so tapping a habit feels instant (0ms)
+    set((state) => ({
+      activities: state.activities.map((a) => (a.id === id ? updated : a)),
+      error: null,
+    }));
+
     try {
       await dbUpdateActivity(updated);
-      set((state) => ({
-        activities: state.activities.map((a) => (a.id === id ? updated : a)),
-        error: null,
-      }));
     } catch (err) {
-      set({
+      set((state) => ({
+        activities: state.activities.map((a) => (a.id === id ? existing : a)),
         error:
           err instanceof Error ? err.message : 'Failed to update activity',
-      });
+      }));
     }
   },
 
@@ -699,15 +702,27 @@ export const useVaultStore = create<VaultState>((set, get) => ({
           completedDates: nextDates,
           updatedAt: new Date().toISOString(),
         };
-        await dbUpdateReminder(updated);
+        // Optimistic UI update so tapping a repeating reminder feels instant
         set((state) => ({
           reminders: state.reminders.map((r) => (r.id === id ? updated : r)),
           error: null,
         }));
+        await dbUpdateReminder(updated);
         return;
       }
 
       const nextCompleted = !existing.isCompleted;
+      const optimistic: ReminderItem = {
+        ...existing,
+        isCompleted: nextCompleted,
+        updatedAt: new Date().toISOString(),
+      };
+      // Optimistic UI update before awaiting notification/DB work
+      set((state) => ({
+        reminders: state.reminders.map((r) => (r.id === id ? optimistic : r)),
+        error: null,
+      }));
+
       let notifId = existing.notificationId || '';
 
       if (nextCompleted && notifId) {
@@ -722,10 +737,8 @@ export const useVaultStore = create<VaultState>((set, get) => ({
       }
 
       const updated: ReminderItem = {
-        ...existing,
-        isCompleted: nextCompleted,
+        ...optimistic,
         notificationId: notifId,
-        updatedAt: new Date().toISOString(),
       };
       await dbUpdateReminder(updated);
       set((state) => ({
@@ -733,10 +746,11 @@ export const useVaultStore = create<VaultState>((set, get) => ({
         error: null,
       }));
     } catch (err) {
-      set({
+      set((state) => ({
+        reminders: state.reminders.map((r) => (r.id === id ? existing : r)),
         error:
           err instanceof Error ? err.message : 'Failed to update reminder',
-      });
+      }));
     }
   },
 

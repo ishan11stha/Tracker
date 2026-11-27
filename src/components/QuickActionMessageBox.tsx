@@ -64,7 +64,7 @@ interface QuickActionMessageBoxProps {
 export function QuickActionMessageBox({
   isDark = false,
 }: QuickActionMessageBoxProps) {
-  const { processQuickCommand } = useVaultStore();
+  const processQuickCommand = useVaultStore((s) => s.processQuickCommand);
   const theme = getThemeColors(isDark);
 
   const [inputVal, setInputVal] = useState('');
@@ -422,7 +422,7 @@ export function QuickActionMessageBox({
 
 const styles = StyleSheet.create({
   wrap: {
-    marginBottom: 20,
+    marginBottom: 12,
   },
   feedbackBanner: {
     flexDirection: 'row',

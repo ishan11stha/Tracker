@@ -18,9 +18,9 @@ import { getSectionPalette, getThemeColors } from '../../theme/colors';
  * Strictly English labels (`Home`, `Money`, `Items`, `Tracker`, `Reminders`).
  */
 export default function TabsLayout() {
-  const { settings } = useVaultStore();
+  const themeMode = useVaultStore((s) => s.settings.theme);
   const insets = useSafeAreaInsets();
-  const isDark = settings.theme === 'dark';
+  const isDark = themeMode === 'dark';
   const theme = getThemeColors(isDark);
   const bottomPad = Math.max(10, insets.bottom);
 
@@ -34,6 +34,9 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
+        lazy: true,
+        freezeOnBlur: true,
+        animation: 'none',
         tabBarHideOnKeyboard: true,
         tabBarStyle: {
           backgroundColor: theme.tabBar,
